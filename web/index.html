@@ -195,17 +195,14 @@
 
     <section class="view" id="view-dashboard">
       <div class="kpis" id="kpis"></div>
-      <div class="grid-2">
-        <div class="panel"><div class="phead"><div><h3>Fatturato mensile</h3><div class="psub">Ultimi 12 mesi · incassato</div></div><div class="psub num" id="rev-ytd"></div></div><div class="bars" id="revbars"></div><div style="display:flex;justify-content:space-between;margin-top:10px" id="revx"></div></div>
+      <div class="grid-2" style="grid-template-columns:1fr 1fr">
         <div class="panel"><div class="phead"><h3>Soci per abbonamento</h3></div><div class="dist" id="distchart"></div></div>
-      </div>
-      <div class="grid-2" style="grid-template-columns:1fr 1.55fr">
         <div class="panel"><div class="phead"><h3>Stato contratti</h3></div><div class="split" id="contractsplit"></div>
           <div style="margin-top:16px"><div class="track" style="height:12px" id="contractbar"></div>
           <div class="legend"><span><i style="background:var(--good)"></i> Attivi</span><span><i style="background:var(--warn)"></i> In scadenza</span><span><i style="background:var(--bad)"></i> Scaduti</span></div></div></div>
-        <div class="panel"><div class="phead"><div><h3>In scadenza nei prossimi 30 giorni</h3><div class="psub">Da contattare per il rinnovo</div></div><button class="btn-sm" id="btn-reminders"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg> Invia promemoria</button></div>
-          <div class="scroll"><table id="expiring"><thead><tr><th>Socio</th><th>Abbonamento</th><th>Scadenza</th><th>Quota</th></tr></thead><tbody></tbody></table></div></div>
       </div>
+      <div class="panel"><div class="phead"><div><h3>In scadenza nei prossimi 30 giorni</h3><div class="psub">Da contattare per il rinnovo</div></div><button class="btn-sm" id="btn-reminders"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg> Invia promemoria</button></div>
+        <div class="scroll"><table id="expiring"><thead><tr><th>Socio</th><th>Abbonamento</th><th>Scadenza</th><th>Quota</th></tr></thead><tbody></tbody></table></div></div>
     </section>
 
     <section class="view" id="view-anagrafiche" hidden>

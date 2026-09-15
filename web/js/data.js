@@ -133,6 +133,18 @@ function loadDemo() {
       plan: planMeta(P.name, P.price, P.dur), start, end, dleft, stato: statoDa(dleft), av: AV[i % AV.length],
     });
   }
+  // porta un buon numero di soci nella finestra "in scadenza" (demo più leggibile)
+  const targetScad = 18;
+  let inScad = members.filter((m) => m.stato === 'In scadenza').length;
+  for (const m of members) {
+    if (inScad >= targetScad) break;
+    if (m.stato === 'Attivo') {
+      const end = new Date(today); end.setDate(end.getDate() + 3 + Math.floor(rnd() * 27)); // 3-29 gg
+      m.end = end; m.dleft = giorni(end, today); m.stato = 'In scadenza';
+      inScad++;
+    }
+  }
+
   // accessi
   const accessi = [];
   let t = 7 * 60 + 5;

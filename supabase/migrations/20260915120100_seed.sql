@@ -84,7 +84,13 @@ begin
             v_start);
   end loop;
 
-  -- accessi di oggi (~28) tra i soci con abbonamento non scaduto
+  -- porta ~18 abbonamenti nella finestra "in scadenza" (1-30 giorni)
+  update abbonamenti set data_scadenza = current_date + (3 + floor(random() * 27))::int, stato = 'in_scadenza'
+  where id in (
+    select id from abbonamenti where data_scadenza > current_date + 30 order by random() limit 18
+  );
+
+  -- accessi di oggi (~14) tra i soci con abbonamento non scaduto
   insert into accessi(socio_id, ingresso, esito, registrato_il)
   select s.id,
          (array['Tornello A','Tornello B','Reception'])[1 + floor(random() * 3)::int],

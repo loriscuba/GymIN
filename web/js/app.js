@@ -75,11 +75,6 @@ function renderDashboard() {
     kpi('In scadenza (30gg)', ic.alert, 'var(--warn-bg)', 'var(--warn)', scad.length, 'Da contattare per rinnovo', '', '') +
     kpi('Contratti scaduti', ic.door, 'var(--bad-bg)', 'var(--bad)', scaduti.length, 'Recuperabili con win-back', '', '');
 
-  const rmax = Math.max(...rev);
-  $('#rev-ytd').textContent = 'Totale 12 mesi: ' + euro(rev.reduce((a, b) => a + b, 0));
-  $('#revbars').innerHTML = revenue.map((r) => `<div class="barcol"><div class="bar" style="height:${(r.value / rmax * 100).toFixed(1)}%"><span class="bval">${euro(r.value)}</span></div></div>`).join('');
-  $('#revx').innerHTML = revenue.map((r) => `<span class="bx" style="flex:1;text-align:center">${r.label}</span>`).join('');
-
   const pmax = Math.max(...plans.map((p) => p.count), 1);
   $('#distchart').innerHTML = plans.map((p) => `<div class="distrow"><span class="dl">${p.name}</span><div class="track"><div class="fill" style="width:${(p.count / pmax * 100).toFixed(0)}%;background:${p.color}"></div></div><span class="dv">${p.count} soci</span></div>`).join('');
 
@@ -92,7 +87,7 @@ function renderDashboard() {
     <div style="width:${scad.length / tot * 100}%;background:var(--warn)"></div>
     <div style="width:${scaduti.length / tot * 100}%;background:var(--bad)"></div></div>`;
 
-  const exp = [...scad].sort((a, b) => a.dleft - b.dleft).slice(0, 6);
+  const exp = [...scad].sort((a, b) => a.dleft - b.dleft).slice(0, 10);
   $('#expiring tbody').innerHTML = exp.map((m) => `<tr><td>${who(m)}</td><td><span class="plan-pill">${m.plan.name}</span></td><td class="mono">${fmtDate(m.end)} <span style="color:var(--warn);font-weight:600">· ${m.dleft}gg</span></td><td class="mono">${euro(m.plan.price)}</td></tr>`).join('') || '<tr><td colspan="4" style="text-align:center;color:var(--ink-3);padding:20px">Nessuno in scadenza</td></tr>';
 }
 
