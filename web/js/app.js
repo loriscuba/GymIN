@@ -94,7 +94,8 @@ const tagFor = (s) => s === 'Attivo' ? '<span class="tag g">Attivo</span>' : s =
 const who = (m) => `<div class="who" data-member="${m.sid}" role="button" tabindex="0" data-tip="Apri scheda socio"><div class="av" style="background:${m.av}">${initials(m.nome)}</div><div><b>${m.nome}</b><span>${m.id}</span></div></div>`;
 const zapSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8z"/></svg>';
 const refreshSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v6h-6"/></svg>';
-const actionsCell = (m) => `<td><div class="actions-cell"><button class="ibtn quick" data-quickrenew="${m.sid}" data-tip="Rinnovo rapido · mantiene il piano" aria-label="Rinnovo rapido">${zapSvg}</button><button class="ibtn full" data-renew="${m.sid}" data-tip="Rinnova · scegli il piano" aria-label="Rinnova con opzioni">${refreshSvg}</button></div></td>`;
+const mailSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg>';
+const actionsCell = (m) => `<td><div class="actions-cell"><button class="ibtn remind" data-remind="${m.sid}" data-tip="Invia promemoria" aria-label="Invia promemoria">${mailSvg}</button><button class="ibtn quick" data-quickrenew="${m.sid}" data-tip="Rinnovo rapido · mantiene il piano" aria-label="Rinnovo rapido">${zapSvg}</button><button class="ibtn full" data-renew="${m.sid}" data-tip="Rinnova · scegli il piano" aria-label="Rinnova con opzioni">${refreshSvg}</button></div></td>`;
 
 function renderDashboard() {
   const { members, revenue, plans } = DATA;
@@ -210,6 +211,14 @@ function openMailPreview(i) {
   $('#mail-to').textContent = m.destinatario;
   $('#mailframe').srcdoc = m.html;
   openModal('modal-mail');
+}
+async function sendReminderTo(sid) {
+  const m = DATA.members.find((x) => x.sid === sid); if (!m) return;
+  if (!m.email) { toast('Il socio non ha un indirizzo email', 'warn'); return; }
+  const { subject, html } = templates.rinnovo(m, Math.max(0, m.dleft));
+  const mail = await sendMail({ tipo: 'rinnovo', tipoLabel: 'Rinnovo', member: m, subject, html });
+  reminded.add(m.sid);
+  toast(mail.channel === 'mailpit' ? `Promemoria inviato a Mailpit · ${m.email}` : `Promemoria generato (anteprima) · ${m.nome}`, 'mail');
 }
 async function sendReminders() {
   const list = DATA.members.filter((m) => m.stato === 'In scadenza' && m.email && !reminded.has(m.sid));
@@ -428,6 +437,7 @@ function openScheda(sid) {
     <div class="mfoot">
       <button type="button" class="btn-ghost" data-close="modal-scheda">Chiudi</button>
       <button type="button" class="btn-ghost" data-edit="${m.sid}">Modifica dati</button>
+      <button type="button" class="btn-ghost" data-remind="${m.sid}">✉ Promemoria</button>
       <button type="button" class="btn-ghost" data-renew="${m.sid}">Rinnova…</button>
       <button type="button" class="btn-primary" style="background:var(--good);box-shadow:none" data-quickrenew="${m.sid}">⚡ Rinnovo rapido</button>
     </div>`;
@@ -501,6 +511,7 @@ function wireEvents() {
   document.addEventListener('click', (e) => {
     const c = e.target.closest('[data-close]'); if (c) return closeModal(c.dataset.close);
     const ed = e.target.closest('[data-edit]'); if (ed) return openSocioModal('edit', ed.dataset.edit);
+    const rd = e.target.closest('[data-remind]'); if (rd) return sendReminderTo(rd.dataset.remind);
     const q = e.target.closest('[data-quickrenew]'); if (q) return quickRenew(q.dataset.quickrenew);
     const r = e.target.closest('[data-renew]'); if (r) return openRinnovoModal(r.dataset.renew);
     const mm = e.target.closest('[data-member]'); if (mm) return openScheda(mm.dataset.member);
