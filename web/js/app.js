@@ -11,6 +11,8 @@ let DATA = null;
 const MAILBOX = [];
 const reminded = new Set();
 const memState = { filter: 'all', query: '', page: 1, PER: 9 };
+let socioMode = 'new';
+let editSid = null;
 
 const ic = {
   euro: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 7a7 7 0 1 0 0 10M5 10h8M5 14h8"/></svg>',
@@ -194,29 +196,68 @@ async function sendReminders() {
 function openModal(id) { $('#' + id).hidden = false; document.body.style.overflow = 'hidden'; }
 function closeModal(id) { $('#' + id).hidden = true; document.body.style.overflow = ''; }
 
-function openSocioModal() {
-  $('#f-piano').innerHTML = DATA.plans.map((p) => `<option value="${p.name}">${p.name} — ${euro(p.price)} · ${p.dur} mese/i</option>`).join('');
-  $('#f-inizio').value = new Date().toISOString().slice(0, 10);
+function openSocioModal(mode = 'new', sid = null) {
+  socioMode = mode; editSid = sid;
   $('#socioform').reset();
-  $('#f-inizio').value = new Date().toISOString().slice(0, 10);
-  $('#f-consenso').checked = true;
+  $('#f-piano').innerHTML = DATA.plans.map((p) => `<option value="${p.name}">${p.name} — ${euro(p.price)} · ${p.dur} mese/i</option>`).join('');
+  const isNew = mode === 'new';
+  $('#socio-title').textContent = isNew ? 'Nuovo socio' : 'Modifica socio';
+  $('#socio-sub').textContent = isNew ? 'Anagrafica + primo abbonamento' : 'Aggiorna i dati anagrafici';
+  $('#socio-submit').textContent = isNew ? 'Aggiungi socio' : 'Salva modifiche';
+  $('#socio-abbsection').hidden = !isNew;
+  closeModal('modal-scheda');
+  if (isNew) {
+    $('#f-inizio').value = new Date().toISOString().slice(0, 10);
+    $('#f-consenso').checked = true;
+  } else {
+    const m = DATA.members.find((x) => x.sid === sid); if (!m) return;
+    const set = (id, v) => { $(id).value = v || ''; };
+    set('#f-nome', m.firstName || m.nome.split(' ')[0]);
+    set('#f-cognome', m.lastName || m.nome.split(' ').slice(1).join(' '));
+    set('#f-email', m.email); set('#f-tel', m.telefono);
+    set('#f-sesso', m.sesso); set('#f-nascita', m.dataNascita); set('#f-cf', m.cf);
+    set('#f-indirizzo', m.indirizzo); set('#f-citta', m.citta); set('#f-cap', m.cap);
+    set('#f-certificato', m.certificato); set('#f-note', m.note);
+    $('#f-consenso').checked = !!m.consenso;
+  }
   openModal('modal-socio');
   setTimeout(() => $('#f-nome').focus(), 50);
 }
+function readSocioForm() {
+  const nome = $('#f-nome').value.trim(), cognome = $('#f-cognome').value.trim();
+  return {
+    ok: !!(nome && cognome), firstName: nome, lastName: cognome, nome: `${nome} ${cognome}`,
+    email: $('#f-email').value.trim(), telefono: $('#f-tel').value.trim(),
+    sesso: $('#f-sesso').value, dataNascita: $('#f-nascita').value, cf: $('#f-cf').value.trim().toUpperCase(),
+    indirizzo: $('#f-indirizzo').value.trim(), citta: $('#f-citta').value.trim(), cap: $('#f-cap').value.trim(),
+    certificato: $('#f-certificato').value, note: $('#f-note').value.trim(), consenso: $('#f-consenso').checked,
+  };
+}
 async function submitSocio(e) {
   e.preventDefault();
-  const nome = $('#f-nome').value.trim(), cognome = $('#f-cognome').value.trim();
-  if (!nome || !cognome) return;
+  const f = readSocioForm();
+  if (!f.ok) return;
+  delete f.ok;
+
+  if (socioMode === 'edit') {
+    const m = DATA.members.find((x) => x.sid === editSid); if (!m) return;
+    Object.assign(m, f);
+    renderAll();
+    closeModal('modal-socio');
+    toast(`Dati aggiornati · ${m.nome}`);
+    openScheda(m.sid);
+    return;
+  }
+
   const plan = DATA.plans.find((p) => p.name === $('#f-piano').value);
   const start = new Date($('#f-inizio').value || Date.now());
   const end = addMonths(start, plan.dur);
   const dleft = giorniTo(end);
   const member = {
-    sid: 'new-' + Date.now(), id: nextTessera(), nome: `${nome} ${cognome}`,
-    email: ($('#f-email').value.trim() || `${nome}.${cognome}`.toLowerCase().replace(/ /g, '') + '@email.it'),
+    sid: 'new-' + Date.now(), id: nextTessera(), ...f,
+    email: f.email || `${f.firstName}.${f.lastName}`.toLowerCase().replace(/ /g, '') + '@email.it',
     plan: { name: plan.name, price: plan.price, mcost: plan.mcost, dur: plan.dur, color: plan.color },
     start, end, dleft, stato: statoDa(dleft), av: AV[DATA.members.length % AV.length],
-    consenso: $('#f-consenso').checked,
   };
   DATA.members.unshift(member);
   recomputePlans();
@@ -313,6 +354,8 @@ let schedaSid = null;
 function openScheda(sid) {
   const m = DATA.members.find((x) => x.sid === sid); if (!m) return;
   schedaSid = sid;
+  const row = (label, val) => `<div><span>${label}</span><b>${val || '—'}</b></div>`;
+  const indirizzo = [m.indirizzo, [m.cap, m.citta].filter(Boolean).join(' ')].filter(Boolean).join(', ');
   $('#modal-scheda .modal').innerHTML = `
     <div class="mhead"><div style="display:flex;align-items:center;gap:12px">
       <div class="av" style="width:46px;height:46px;background:${m.av};border-radius:50%;display:grid;place-items:center;color:#fff;font-weight:700;font-size:15px">${initials(m.nome)}</div>
@@ -321,15 +364,23 @@ function openScheda(sid) {
     <div class="mbody">
       <div style="margin-bottom:14px">${tagFor(m.stato)}</div>
       <div class="scheda-grid">
-        <div><span>Email</span><b>${m.email || '—'}</b></div>
-        <div><span>Abbonamento</span><b>${m.plan.name} · ${euro(m.plan.price)}</b></div>
-        <div><span>Iscritto il</span><b>${fmtDate(m.start)}</b></div>
-        <div><span>Scadenza</span><b>${fmtDate(m.end)} · ${m.dleft >= 0 ? m.dleft + 'gg' : 'scaduto'}</b></div>
+        ${row('Email', m.email)}
+        ${row('Telefono', m.telefono)}
+        ${row('Data di nascita', m.dataNascita ? fmtDate(m.dataNascita) : '')}
+        ${row('Sesso', m.sesso)}
+        ${row('Codice fiscale', m.cf)}
+        ${row('Certificato medico', m.certificato ? fmtDate(m.certificato) : '')}
+        ${row('Indirizzo', indirizzo)}
+        ${row('Abbonamento', `${m.plan.name} · ${euro(m.plan.price)}`)}
+        ${row('Iscritto il', fmtDate(m.start))}
+        ${row('Scadenza', `${fmtDate(m.end)} · ${m.dleft >= 0 ? m.dleft + 'gg' : 'scaduto'}`)}
       </div>
+      ${m.note ? `<div class="scheda-grid" style="grid-template-columns:1fr;margin-top:12px"><div><span>Note</span><b style="font-weight:500">${m.note}</b></div></div>` : ''}
     </div>
     <div class="mfoot">
       <button type="button" class="btn-ghost" data-close="modal-scheda">Chiudi</button>
-      <button type="button" class="btn-ghost" data-renew="${m.sid}">Rinnova con opzioni…</button>
+      <button type="button" class="btn-ghost" data-edit="${m.sid}">Modifica dati</button>
+      <button type="button" class="btn-ghost" data-renew="${m.sid}">Rinnova…</button>
       <button type="button" class="btn-primary" style="background:var(--good);box-shadow:none" data-quickrenew="${m.sid}">⚡ Rinnovo rapido</button>
     </div>`;
   openModal('modal-scheda');
@@ -383,7 +434,7 @@ function wireEvents() {
   });
 
   // azioni demo
-  $('#btn-nuovo').addEventListener('click', openSocioModal);
+  $('#btn-nuovo').addEventListener('click', () => openSocioModal('new'));
   $('#socioform').addEventListener('submit', submitSocio);
   $('#btn-accesso').addEventListener('click', openAccessoModal);
   $('#accessoform').addEventListener('submit', submitAccesso);
@@ -395,6 +446,7 @@ function wireEvents() {
   // delega globale: chiusura modali, rinnovo rapido, rinnovo con opzioni, apri scheda
   document.addEventListener('click', (e) => {
     const c = e.target.closest('[data-close]'); if (c) return closeModal(c.dataset.close);
+    const ed = e.target.closest('[data-edit]'); if (ed) return openSocioModal('edit', ed.dataset.edit);
     const q = e.target.closest('[data-quickrenew]'); if (q) return quickRenew(q.dataset.quickrenew);
     const r = e.target.closest('[data-renew]'); if (r) return openRinnovoModal(r.dataset.renew);
     const mm = e.target.closest('[data-member]'); if (mm) return openScheda(mm.dataset.member);

@@ -131,8 +131,10 @@
   .xbtn{width:32px;height:32px;border:0;background:var(--surface-2);border-radius:8px;color:var(--ink-2);cursor:pointer;font-size:18px;line-height:1;flex:none}
   .field{margin-bottom:14px}.field.row{display:flex;gap:12px}.field.row>div{flex:1}
   .field label{display:block;font-size:12.5px;font-weight:600;color:var(--ink-2);margin-bottom:5px}
-  .field input,.field select{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:9px;background:var(--surface-2);color:var(--ink);font-size:14px;font-family:inherit}
-  .field input:focus,.field select:focus{outline:2px solid var(--accent);outline-offset:-1px}
+  .field input,.field select,.field textarea{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:9px;background:var(--surface-2);color:var(--ink);font-size:14px;font-family:inherit}
+  .field textarea{resize:vertical;min-height:44px}
+  .field input:focus,.field select:focus,.field textarea:focus{outline:2px solid var(--accent);outline-offset:-1px}
+  .modal .mfoot{flex-wrap:wrap}
   .check{display:flex;align-items:center;gap:9px;font-size:13.5px;color:var(--ink-2)}.check input{width:auto}
   .btn-ghost{padding:10px 16px;background:var(--surface-2);color:var(--ink-2);border:1px solid var(--line);border-radius:10px;font-size:13.5px;font-weight:600;cursor:pointer}
   .btn-sm{padding:8px 13px;font-size:12.5px;background:var(--accent);color:#fff;border:0;border-radius:9px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}.btn-sm svg{width:14px;height:14px}
@@ -251,15 +253,24 @@
 
 <!-- Modale: nuovo socio -->
 <div class="overlay" id="modal-socio" hidden>
-  <form class="modal" id="socioform">
-    <div class="mhead"><div><h3>Nuovo socio</h3><div class="msub">Anagrafica + abbonamento</div></div><button type="button" class="xbtn" data-close="modal-socio">×</button></div>
+  <form class="modal wide" id="socioform">
+    <div class="mhead"><div><h3 id="socio-title">Nuovo socio</h3><div class="msub" id="socio-sub">Anagrafica + primo abbonamento</div></div><button type="button" class="xbtn" data-close="modal-socio">×</button></div>
     <div class="mbody">
-      <div class="field row"><div><label for="f-nome">Nome</label><input id="f-nome" required></div><div><label for="f-cognome">Cognome</label><input id="f-cognome" required></div></div>
-      <div class="field row"><div><label for="f-email">Email</label><input id="f-email" type="email" placeholder="mario.rossi@email.it"></div><div><label for="f-tel">Telefono</label><input id="f-tel" placeholder="+39 3xx xxxxxxx"></div></div>
-      <div class="field row"><div><label for="f-piano">Abbonamento</label><select id="f-piano"></select></div><div><label for="f-inizio">Data inizio</label><input id="f-inizio" type="date"></div></div>
-      <label class="check"><input type="checkbox" id="f-consenso" checked> Consenso all'invio di email (invia la mail di benvenuto)</label>
+      <div class="field row"><div><label for="f-nome">Nome *</label><input id="f-nome" required></div><div><label for="f-cognome">Cognome *</label><input id="f-cognome" required></div></div>
+      <div class="field row"><div><label for="f-sesso">Sesso</label><select id="f-sesso"><option value="">—</option><option>M</option><option>F</option><option>Altro</option></select></div><div><label for="f-nascita">Data di nascita</label><input id="f-nascita" type="date"></div></div>
+      <div class="field row"><div><label for="f-cf">Codice fiscale</label><input id="f-cf" maxlength="16" placeholder="RSSMRA90A01F205X" style="text-transform:uppercase"></div><div><label for="f-tel">Telefono</label><input id="f-tel" placeholder="+39 3xx xxxxxxx"></div></div>
+      <div class="field"><label for="f-email">Email</label><input id="f-email" type="email" placeholder="mario.rossi@email.it"></div>
+      <div class="field"><label for="f-indirizzo">Indirizzo</label><input id="f-indirizzo" placeholder="Via, numero civico"></div>
+      <div class="field row"><div><label for="f-citta">Città</label><input id="f-citta"></div><div style="max-width:130px"><label for="f-cap">CAP</label><input id="f-cap" maxlength="5" inputmode="numeric"></div></div>
+      <div class="field"><label for="f-certificato">Scadenza certificato medico</label><input id="f-certificato" type="date"></div>
+      <div class="field"><label for="f-note">Note</label><textarea id="f-note" rows="2" placeholder="Note interne (es. obiettivi, patologie, preferenze)"></textarea></div>
+      <label class="check"><input type="checkbox" id="f-consenso" checked> Consenso all'invio di email</label>
+      <div id="socio-abbsection" style="margin-top:16px;padding-top:16px;border-top:1px dashed var(--line)">
+        <div style="font-size:12.5px;font-weight:700;color:var(--ink-2);margin-bottom:10px;letter-spacing:.02em">PRIMO ABBONAMENTO</div>
+        <div class="field row" style="margin-bottom:0"><div><label for="f-piano">Abbonamento</label><select id="f-piano"></select></div><div><label for="f-inizio">Data inizio</label><input id="f-inizio" type="date"></div></div>
+      </div>
     </div>
-    <div class="mfoot"><button type="button" class="btn-ghost" data-close="modal-socio">Annulla</button><button type="submit" class="btn-primary">Aggiungi socio</button></div>
+    <div class="mfoot"><button type="button" class="btn-ghost" data-close="modal-socio">Annulla</button><button type="submit" class="btn-primary" id="socio-submit">Aggiungi socio</button></div>
   </form>
 </div>
 

@@ -48,15 +48,19 @@ async function loadSupabase(supa) {
 
   const { data: abb, error } = await supa
     .from('abbonamenti')
-    .select('id,data_inizio,data_scadenza,socio:soci(id,nome,cognome,email,tessera),piano:piani(nome,prezzo,durata_mesi)');
+    .select('id,data_inizio,data_scadenza,socio:soci(id,nome,cognome,email,telefono,data_nascita,sesso,codice_fiscale,indirizzo,citta,cap,certificato_scadenza,note,consenso_mail,tessera),piano:piani(nome,prezzo,durata_mesi)');
   if (error) throw error;
 
   const members = abb.filter((a) => a.socio).map((a, i) => {
     const end = new Date(a.data_scadenza);
     const dleft = giorni(end, today);
-    const nome = `${a.socio.nome} ${a.socio.cognome}`;
+    const s = a.socio;
+    const nome = `${s.nome} ${s.cognome}`;
     return {
-      sid: a.socio.id, id: a.socio.tessera || a.socio.id.slice(0, 8), nome, email: a.socio.email || '',
+      sid: s.id, id: s.tessera || s.id.slice(0, 8), nome, firstName: s.nome, lastName: s.cognome, email: s.email || '',
+      telefono: s.telefono, dataNascita: s.data_nascita, sesso: s.sesso, cf: s.codice_fiscale,
+      indirizzo: s.indirizzo, citta: s.citta, cap: s.cap, certificato: s.certificato_scadenza,
+      note: s.note, consenso: s.consenso_mail,
       plan: planMeta(a.piano?.nome || '—', a.piano?.prezzo || 0, a.piano?.durata_mesi || 1),
       start: new Date(a.data_inizio), end, dleft, stato: statoDa(dleft), av: AV[i % AV.length],
     };
@@ -118,18 +122,24 @@ function loadDemo() {
     { name: 'Personal 10', price: 350, dur: 4, w: .15 },
   ];
   const today = new Date(); today.setHours(0, 0, 0, 0);
+  const citaArr = ['Milano', 'Monza', 'Como', 'Bergamo', 'Lecco', 'Varese'];
   const members = [];
   for (let i = 0; i < 90; i++) {
-    const nome = pick(nomi) + ' ' + pick(cognomi);
+    const fn = pick(nomi), ln = pick(cognomi), nome = fn + ' ' + ln;
     let acc = 0, pr = rnd(), P = PLANS[0];
     for (const p of PLANS) { acc += p.w; if (pr <= acc) { P = p; break; } }
     let start = new Date(today); start.setDate(start.getDate() - Math.floor(rnd() * 400));
     let end = new Date(start); end.setMonth(end.getMonth() + P.dur);
     while (end < today && rnd() < 0.72) { start = new Date(end); end.setMonth(end.getMonth() + P.dur); }
     const dleft = giorni(end, today);
+    const nasc = new Date(today); nasc.setFullYear(nasc.getFullYear() - (18 + Math.floor(rnd() * 40))); nasc.setMonth(Math.floor(rnd() * 12), 1 + Math.floor(rnd() * 27));
+    const cert = new Date(today); cert.setDate(cert.getDate() + Math.floor(rnd() * 320) - 40);
     members.push({
-      sid: 'demo-' + i, id: 'GY-' + (1200 + i), nome,
+      sid: 'demo-' + i, id: 'GY-' + (1200 + i), nome, firstName: fn, lastName: ln,
       email: nome.toLowerCase().replace(/ /g, '.') + i + '@email.it',
+      telefono: '+39 3' + (10 + Math.floor(rnd() * 89)) + ' ' + (1000000 + Math.floor(rnd() * 8999999)),
+      sesso: pick(['M', 'F']), dataNascita: nasc.toISOString().slice(0, 10),
+      citta: pick(citaArr), certificato: cert.toISOString().slice(0, 10), consenso: rnd() < 0.85,
       plan: planMeta(P.name, P.price, P.dur), start, end, dleft, stato: statoDa(dleft), av: AV[i % AV.length],
     });
   }
