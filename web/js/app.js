@@ -88,7 +88,7 @@ function renderDashboard() {
     <div style="width:${scaduti.length / tot * 100}%;background:var(--bad)"></div></div>`;
 
   const exp = [...scad].sort((a, b) => a.dleft - b.dleft).slice(0, 10);
-  $('#expiring tbody').innerHTML = exp.map((m) => `<tr><td>${who(m)}</td><td><span class="plan-pill">${m.plan.name}</span></td><td class="mono">${fmtDate(m.end)} <span style="color:var(--warn);font-weight:600">· ${m.dleft}gg</span></td><td class="mono">${euro(m.plan.price)}</td></tr>`).join('') || '<tr><td colspan="4" style="text-align:center;color:var(--ink-3);padding:20px">Nessuno in scadenza</td></tr>';
+  $('#expiring tbody').innerHTML = exp.map((m) => `<tr><td>${who(m)}</td><td><span class="plan-pill">${m.plan.name}</span></td><td class="mono">${fmtDate(m.end)} <span style="color:var(--warn);font-weight:600">· ${m.dleft}gg</span></td><td class="mono">${euro(m.plan.price)}</td><td><button class="btn-row" data-renew="${m.sid}">Rinnova</button></td></tr>`).join('') || '<tr><td colspan="5" style="text-align:center;color:var(--ink-3);padding:20px">Nessuno in scadenza</td></tr>';
 }
 
 function renderMembers() {
@@ -348,7 +348,9 @@ function wireEvents() {
   $('#accessoform').addEventListener('submit', submitAccesso);
   $('#btn-reminders').addEventListener('click', sendReminders);
   $('#btn-clear-posta').addEventListener('click', clearPosta);
-  $('#memtable tbody').addEventListener('click', (e) => { const b = e.target.closest('[data-renew]'); if (b) openRinnovoModal(b.dataset.renew); });
+  const onRenewClick = (e) => { const b = e.target.closest('[data-renew]'); if (b) openRinnovoModal(b.dataset.renew); };
+  $('#memtable tbody').addEventListener('click', onRenewClick);
+  $('#expiring tbody').addEventListener('click', onRenewClick);
   $('#r-piano').addEventListener('change', updateRinnovoPreview);
   $('#rinnovoform').addEventListener('submit', doRenew);
   $('#posta tbody').addEventListener('click', (e) => { const tr = e.target.closest('tr[data-i]'); if (tr) openMailPreview(+tr.dataset.i); });
