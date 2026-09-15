@@ -77,9 +77,8 @@ export const templates = {
       subject: `Il tuo abbonamento scade tra ${giorni} ${giorni === 1 ? 'giorno' : 'giorni'}`,
       html: layout({
         titolo: `${socio.nome}, è ora di rinnovare`,
-        corpo: `Il tuo abbonamento <b>${piano}</b> scade il <b>${dataIt(scadenza)}</b>.
-                Rinnova ora per non perdere l'accesso e continuare i tuoi allenamenti senza interruzioni.`,
-        cta: { href: 'https://gymin.local/rinnova', label: 'Rinnova l\'abbonamento' },
+        corpo: `Il tuo abbonamento <b>${piano}</b> scade il <b>${dataIt(scadenza)}</b>.<br><br>
+                Per rinnovare <b>passa in palestra alla reception</b>: ti aspettiamo per continuare i tuoi allenamenti senza interruzioni!`,
       }),
     };
   },
@@ -89,9 +88,8 @@ export const templates = {
       subject: 'Il tuo abbonamento GymIN è scaduto',
       html: layout({
         titolo: `${socio.nome}, il tuo abbonamento è scaduto`,
-        corpo: `Il tuo abbonamento <b>${piano}</b> è scaduto il <b>${dataIt(scadenza)}</b>.
-                Ci piacerebbe rivederti in palestra: rinnova quando vuoi, ti aspettiamo!`,
-        cta: { href: 'https://gymin.local/rinnova', label: 'Riattiva ora' },
+        corpo: `Il tuo abbonamento <b>${piano}</b> è scaduto il <b>${dataIt(scadenza)}</b>.<br><br>
+                Ci piacerebbe rivederti: <b>passa in palestra alla reception</b> per rinnovare quando vuoi, ti aspettiamo!`,
       }),
     };
   },

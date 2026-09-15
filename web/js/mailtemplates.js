@@ -32,8 +32,7 @@ export const templates = {
     subject: `Il tuo abbonamento scade tra ${giorni} ${giorni === 1 ? 'giorno' : 'giorni'}`,
     html: layout({
       titolo: `${m.nome.split(' ')[0]}, è ora di rinnovare`,
-      corpo: `Il tuo abbonamento <b>${m.plan.name}</b> scade il <b>${dataIt(m.end)}</b>. Rinnova ora per continuare ad allenarti senza interruzioni.`,
-      cta: { href: '#', label: 'Rinnova l\'abbonamento' },
+      corpo: `Il tuo abbonamento <b>${m.plan.name}</b> scade il <b>${dataIt(m.end)}</b>.<br><br>Per rinnovare <b>passa in palestra alla reception</b>: ti aspettiamo per continuare ad allenarti senza interruzioni!`,
     }),
   }),
   ricevuta: (m) => ({
