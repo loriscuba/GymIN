@@ -151,6 +151,12 @@
   .ibtn.quick{color:var(--good);background:var(--good-bg)}
   .ibtn.full{color:var(--accent-ink);background:var(--accent-soft)}
   .ibtn:hover{filter:brightness(.96);border-color:currentColor}
+  /* tooltip istantaneo */
+  .tip{position:fixed;z-index:200;background:var(--ink);color:var(--surface);font-size:12px;font-weight:600;padding:5px 9px;border-radius:7px;white-space:nowrap;pointer-events:none;transform:translate(-50%,-100%);box-shadow:0 6px 18px rgba(0,0,0,.28)}
+  .tip[data-pos="below"]{transform:translate(-50%,0)}
+  .tip::after{content:"";position:absolute;left:50%;transform:translateX(-50%);border:5px solid transparent}
+  .tip[data-pos="above"]::after{top:100%;border-top-color:var(--ink)}
+  .tip[data-pos="below"]::after{bottom:100%;border-bottom-color:var(--ink)}
   .who[data-member]{cursor:pointer;border-radius:8px}
   .who[data-member]:hover b{color:var(--accent-ink);text-decoration:underline}
   .who[data-member]:focus-visible{outline:2px solid var(--accent);outline-offset:2px}

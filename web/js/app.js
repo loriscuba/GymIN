@@ -48,6 +48,25 @@ function toast(msg, kind = 'ok') {
   setTimeout(() => { t.classList.add('out'); setTimeout(() => t.remove(), 300); }, 3200);
 }
 
+// ---------- tooltip istantaneo (data-tip) ----------
+const tipEl = document.createElement('div');
+tipEl.className = 'tip'; tipEl.hidden = true;
+document.body.appendChild(tipEl);
+function showTip(el) {
+  const txt = el.getAttribute('data-tip'); if (!txt) return;
+  tipEl.textContent = txt; tipEl.hidden = false;
+  const r = el.getBoundingClientRect();
+  const below = r.top < 46;
+  tipEl.dataset.pos = below ? 'below' : 'above';
+  tipEl.style.left = (r.left + r.width / 2) + 'px';
+  tipEl.style.top = (below ? r.bottom + 8 : r.top - 8) + 'px';
+}
+const hideTip = () => { tipEl.hidden = true; };
+document.addEventListener('mouseover', (e) => { const el = e.target.closest('[data-tip]'); if (el) showTip(el); });
+document.addEventListener('mouseout', (e) => { const el = e.target.closest('[data-tip]'); if (el && !el.contains(e.relatedTarget)) hideTip(); });
+document.addEventListener('click', hideTip, true);
+window.addEventListener('scroll', hideTip, true);
+
 // ---------- rendering base ----------
 function sparkline(data, color) {
   const w = 82, h = 34, mx = Math.max(...data), mn = Math.min(...data);
@@ -60,10 +79,10 @@ function kpi(label, icon, bg, col, val, trend, tclass, spark) {
     <div class="kval num">${val}</div><div class="ktrend"><span class="${tclass}">${trend}</span></div>${spark || ''}</div>`;
 }
 const tagFor = (s) => s === 'Attivo' ? '<span class="tag g">Attivo</span>' : s === 'In scadenza' ? '<span class="tag w">In scadenza</span>' : '<span class="tag b">Scaduto</span>';
-const who = (m) => `<div class="who" data-member="${m.sid}" role="button" tabindex="0" title="Apri scheda socio"><div class="av" style="background:${m.av}">${initials(m.nome)}</div><div><b>${m.nome}</b><span>${m.id}</span></div></div>`;
+const who = (m) => `<div class="who" data-member="${m.sid}" role="button" tabindex="0" data-tip="Apri scheda socio"><div class="av" style="background:${m.av}">${initials(m.nome)}</div><div><b>${m.nome}</b><span>${m.id}</span></div></div>`;
 const zapSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8z"/></svg>';
 const refreshSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v6h-6"/></svg>';
-const actionsCell = (m) => `<td><div class="actions-cell"><button class="ibtn quick" data-quickrenew="${m.sid}" title="Rinnovo rapido (mantiene il piano)" aria-label="Rinnovo rapido">${zapSvg}</button><button class="ibtn full" data-renew="${m.sid}" title="Rinnova · scegli piano" aria-label="Rinnova con opzioni">${refreshSvg}</button></div></td>`;
+const actionsCell = (m) => `<td><div class="actions-cell"><button class="ibtn quick" data-quickrenew="${m.sid}" data-tip="Rinnovo rapido · mantiene il piano" aria-label="Rinnovo rapido">${zapSvg}</button><button class="ibtn full" data-renew="${m.sid}" data-tip="Rinnova · scegli il piano" aria-label="Rinnova con opzioni">${refreshSvg}</button></div></td>`;
 
 function renderDashboard() {
   const { members, revenue, plans } = DATA;
