@@ -1,0 +1,14 @@
+# Mailpit: cattura tutte le mail in sviluppo (SMTP :1025, web UI :8025).
+# Nessuna mail esce davvero — le apri e le ispezioni dal browser.
+services:
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: gymin-mailpit
+    restart: unless-stopped
+    ports:
+      - "1025:1025"   # SMTP  -> ci punta il mailer
+      - "8025:8025"   # Web UI -> http://localhost:8025
+    environment:
+      MP_MAX_MESSAGES: 500
+      MP_SMTP_AUTH_ACCEPT_ANY: "true"
+      MP_SMTP_AUTH_ALLOW_INSECURE: "true"
