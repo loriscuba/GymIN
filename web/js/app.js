@@ -58,7 +58,10 @@ function kpi(label, icon, bg, col, val, trend, tclass, spark) {
     <div class="kval num">${val}</div><div class="ktrend"><span class="${tclass}">${trend}</span></div>${spark || ''}</div>`;
 }
 const tagFor = (s) => s === 'Attivo' ? '<span class="tag g">Attivo</span>' : s === 'In scadenza' ? '<span class="tag w">In scadenza</span>' : '<span class="tag b">Scaduto</span>';
-const who = (m) => `<div class="who"><div class="av" style="background:${m.av}">${initials(m.nome)}</div><div><b>${m.nome}</b><span>${m.id}</span></div></div>`;
+const who = (m) => `<div class="who" data-member="${m.sid}" role="button" tabindex="0" title="Apri scheda socio"><div class="av" style="background:${m.av}">${initials(m.nome)}</div><div><b>${m.nome}</b><span>${m.id}</span></div></div>`;
+const zapSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8z"/></svg>';
+const refreshSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v6h-6"/></svg>';
+const actionsCell = (m) => `<td><div class="actions-cell"><button class="ibtn quick" data-quickrenew="${m.sid}" title="Rinnovo rapido (mantiene il piano)" aria-label="Rinnovo rapido">${zapSvg}</button><button class="ibtn full" data-renew="${m.sid}" title="Rinnova · scegli piano" aria-label="Rinnova con opzioni">${refreshSvg}</button></div></td>`;
 
 function renderDashboard() {
   const { members, revenue, plans } = DATA;
@@ -88,7 +91,7 @@ function renderDashboard() {
     <div style="width:${scaduti.length / tot * 100}%;background:var(--bad)"></div></div>`;
 
   const exp = [...scad].sort((a, b) => a.dleft - b.dleft).slice(0, 10);
-  $('#expiring tbody').innerHTML = exp.map((m) => `<tr><td>${who(m)}</td><td><span class="plan-pill">${m.plan.name}</span></td><td class="mono">${fmtDate(m.end)} <span style="color:var(--warn);font-weight:600">· ${m.dleft}gg</span></td><td class="mono">${euro(m.plan.price)}</td><td><button class="btn-row" data-renew="${m.sid}">Rinnova</button></td></tr>`).join('') || '<tr><td colspan="5" style="text-align:center;color:var(--ink-3);padding:20px">Nessuno in scadenza</td></tr>';
+  $('#expiring tbody').innerHTML = exp.map((m) => `<tr><td>${who(m)}</td><td><span class="plan-pill">${m.plan.name}</span></td><td class="mono">${fmtDate(m.end)} <span style="color:var(--warn);font-weight:600">· ${m.dleft}gg</span></td><td class="mono">${euro(m.plan.price)}</td>${actionsCell(m)}</tr>`).join('') || '<tr><td colspan="5" style="text-align:center;color:var(--ink-3);padding:20px">Nessuno in scadenza</td></tr>';
 }
 
 function renderMembers() {
@@ -101,7 +104,7 @@ function renderMembers() {
   const pages = Math.max(1, Math.ceil(list.length / memState.PER));
   if (memState.page > pages) memState.page = pages;
   const slice = list.slice((memState.page - 1) * memState.PER, memState.page * memState.PER);
-  $('#memtable tbody').innerHTML = slice.map((m) => `<tr><td>${who(m)}</td><td class="mono">${m.id}</td><td><span class="plan-pill">${m.plan.name}</span></td><td class="mono">${fmtDate(m.start)}</td><td class="mono">${fmtDate(m.end)}</td><td>${tagFor(m.stato)}</td><td><button class="btn-row" data-renew="${m.sid}">Rinnova</button></td></tr>`).join('') || '<tr><td colspan="7" style="text-align:center;color:var(--ink-3);padding:28px">Nessun socio trovato</td></tr>';
+  $('#memtable tbody').innerHTML = slice.map((m) => `<tr><td>${who(m)}</td><td class="mono">${m.id}</td><td><span class="plan-pill">${m.plan.name}</span></td><td class="mono">${fmtDate(m.start)}</td><td class="mono">${fmtDate(m.end)}</td><td>${tagFor(m.stato)}</td>${actionsCell(m)}</tr>`).join('') || '<tr><td colspan="7" style="text-align:center;color:var(--ink-3);padding:28px">Nessun socio trovato</td></tr>';
   $('#memcount').textContent = `${list.length} soci · pagina ${memState.page} di ${pages}`;
   let pg = `<button ${memState.page === 1 ? 'disabled' : ''} data-p="prev">‹</button>`;
   for (let i = 1; i <= pages && i <= 6; i++) pg += `<button class="${i === memState.page ? 'active' : ''}" data-p="${i}">${i}</button>`;
@@ -263,6 +266,7 @@ function renewBase(m) { const t = new Date(); t.setHours(0, 0, 0, 0); return new
 function openRinnovoModal(sid) {
   const m = DATA.members.find((x) => x.sid === sid); if (!m) return;
   renewSid = sid;
+  closeModal('modal-scheda');
   $('#r-socio').textContent = `${m.nome} · ${m.id}`;
   $('#r-piano').innerHTML = DATA.plans.map((p) => `<option value="${p.name}"${p.name === m.plan.name ? ' selected' : ''}>${p.name} — ${euro(p.price)} · ${p.dur} mese/i</option>`).join('');
   $('#r-old').textContent = fmtDate(m.end);
@@ -274,10 +278,7 @@ function updateRinnovoPreview() {
   const plan = DATA.plans.find((p) => p.name === $('#r-piano').value);
   $('#r-new').textContent = fmtDate(addMonths(renewBase(m), plan.dur));
 }
-async function doRenew(e) {
-  e.preventDefault();
-  const m = DATA.members.find((x) => x.sid === renewSid); if (!m) return;
-  const plan = DATA.plans.find((p) => p.name === $('#r-piano').value);
+async function applyRenewal(m, plan, sendRicevuta) {
   const newEnd = addMonths(renewBase(m), plan.dur);
   m.plan = { name: plan.name, price: plan.price, mcost: plan.mcost, dur: plan.dur, color: plan.color };
   m.end = newEnd; m.dleft = giorniTo(newEnd); m.stato = statoDa(m.dleft);
@@ -285,13 +286,53 @@ async function doRenew(e) {
   DATA.revenue.at(-1).value += plan.price;      // incassa la quota nel mese corrente
   recomputePlans();
   renderAll();
-  closeModal('modal-rinnovo');
   toast(`Abbonamento rinnovato · ${m.nome} → scad. ${fmtDate(newEnd)}`);
-  if ($('#r-ricevuta').checked && m.email) {
+  if (sendRicevuta && m.email) {
     const { subject, html } = templates.ricevuta(m);
     const mail = await sendMail({ tipo: 'ricevuta', tipoLabel: 'Ricevuta', member: m, subject, html });
     toast(mail.channel === 'mailpit' ? `Ricevuta inviata a Mailpit · ${m.email}` : `Ricevuta generata (anteprima) · apri Posta`, 'mail');
   }
+}
+async function doRenew(e) {
+  e.preventDefault();
+  const m = DATA.members.find((x) => x.sid === renewSid); if (!m) return;
+  const plan = DATA.plans.find((p) => p.name === $('#r-piano').value);
+  const ricevuta = $('#r-ricevuta').checked;
+  closeModal('modal-rinnovo');
+  await applyRenewal(m, plan, ricevuta);
+}
+async function quickRenew(sid) {
+  const m = DATA.members.find((x) => x.sid === sid); if (!m) return;
+  const plan = DATA.plans.find((p) => p.name === m.plan.name) || m.plan;
+  await applyRenewal(m, plan, true);            // rinnovo rapido: stesso piano, con ricevuta
+  if (!$('#modal-scheda').hidden) openScheda(sid); // aggiorna la scheda se aperta
+}
+
+// ---------- scheda socio ----------
+let schedaSid = null;
+function openScheda(sid) {
+  const m = DATA.members.find((x) => x.sid === sid); if (!m) return;
+  schedaSid = sid;
+  $('#modal-scheda .modal').innerHTML = `
+    <div class="mhead"><div style="display:flex;align-items:center;gap:12px">
+      <div class="av" style="width:46px;height:46px;background:${m.av};border-radius:50%;display:grid;place-items:center;color:#fff;font-weight:700;font-size:15px">${initials(m.nome)}</div>
+      <div><h3>${m.nome}</h3><div class="msub">${m.id} · ${m.plan.name}</div></div></div>
+      <button type="button" class="xbtn" data-close="modal-scheda">×</button></div>
+    <div class="mbody">
+      <div style="margin-bottom:14px">${tagFor(m.stato)}</div>
+      <div class="scheda-grid">
+        <div><span>Email</span><b>${m.email || '—'}</b></div>
+        <div><span>Abbonamento</span><b>${m.plan.name} · ${euro(m.plan.price)}</b></div>
+        <div><span>Iscritto il</span><b>${fmtDate(m.start)}</b></div>
+        <div><span>Scadenza</span><b>${fmtDate(m.end)} · ${m.dleft >= 0 ? m.dleft + 'gg' : 'scaduto'}</b></div>
+      </div>
+    </div>
+    <div class="mfoot">
+      <button type="button" class="btn-ghost" data-close="modal-scheda">Chiudi</button>
+      <button type="button" class="btn-ghost" data-renew="${m.sid}">Rinnova con opzioni…</button>
+      <button type="button" class="btn-primary" style="background:var(--good);box-shadow:none" data-quickrenew="${m.sid}">⚡ Rinnovo rapido</button>
+    </div>`;
+  openModal('modal-scheda');
 }
 
 // ---------- navigazione ----------
@@ -348,15 +389,21 @@ function wireEvents() {
   $('#accessoform').addEventListener('submit', submitAccesso);
   $('#btn-reminders').addEventListener('click', sendReminders);
   $('#btn-clear-posta').addEventListener('click', clearPosta);
-  const onRenewClick = (e) => { const b = e.target.closest('[data-renew]'); if (b) openRinnovoModal(b.dataset.renew); };
-  $('#memtable tbody').addEventListener('click', onRenewClick);
-  $('#expiring tbody').addEventListener('click', onRenewClick);
   $('#r-piano').addEventListener('change', updateRinnovoPreview);
   $('#rinnovoform').addEventListener('submit', doRenew);
   $('#posta tbody').addEventListener('click', (e) => { const tr = e.target.closest('tr[data-i]'); if (tr) openMailPreview(+tr.dataset.i); });
-  document.querySelectorAll('[data-close]').forEach((b) => b.addEventListener('click', () => closeModal(b.dataset.close)));
+  // delega globale: chiusura modali, rinnovo rapido, rinnovo con opzioni, apri scheda
+  document.addEventListener('click', (e) => {
+    const c = e.target.closest('[data-close]'); if (c) return closeModal(c.dataset.close);
+    const q = e.target.closest('[data-quickrenew]'); if (q) return quickRenew(q.dataset.quickrenew);
+    const r = e.target.closest('[data-renew]'); if (r) return openRinnovoModal(r.dataset.renew);
+    const mm = e.target.closest('[data-member]'); if (mm) return openScheda(mm.dataset.member);
+  });
   document.querySelectorAll('.overlay').forEach((o) => o.addEventListener('click', (e) => { if (e.target === o) closeModal(o.id); }));
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') document.querySelectorAll('.overlay:not([hidden])').forEach((o) => closeModal(o.id)); });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') document.querySelectorAll('.overlay:not([hidden])').forEach((o) => closeModal(o.id));
+    if (e.key === 'Enter') { const mm = e.target.closest && e.target.closest('[data-member]'); if (mm) { e.preventDefault(); openScheda(mm.dataset.member); } }
+  });
 
   $('#loginform')?.addEventListener('submit', async (e) => {
     e.preventDefault();
