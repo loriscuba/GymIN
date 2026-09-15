@@ -166,6 +166,13 @@ async function sendMail({ tipo, tipoLabel, member, subject, html }) {
   renderPosta();
   return mail;
 }
+function clearPosta() {
+  if (!MAILBOX.length) { toast('La posta è già vuota', 'warn'); return; }
+  MAILBOX.length = 0;
+  reminded.clear();
+  renderPosta();
+  toast('Posta svuotata');
+}
 function openMailPreview(i) {
   const m = MAILBOX[i]; if (!m) return;
   $('#mail-subject').textContent = m.subject;
@@ -308,6 +315,7 @@ function wireEvents() {
   $('#btn-accesso').addEventListener('click', openAccessoModal);
   $('#accessoform').addEventListener('submit', submitAccesso);
   $('#btn-reminders').addEventListener('click', sendReminders);
+  $('#btn-clear-posta').addEventListener('click', clearPosta);
   $('#posta tbody').addEventListener('click', (e) => { const tr = e.target.closest('tr[data-i]'); if (tr) openMailPreview(+tr.dataset.i); });
   document.querySelectorAll('[data-close]').forEach((b) => b.addEventListener('click', () => closeModal(b.dataset.close)));
   document.querySelectorAll('.overlay').forEach((o) => o.addEventListener('click', (e) => { if (e.target === o) closeModal(o.id); }));

@@ -119,7 +119,7 @@ function loadDemo() {
   ];
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const members = [];
-  for (let i = 0; i < 180; i++) {
+  for (let i = 0; i < 90; i++) {
     const nome = pick(nomi) + ' ' + pick(cognomi);
     let acc = 0, pr = rnd(), P = PLANS[0];
     for (const p of PLANS) { acc += p.w; if (pr <= acc) { P = p; break; } }
@@ -136,7 +136,7 @@ function loadDemo() {
   // accessi
   const accessi = [];
   let t = 7 * 60 + 5;
-  for (let i = 0; i < 26; i++) {
+  for (let i = 0; i < 14; i++) {
     t += Math.floor(rnd() * 34) + 6;
     const m = members[Math.floor(rnd() * members.length)];
     accessi.push({

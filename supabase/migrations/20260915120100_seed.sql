@@ -42,7 +42,7 @@ begin
     into piani_ids, piani_dur, piani_prz
     from piani;
 
-  for i in 1..180 loop
+  for i in 1..90 loop
     v_nome  := nomi[1 + floor(random() * array_length(nomi, 1))::int];
     v_cog   := cognomi[1 + floor(random() * array_length(cognomi, 1))::int];
     v_email := lower(v_nome || '.' || replace(v_cog, ' ', '') || i || '@email.it');
@@ -94,7 +94,7 @@ begin
   join abbonamenti a on a.socio_id = s.id
   where a.data_scadenza >= current_date
   order by random()
-  limit 28;
+  limit 14;
 
-  raise notice 'Seed completato: 5 piani, 180 soci, abbonamenti, pagamenti e accessi.';
+  raise notice 'Seed completato: 5 piani, 90 soci, abbonamenti, pagamenti e accessi.';
 end $$;
