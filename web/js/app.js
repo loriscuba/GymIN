@@ -57,9 +57,17 @@ const tipEl = document.createElement('div');
 tipEl.className = 'tip'; tipEl.hidden = true;
 document.body.appendChild(tipEl);
 function showTip(el) {
+  // i nomi delle voci di menu compaiono come tooltip solo quando la barra è compressa
+  if (el.classList.contains('nav') && !document.querySelector('.app').classList.contains('collapsed')) return;
   const txt = el.getAttribute('data-tip'); if (!txt) return;
   tipEl.textContent = txt; tipEl.hidden = false;
   const r = el.getBoundingClientRect();
+  if (el.classList.contains('nav')) {           // voci del menu compresso: tooltip a destra
+    tipEl.dataset.pos = 'right';
+    tipEl.style.left = (r.right + 10) + 'px';
+    tipEl.style.top = (r.top + r.height / 2) + 'px';
+    return;
+  }
   const below = r.top < 46;
   tipEl.dataset.pos = below ? 'below' : 'above';
   tipEl.style.left = (r.left + r.width / 2) + 'px';
@@ -466,6 +474,12 @@ function wireEvents() {
     renderMembers();
   });
   $('#burger').addEventListener('click', () => { $('#sidebar').classList.add('open'); $('#scrim').classList.add('show'); });
+  try { document.querySelector('.app').classList.toggle('collapsed', localStorage.getItem('gymin-collapsed') === '1'); } catch {}
+  $('#collapse').addEventListener('click', () => {
+    const on = document.querySelector('.app').classList.toggle('collapsed');
+    try { localStorage.setItem('gymin-collapsed', on ? '1' : '0'); } catch {}
+    hideTip();
+  });
   $('#scrim').addEventListener('click', () => { $('#sidebar').classList.remove('open'); $('#scrim').classList.remove('show'); });
   $('#theme').addEventListener('click', () => {
     const r = document.documentElement;

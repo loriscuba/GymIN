@@ -47,6 +47,20 @@
   .sidebar-foot{margin-top:auto;border-top:1px solid var(--sidebar-line);padding-top:14px;display:flex;align-items:center;gap:10px}
   .avatar{width:34px;height:34px;border-radius:50%;background:#2a3342;display:grid;place-items:center;color:#cdd4e0;font-weight:600;font-size:13px;flex:none}
   .sidebar-foot b{color:#e7ebf2;font-size:13px;display:block}.sidebar-foot span{color:#6f7889;font-size:11.5px}
+  /* menu laterale comprimibile (desktop) */
+  .app{transition:grid-template-columns .18s ease}
+  @media (min-width:921px){
+    .app.collapsed{grid-template-columns:70px 1fr}
+    .app.collapsed .sidebar{padding-left:8px;padding-right:8px}
+    .app.collapsed .brand{justify-content:center;padding:6px 0 18px}
+    .app.collapsed .brand-txt{display:none}
+    .app.collapsed .navlabel{opacity:0;height:10px;padding:0;overflow:hidden}
+    .app.collapsed .nav{justify-content:center;padding-left:0;padding-right:0;gap:0}
+    .app.collapsed .nav-label,.app.collapsed .nav .count{display:none}
+    .app.collapsed .sidebar-foot{justify-content:center}
+    .app.collapsed .foot-txt{display:none}
+  }
+  @media (max-width:920px){.desktop-only{display:none!important}}
   .main{min-width:0;display:flex;flex-direction:column}
   .topbar{display:flex;align-items:center;gap:16px;padding:18px 30px;border-bottom:1px solid var(--line);background:var(--surface);position:sticky;top:0;z-index:5}
   .topbar h2{font-size:19px;font-weight:700}.topbar .sub{color:var(--ink-3);font-size:13px;margin-top:1px}.topbar .spacer{flex:1}
@@ -154,9 +168,11 @@
   /* tooltip istantaneo */
   .tip{position:fixed;z-index:200;background:var(--ink);color:var(--surface);font-size:12px;font-weight:600;padding:5px 9px;border-radius:7px;white-space:nowrap;pointer-events:none;transform:translate(-50%,-100%);box-shadow:0 6px 18px rgba(0,0,0,.28)}
   .tip[data-pos="below"]{transform:translate(-50%,0)}
+  .tip[data-pos="right"]{transform:translate(0,-50%)}
   .tip::after{content:"";position:absolute;left:50%;transform:translateX(-50%);border:5px solid transparent}
   .tip[data-pos="above"]::after{top:100%;border-top-color:var(--ink)}
   .tip[data-pos="below"]::after{bottom:100%;border-bottom-color:var(--ink)}
+  .tip[data-pos="right"]::after{left:-5px;top:50%;transform:translateY(-50%);border-right-color:var(--ink);border-left-width:0}
   .who[data-member]{cursor:pointer;border-radius:8px}
   .who[data-member]:hover b{color:var(--accent-ink);text-decoration:underline}
   .who[data-member]:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
@@ -195,21 +211,22 @@
   <aside class="sidebar" id="sidebar">
     <div class="brand">
       <div class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"><path d="M6.5 7v10M17.5 7v10M4 9.5v5M20 9.5v5M6.5 12h11"/></svg></div>
-      <div><b>GymIN</b><small>Gestionale</small></div>
+      <div class="brand-txt"><b>GymIN</b><small>Gestionale</small></div>
     </div>
     <div class="navlabel">Generale</div>
-    <button class="nav active" data-view="dashboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg> Dashboard</button>
+    <button class="nav active" data-view="dashboard" data-tip="Dashboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg> <span class="nav-label">Dashboard</span></button>
     <div class="navlabel">Gestione</div>
-    <button class="nav" data-view="anagrafiche"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg> Anagrafiche <span class="count" id="c-mem"></span></button>
-    <button class="nav" data-view="abbonamenti"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg> Abbonamenti</button>
-    <button class="nav" data-view="entrate"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"/></svg> Entrate / Accessi <span class="count" id="c-acc"></span></button>
-    <button class="nav" data-view="posta"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg> Posta <span class="count" id="c-posta"></span></button>
-    <div class="sidebar-foot"><div class="avatar">LC</div><div><b>Loris C.</b><span>Direttore</span></div></div>
+    <button class="nav" data-view="anagrafiche" data-tip="Anagrafiche"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg> <span class="nav-label">Anagrafiche</span> <span class="count" id="c-mem"></span></button>
+    <button class="nav" data-view="abbonamenti" data-tip="Abbonamenti"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg> <span class="nav-label">Abbonamenti</span></button>
+    <button class="nav" data-view="entrate" data-tip="Entrate / Accessi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"/></svg> <span class="nav-label">Entrate / Accessi</span> <span class="count" id="c-acc"></span></button>
+    <button class="nav" data-view="posta" data-tip="Posta"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg> <span class="nav-label">Posta</span> <span class="count" id="c-posta"></span></button>
+    <div class="sidebar-foot"><div class="avatar">LC</div><div class="foot-txt"><b>Loris C.</b><span>Direttore</span></div></div>
   </aside>
 
   <div class="main">
     <header class="topbar">
       <button class="iconbtn mobile-top" id="burger" aria-label="Menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>
+      <button class="iconbtn desktop-only" id="collapse" aria-label="Comprimi menu" data-tip="Comprimi / espandi menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/></svg></button>
       <div><h2 id="pg-title">Dashboard</h2><div class="sub" id="pg-sub">Panoramica attività</div></div>
       <div class="spacer"></div>
       <span class="badge-demo" id="modebadge" hidden>MODALITÀ DEMO</span>
