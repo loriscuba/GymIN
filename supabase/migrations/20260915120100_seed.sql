@@ -12,6 +12,9 @@ declare
   piani_ids  uuid[];
   piani_dur  int[];
   piani_prz  numeric[];
+  piani_ent  int[];
+  v_entrate  int;
+  v_residue  int;
   idx        int;
   v_socio    uuid;
   v_abb      uuid;
@@ -29,17 +32,19 @@ begin
     return;
   end if;
 
-  insert into piani(nome, prezzo, durata_mesi, descrizione) values
-    ('Open Mese',   59,  1,  'Accesso libero sala e corsi'),
-    ('Trimestrale', 159, 3,  '3 mesi, sala + corsi'),
-    ('Annuale',     499, 12, '12 mesi, miglior prezzo'),
-    ('Student',     39,  1,  'Under 26, orario ridotto'),
-    ('Personal 10', 350, 4,  '10 sedute personal trainer');
+  insert into piani(nome, prezzo, durata_mesi, entrate, descrizione) values
+    ('Open Mese',       59,  1,  0, 'Accesso libero sala e corsi'),
+    ('Trimestrale',     159, 3,  0, '3 mesi, sala + corsi'),
+    ('Annuale',         499, 12, 0, '12 mesi, miglior prezzo'),
+    ('Student',         39,  1,  0, 'Under 26, orario ridotto'),
+    ('Personal 10',     350, 4,  0, '10 sedute personal trainer'),
+    ('Carnet 5 entrate', 45, 6,  5, 'Pacchetto 5 ingressi a consumo');
 
   select array_agg(id order by creato_il),
          array_agg(durata_mesi order by creato_il),
-         array_agg(prezzo order by creato_il)
-    into piani_ids, piani_dur, piani_prz
+         array_agg(prezzo order by creato_il),
+         array_agg(entrate order by creato_il)
+    into piani_ids, piani_dur, piani_prz, piani_ent
     from piani;
 
   for i in 1..90 loop
@@ -50,6 +55,8 @@ begin
     idx      := 1 + floor(random() * array_length(piani_ids, 1))::int;
     v_dur    := piani_dur[idx];
     v_prezzo := piani_prz[idx];
+    v_entrate := piani_ent[idx];
+    v_residue := case when v_entrate > 0 then floor(random() * (v_entrate + 1))::int else null end;  -- carnet: 0..5
 
     v_start := current_date - floor(random() * 400)::int;
     v_end   := (v_start + (v_dur || ' months')::interval)::date;
@@ -69,10 +76,11 @@ begin
     )
     returning id into v_socio;
 
-    insert into abbonamenti(socio_id, piano_id, data_inizio, data_scadenza, stato)
+    insert into abbonamenti(socio_id, piano_id, data_inizio, data_scadenza, entrate_residue, stato)
     values (
-      v_socio, piani_ids[idx], v_start, v_end,
-      case when v_end < current_date then 'scaduto'
+      v_socio, piani_ids[idx], v_start, v_end, v_residue,
+      case when v_entrate > 0 then case when v_residue <= 0 then 'scaduto' when v_residue <= 1 then 'in_scadenza' else 'attivo' end
+           when v_end < current_date then 'scaduto'
            when v_end <= current_date + 30 then 'in_scadenza'
            else 'attivo' end
     )
@@ -87,7 +95,7 @@ begin
   -- porta ~18 abbonamenti nella finestra "in scadenza" (1-30 giorni)
   update abbonamenti set data_scadenza = current_date + (3 + floor(random() * 27))::int, stato = 'in_scadenza'
   where id in (
-    select id from abbonamenti where data_scadenza > current_date + 30 order by random() limit 18
+    select id from abbonamenti where data_scadenza > current_date + 30 and entrate_residue is null order by random() limit 18
   );
 
   -- accessi di oggi (~14) tra i soci con abbonamento non scaduto

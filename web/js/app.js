@@ -27,6 +27,10 @@ const ic = {
 const addMonths = (d, m) => { const x = new Date(d); x.setMonth(x.getMonth() + m); return x; };
 const giorniTo = (d) => { const t = new Date(); t.setHours(0, 0, 0, 0); return Math.round((new Date(d) - t) / 86400000); };
 const statoDa = (dleft) => (dleft < 0 ? 'Scaduto' : dleft <= 30 ? 'In scadenza' : 'Attivo');
+// stato che tiene conto dei carnet a consumo
+const computeStato = (m) => m.plan.entrate ? (m.entrateResidue <= 0 ? 'Scaduto' : m.entrateResidue <= 1 ? 'In scadenza' : 'Attivo') : statoDa(m.dleft);
+// testo colonna "Scadenza": data per gli abbonamenti a tempo, entrate residue per i carnet
+const scadCell = (m) => m.plan.entrate ? `${m.entrateResidue}/${m.plan.entrate} entrate` : fmtDate(m.end);
 function nextTessera() {
   const nums = DATA.members.map((m) => +(String(m.id).match(/(\d+)/)?.[1] || 0));
   return 'GY-' + (Math.max(1200, ...nums) + 1);
@@ -112,7 +116,7 @@ function renderDashboard() {
     <div style="width:${scaduti.length / tot * 100}%;background:var(--bad)"></div></div>`;
 
   const exp = [...scad].sort((a, b) => a.dleft - b.dleft).slice(0, 10);
-  $('#expiring tbody').innerHTML = exp.map((m) => `<tr><td>${who(m)}</td><td><span class="plan-pill">${m.plan.name}</span></td><td class="mono">${fmtDate(m.end)} <span style="color:var(--warn);font-weight:600">· ${m.dleft}gg</span></td><td class="mono">${euro(m.plan.price)}</td>${actionsCell(m)}</tr>`).join('') || '<tr><td colspan="5" style="text-align:center;color:var(--ink-3);padding:20px">Nessuno in scadenza</td></tr>';
+  $('#expiring tbody').innerHTML = exp.map((m) => `<tr><td>${who(m)}</td><td><span class="plan-pill">${m.plan.name}</span></td><td class="mono">${m.plan.entrate ? `<span style="color:var(--warn);font-weight:600">${m.entrateResidue} entrate rimaste</span>` : `${fmtDate(m.end)} <span style="color:var(--warn);font-weight:600">· ${m.dleft}gg</span>`}</td><td class="mono">${euro(m.plan.price)}</td>${actionsCell(m)}</tr>`).join('') || '<tr><td colspan="5" style="text-align:center;color:var(--ink-3);padding:20px">Nessuno in scadenza</td></tr>';
 }
 
 function renderMembers() {
@@ -125,7 +129,7 @@ function renderMembers() {
   const pages = Math.max(1, Math.ceil(list.length / memState.PER));
   if (memState.page > pages) memState.page = pages;
   const slice = list.slice((memState.page - 1) * memState.PER, memState.page * memState.PER);
-  $('#memtable tbody').innerHTML = slice.map((m) => `<tr><td>${who(m)}</td><td class="mono">${m.id}</td><td><span class="plan-pill">${m.plan.name}</span></td><td class="mono">${fmtDate(m.start)}</td><td class="mono">${fmtDate(m.end)}</td><td>${tagFor(m.stato)}</td>${actionsCell(m)}</tr>`).join('') || '<tr><td colspan="7" style="text-align:center;color:var(--ink-3);padding:28px">Nessun socio trovato</td></tr>';
+  $('#memtable tbody').innerHTML = slice.map((m) => `<tr><td>${who(m)}</td><td class="mono">${m.id}</td><td><span class="plan-pill">${m.plan.name}</span></td><td class="mono">${fmtDate(m.start)}</td><td class="mono">${scadCell(m)}</td><td>${tagFor(m.stato)}</td>${actionsCell(m)}</tr>`).join('') || '<tr><td colspan="7" style="text-align:center;color:var(--ink-3);padding:28px">Nessun socio trovato</td></tr>';
   $('#memcount').textContent = `${list.length} soci · pagina ${memState.page} di ${pages}`;
   let pg = `<button ${memState.page === 1 ? 'disabled' : ''} data-p="prev">‹</button>`;
   for (let i = 1; i <= pages && i <= 6; i++) pg += `<button class="${i === memState.page ? 'active' : ''}" data-p="${i}">${i}</button>`;
@@ -236,7 +240,7 @@ function openSocioModal(mode = 'new', sid = null) {
     set('#f-email', m.email); set('#f-tel', m.telefono);
     set('#f-sesso', m.sesso); set('#f-nascita', m.dataNascita); set('#f-cf', m.cf);
     set('#f-indirizzo', m.indirizzo); set('#f-citta', m.citta); set('#f-cap', m.cap);
-    set('#f-certificato', m.certificato); set('#f-note', m.note);
+    set('#f-note', m.note);
     $('#f-consenso').checked = !!m.consenso;
   }
   openModal('modal-socio');
@@ -249,7 +253,7 @@ function readSocioForm() {
     email: $('#f-email').value.trim(), telefono: $('#f-tel').value.trim(),
     sesso: $('#f-sesso').value, dataNascita: $('#f-nascita').value, cf: $('#f-cf').value.trim().toUpperCase(),
     indirizzo: $('#f-indirizzo').value.trim(), citta: $('#f-citta').value.trim(), cap: $('#f-cap').value.trim(),
-    certificato: $('#f-certificato').value, note: $('#f-note').value.trim(), consenso: $('#f-consenso').checked,
+    note: $('#f-note').value.trim(), consenso: $('#f-consenso').checked,
   };
 }
 async function submitSocio(e) {
@@ -275,9 +279,11 @@ async function submitSocio(e) {
   const member = {
     sid: 'new-' + Date.now(), id: nextTessera(), ...f,
     email: f.email || `${f.firstName}.${f.lastName}`.toLowerCase().replace(/ /g, '') + '@email.it',
-    plan: { name: plan.name, price: plan.price, mcost: plan.mcost, dur: plan.dur, color: plan.color },
-    start, end, dleft, stato: statoDa(dleft), av: AV[DATA.members.length % AV.length],
+    plan: { name: plan.name, price: plan.price, mcost: plan.mcost, dur: plan.dur, color: plan.color, entrate: plan.entrate },
+    entrateResidue: plan.entrate ? plan.entrate : undefined,
+    start, end, dleft, av: AV[DATA.members.length % AV.length],
   };
+  member.stato = computeStato(member);
   DATA.members.unshift(member);
   recomputePlans();
   DATA.revenue.at(-1).value += plan.price;       // incassa la quota nel mese corrente
@@ -307,17 +313,29 @@ function submitAccesso(e) {
   e.preventDefault();
   const m = DATA.members.find((x) => x.sid === $('#a-socio').value);
   if (!m) return;
-  const ok = m.stato !== 'Scaduto';
+  const isCarnet = !!m.plan.entrate;
+  let ok, extra = '', motivo = 'abbonamento scaduto';
+  if (isCarnet) {
+    if ((m.entrateResidue || 0) <= 0) { ok = false; motivo = 'carnet esaurito'; }
+    else {
+      ok = true;
+      m.entrateResidue -= 1;                       // consuma un'entrata dal carnet
+      m.stato = computeStato(m);
+      extra = ` · ${m.entrateResidue} ${m.entrateResidue === 1 ? 'entrata rimasta' : 'entrate rimaste'}`;
+    }
+  } else {
+    ok = m.stato !== 'Scaduto';
+  }
   const now = new Date();
   DATA.accessi.unshift({
     time: now.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }),
     nome: m.nome, id: m.id, av: m.av, plan: m.plan.name, ing: $('#a-ingresso').value,
     ok, warnScad: m.stato === 'In scadenza',
   });
-  $('#c-acc').textContent = DATA.accessi.length;
-  renderAccessi();
+  renderAll();                                     // aggiorna anche stato/entrate nelle altre viste
   closeModal('modal-accesso');
-  toast(ok ? `Accesso registrato · ${m.nome}` : `Accesso NEGATO · ${m.nome} (abbonamento scaduto)`, ok ? 'ok' : 'warn');
+  toast(ok ? `Accesso registrato · ${m.nome}${extra}` : `Accesso NEGATO · ${m.nome} (${motivo})`, ok ? 'ok' : 'warn');
+  if (!$('#modal-scheda').hidden && schedaSid === m.sid) openScheda(m.sid);
 }
 
 // ---------- rinnovo abbonamento ----------
@@ -340,8 +358,10 @@ function updateRinnovoPreview() {
 }
 async function applyRenewal(m, plan, sendRicevuta) {
   const newEnd = addMonths(renewBase(m), plan.dur);
-  m.plan = { name: plan.name, price: plan.price, mcost: plan.mcost, dur: plan.dur, color: plan.color };
-  m.end = newEnd; m.dleft = giorniTo(newEnd); m.stato = statoDa(m.dleft);
+  m.plan = { name: plan.name, price: plan.price, mcost: plan.mcost, dur: plan.dur, color: plan.color, entrate: plan.entrate };
+  m.end = newEnd; m.dleft = giorniTo(newEnd);
+  m.entrateResidue = plan.entrate ? plan.entrate : undefined;  // il carnet riparte pieno
+  m.stato = computeStato(m);
   reminded.delete(m.sid);                       // riabilita eventuali futuri promemoria
   DATA.revenue.at(-1).value += plan.price;      // incassa la quota nel mese corrente
   recomputePlans();
@@ -388,11 +408,12 @@ function openScheda(sid) {
         ${row('Data di nascita', m.dataNascita ? fmtDate(m.dataNascita) : '')}
         ${row('Sesso', m.sesso)}
         ${row('Codice fiscale', m.cf)}
-        ${row('Certificato medico', m.certificato ? fmtDate(m.certificato) : '')}
         ${row('Indirizzo', indirizzo)}
         ${row('Abbonamento', `${m.plan.name} · ${euro(m.plan.price)}`)}
         ${row('Iscritto il', fmtDate(m.start))}
-        ${row('Scadenza', `${fmtDate(m.end)} · ${m.dleft >= 0 ? m.dleft + 'gg' : 'scaduto'}`)}
+        ${m.plan.entrate
+      ? row('Entrate residue', `${m.entrateResidue} / ${m.plan.entrate}`)
+      : row('Scadenza', `${fmtDate(m.end)} · ${m.dleft >= 0 ? m.dleft + 'gg' : 'scaduto'}`)}
       </div>
       ${m.note ? `<div class="scheda-grid" style="grid-template-columns:1fr;margin-top:12px"><div><span>Note</span><b style="font-weight:500">${m.note}</b></div></div>` : ''}
     </div>

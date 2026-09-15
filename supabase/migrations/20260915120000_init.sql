@@ -12,6 +12,7 @@ create table if not exists piani (
   nome        text not null,
   prezzo      numeric(8,2) not null,
   durata_mesi int  not null default 1,
+  entrate     int  not null default 0,   -- >0 = carnet a consumo (es. 5 entrate)
   descrizione text,
   attivo      boolean not null default true,
   creato_il   timestamptz not null default now()
@@ -38,12 +39,13 @@ create table if not exists soci (
 -- ---------------------------------------------------------------------------
 create table if not exists abbonamenti (
   id            uuid primary key default gen_random_uuid(),
-  socio_id      uuid not null references soci(id) on delete cascade,
-  piano_id      uuid not null references piani(id),
-  data_inizio   date not null default current_date,
-  data_scadenza date not null,
-  stato         text not null default 'attivo',   -- valore di comodo; lo stato "vivo" è calcolato (vedi view)
-  creato_il     timestamptz not null default now()
+  socio_id       uuid not null references soci(id) on delete cascade,
+  piano_id       uuid not null references piani(id),
+  data_inizio    date not null default current_date,
+  data_scadenza  date not null,
+  entrate_residue int,                              -- solo per i carnet: entrate ancora disponibili
+  stato          text not null default 'attivo',   -- valore di comodo; lo stato "vivo" è calcolato (vedi view)
+  creato_il      timestamptz not null default now()
 );
 create index if not exists idx_abb_socio on abbonamenti(socio_id);
 create index if not exists idx_abb_scadenza on abbonamenti(data_scadenza);
