@@ -181,7 +181,8 @@ async function sendReminders() {
     await sendMail({ tipo: 'rinnovo', tipoLabel: 'Rinnovo', member: m, subject, html });
     reminded.add(m.sid);
   }
-  toast(`${list.length} promemoria di rinnovo inviati`, 'mail');
+  const real = !!(window.GYMIN_CONFIG && window.GYMIN_CONFIG.MAILPIT_URL);
+  toast(`${list.length} promemoria di rinnovo ${real ? 'inviati a Mailpit' : 'generati (anteprima)'}`, 'mail');
 }
 
 // ---------- MODALI ----------
@@ -220,8 +221,10 @@ async function submitSocio(e) {
   toast(`Socio ${member.nome} aggiunto · ${plan.name}`);
   if (member.consenso) {
     const { subject, html } = templates.benvenuto(member);
-    await sendMail({ tipo: 'benvenuto', tipoLabel: 'Benvenuto', member, subject, html });
-    toast(`Mail di benvenuto inviata a ${member.email}`, 'mail');
+    const mail = await sendMail({ tipo: 'benvenuto', tipoLabel: 'Benvenuto', member, subject, html });
+    toast(mail.channel === 'mailpit'
+      ? `Mail di benvenuto inviata a Mailpit · ${member.email}`
+      : `Mail di benvenuto generata (anteprima) · apri la sezione Posta`, 'mail');
   }
   memState.filter = 'all'; memState.query = ''; memState.page = 1;
   $('#memsearch').value = '';
