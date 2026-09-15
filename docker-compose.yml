@@ -12,3 +12,5 @@ services:
       MP_MAX_MESSAGES: 500
       MP_SMTP_AUTH_ACCEPT_ANY: "true"
       MP_SMTP_AUTH_ALLOW_INSECURE: "true"
+      # Permette al frontend (in modalità demo) di inviare via l'API HTTP di Mailpit.
+      MP_API_CORS: "*"

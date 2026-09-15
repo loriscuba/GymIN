@@ -36,7 +36,8 @@ function statoDa(dleft) {
   return dleft < 0 ? 'Scaduto' : dleft <= 30 ? 'In scadenza' : 'Attivo';
 }
 function planMeta(nome, prezzo, durata) {
-  return { name: nome, price: Number(prezzo), mcost: Number(prezzo) / (durata || 1), color: PLAN_COLORS[nome] || 'var(--slate)' };
+  const dur = durata || 1;
+  return { name: nome, price: Number(prezzo), dur, mcost: Number(prezzo) / dur, color: PLAN_COLORS[nome] || 'var(--slate)' };
 }
 
 // ---------------------------------------------------------------------------
@@ -159,7 +160,7 @@ function finalize(members, accessi, revenue, source) {
       const list = members.filter((m) => m.plan.name === name);
       return {
         name, color: PLAN_COLORS[name] || 'var(--slate)',
-        price: list[0]?.plan.price || 0, mcost: list[0]?.plan.mcost || 0,
+        price: list[0]?.plan.price || 0, mcost: list[0]?.plan.mcost || 0, dur: list[0]?.plan.dur || 1,
         count: list.length, active: list.filter((m) => m.stato === 'Attivo').length,
       };
     });

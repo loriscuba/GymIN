@@ -1,11 +1,15 @@
 import { loadData, getSupa } from './data.js';
+import { templates } from './mailtemplates.js';
 
 const $ = (s, r = document) => r.querySelector(s);
 const euro = (n) => '€ ' + Math.round(n).toLocaleString('it-IT');
 const fmtDate = (d) => new Date(d).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' });
 const initials = (n) => n.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase();
+const AV = ['#f4511e', '#2563eb', '#0d9488', '#7c3aed', '#db2777', '#0891b2', '#ca8a04', '#4f46e5'];
 
 let DATA = null;
+const MAILBOX = [];
+const reminded = new Set();
 const memState = { filter: 'all', query: '', page: 1, PER: 9 };
 
 const ic = {
@@ -14,8 +18,35 @@ const ic = {
   alert: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0zM12 9v4M12 17h.01"/></svg>',
   door: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"/></svg>',
   check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>',
+  mail: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg>',
 };
 
+// ---------- helpers stato demo ----------
+const addMonths = (d, m) => { const x = new Date(d); x.setMonth(x.getMonth() + m); return x; };
+const giorniTo = (d) => { const t = new Date(); t.setHours(0, 0, 0, 0); return Math.round((new Date(d) - t) / 86400000); };
+const statoDa = (dleft) => (dleft < 0 ? 'Scaduto' : dleft <= 30 ? 'In scadenza' : 'Attivo');
+function nextTessera() {
+  const nums = DATA.members.map((m) => +(String(m.id).match(/(\d+)/)?.[1] || 0));
+  return 'GY-' + (Math.max(1200, ...nums) + 1);
+}
+function recomputePlans() {
+  for (const p of DATA.plans) {
+    const list = DATA.members.filter((m) => m.plan.name === p.name);
+    p.count = list.length;
+    p.active = list.filter((m) => m.stato === 'Attivo').length;
+  }
+}
+
+// ---------- toast ----------
+function toast(msg, kind = 'ok') {
+  const t = document.createElement('div');
+  t.className = 'toast ' + kind;
+  t.innerHTML = `<span class="ti">${kind === 'warn' ? ic.alert : kind === 'mail' ? ic.mail : ic.check}</span><span>${msg}</span>`;
+  $('#toasts').appendChild(t);
+  setTimeout(() => { t.classList.add('out'); setTimeout(() => t.remove(), 300); }, 3200);
+}
+
+// ---------- rendering base ----------
 function sparkline(data, color) {
   const w = 82, h = 34, mx = Math.max(...data), mn = Math.min(...data);
   const pts = data.map((v, i) => [i / (data.length - 1) * w, h - 2 - ((v - mn) / (mx - mn || 1)) * (h - 6)]);
@@ -26,9 +57,8 @@ function kpi(label, icon, bg, col, val, trend, tclass, spark) {
   return `<div class="kpi"><div class="klabel"><span class="kbadge" style="background:${bg};color:${col}">${icon}</span>${label}</div>
     <div class="kval num">${val}</div><div class="ktrend"><span class="${tclass}">${trend}</span></div>${spark || ''}</div>`;
 }
-function tagFor(s) {
-  return s === 'Attivo' ? '<span class="tag g">Attivo</span>' : s === 'In scadenza' ? '<span class="tag w">In scadenza</span>' : '<span class="tag b">Scaduto</span>';
-}
+const tagFor = (s) => s === 'Attivo' ? '<span class="tag g">Attivo</span>' : s === 'In scadenza' ? '<span class="tag w">In scadenza</span>' : '<span class="tag b">Scaduto</span>';
+const who = (m) => `<div class="who"><div class="av" style="background:${m.av}">${initials(m.nome)}</div><div><b>${m.nome}</b><span>${m.id}</span></div></div>`;
 
 function renderDashboard() {
   const { members, revenue, plans } = DATA;
@@ -65,7 +95,6 @@ function renderDashboard() {
   const exp = [...scad].sort((a, b) => a.dleft - b.dleft).slice(0, 6);
   $('#expiring tbody').innerHTML = exp.map((m) => `<tr><td>${who(m)}</td><td><span class="plan-pill">${m.plan.name}</span></td><td class="mono">${fmtDate(m.end)} <span style="color:var(--warn);font-weight:600">· ${m.dleft}gg</span></td><td class="mono">${euro(m.plan.price)}</td></tr>`).join('') || '<tr><td colspan="4" style="text-align:center;color:var(--ink-3);padding:20px">Nessuno in scadenza</td></tr>';
 }
-const who = (m) => `<div class="who"><div class="av" style="background:${m.av}">${initials(m.nome)}</div><div><b>${m.nome}</b><span>${m.id}</span></div></div>`;
 
 function renderMembers() {
   const list = DATA.members.filter((m) => {
@@ -86,7 +115,7 @@ function renderMembers() {
 }
 
 function renderPlans() {
-  const { plans, members } = DATA;
+  const { plans } = DATA;
   $('#plans').innerHTML = plans.map((p) => `<div class="plancard${p.name === 'Annuale' ? ' feat' : ''}">${p.name === 'Annuale' ? '<div class="ribbon">Più venduto</div>' : ''}
     <h3>${p.name}</h3><div class="price num">${euro(p.price)}</div>
     <div class="sub-metric"><span>Soci attivi</span><b class="num">${p.active} / ${p.count}</b></div></div>`).join('');
@@ -106,17 +135,128 @@ function renderAccessi() {
   $('#acctable tbody').innerHTML = acc.map((a) => `<tr><td class="mono" style="font-weight:600">${a.time}</td><td><div class="who"><div class="av" style="background:${a.av}">${initials(a.nome)}</div><div><b>${a.nome}</b><span>${a.id}</span></div></div></td><td><span class="plan-pill">${a.plan}</span></td><td class="mono">${a.ing}</td><td>${a.ok ? (a.warnScad ? '<span class="tag w">Valido · in scadenza</span>' : '<span class="tag g">Valido</span>') : '<span class="tag b">Negato</span>'}</td></tr>`).join('') || '<tr><td colspan="5" style="text-align:center;color:var(--ink-3);padding:24px">Nessun accesso oggi</td></tr>';
 }
 
+function renderPosta() {
+  $('#c-posta').textContent = MAILBOX.length || '';
+  $('#posta tbody').innerHTML = MAILBOX.map((m, i) => `<tr data-i="${i}" style="cursor:pointer"><td class="mono">${m.when.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}</td><td><span class="plan-pill">${m.tipoLabel}</span></td><td><b>${m.nome}</b><br><span style="color:var(--ink-3);font-size:12px">${m.destinatario}</span></td><td>${m.subject}</td><td>${m.channel === 'mailpit' ? '<span class="tag g">Mailpit</span>' : '<span class="tag w">Anteprima demo</span>'}</td></tr>`).join('') || '<tr><td colspan="5" style="text-align:center;color:var(--ink-3);padding:28px">Nessuna mail inviata. Aggiungi un socio o invia i promemoria di rinnovo.</td></tr>';
+}
+
 function renderAll() {
   $('#c-mem').textContent = DATA.members.length;
   $('#c-acc').textContent = DATA.accessi.length;
   $('#modebadge').hidden = DATA.source !== 'demo';
-  renderDashboard(); renderMembers(); renderPlans(); renderAccessi();
+  renderDashboard(); renderMembers(); renderPlans(); renderAccessi(); renderPosta();
 }
 
-// ---- navigazione ----
+// ---------- MAIL ----------
+async function toMailpit(mail) {
+  const url = window.GYMIN_CONFIG && window.GYMIN_CONFIG.MAILPIT_URL;
+  if (!url) return false;
+  try {
+    const r = await fetch(url.replace(/\/$/, '') + '/api/v1/send', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ From: { Email: 'no-reply@gymin.local', Name: 'GymIN' }, To: [{ Email: mail.destinatario }], Subject: mail.subject, HTML: mail.html }),
+    });
+    return r.ok;
+  } catch { return false; }
+}
+async function sendMail({ tipo, tipoLabel, member, subject, html }) {
+  const mail = { tipo, tipoLabel, nome: member.nome, destinatario: member.email, subject, html, when: new Date(), channel: 'demo' };
+  if (await toMailpit(mail)) mail.channel = 'mailpit';
+  MAILBOX.unshift(mail);
+  renderPosta();
+  return mail;
+}
+function openMailPreview(i) {
+  const m = MAILBOX[i]; if (!m) return;
+  $('#mail-subject').textContent = m.subject;
+  $('#mail-to').textContent = m.destinatario;
+  $('#mailframe').srcdoc = m.html;
+  openModal('modal-mail');
+}
+async function sendReminders() {
+  const list = DATA.members.filter((m) => m.stato === 'In scadenza' && m.email && !reminded.has(m.sid));
+  if (!list.length) { toast('Nessun nuovo promemoria da inviare', 'warn'); return; }
+  for (const m of list) {
+    const { subject, html } = templates.rinnovo(m, Math.max(0, m.dleft));
+    await sendMail({ tipo: 'rinnovo', tipoLabel: 'Rinnovo', member: m, subject, html });
+    reminded.add(m.sid);
+  }
+  toast(`${list.length} promemoria di rinnovo inviati`, 'mail');
+}
+
+// ---------- MODALI ----------
+function openModal(id) { $('#' + id).hidden = false; document.body.style.overflow = 'hidden'; }
+function closeModal(id) { $('#' + id).hidden = true; document.body.style.overflow = ''; }
+
+function openSocioModal() {
+  $('#f-piano').innerHTML = DATA.plans.map((p) => `<option value="${p.name}">${p.name} — ${euro(p.price)} · ${p.dur} mese/i</option>`).join('');
+  $('#f-inizio').value = new Date().toISOString().slice(0, 10);
+  $('#socioform').reset();
+  $('#f-inizio').value = new Date().toISOString().slice(0, 10);
+  $('#f-consenso').checked = true;
+  openModal('modal-socio');
+  setTimeout(() => $('#f-nome').focus(), 50);
+}
+async function submitSocio(e) {
+  e.preventDefault();
+  const nome = $('#f-nome').value.trim(), cognome = $('#f-cognome').value.trim();
+  if (!nome || !cognome) return;
+  const plan = DATA.plans.find((p) => p.name === $('#f-piano').value);
+  const start = new Date($('#f-inizio').value || Date.now());
+  const end = addMonths(start, plan.dur);
+  const dleft = giorniTo(end);
+  const member = {
+    sid: 'new-' + Date.now(), id: nextTessera(), nome: `${nome} ${cognome}`,
+    email: ($('#f-email').value.trim() || `${nome}.${cognome}`.toLowerCase().replace(/ /g, '') + '@email.it'),
+    plan: { name: plan.name, price: plan.price, mcost: plan.mcost, dur: plan.dur, color: plan.color },
+    start, end, dleft, stato: statoDa(dleft), av: AV[DATA.members.length % AV.length],
+    consenso: $('#f-consenso').checked,
+  };
+  DATA.members.unshift(member);
+  recomputePlans();
+  DATA.revenue.at(-1).value += plan.price;       // incassa la quota nel mese corrente
+  renderAll();
+  closeModal('modal-socio');
+  toast(`Socio ${member.nome} aggiunto · ${plan.name}`);
+  if (member.consenso) {
+    const { subject, html } = templates.benvenuto(member);
+    await sendMail({ tipo: 'benvenuto', tipoLabel: 'Benvenuto', member, subject, html });
+    toast(`Mail di benvenuto inviata a ${member.email}`, 'mail');
+  }
+  memState.filter = 'all'; memState.query = ''; memState.page = 1;
+  $('#memsearch').value = '';
+  document.querySelectorAll('#memfilters .chip').forEach((c) => c.classList.toggle('active', c.dataset.f === 'all'));
+  go('anagrafiche');
+}
+
+function openAccessoModal() {
+  const opts = [...DATA.members].sort((a, b) => a.nome.localeCompare(b.nome))
+    .map((m) => `<option value="${m.sid}">${m.nome} — ${m.id} (${m.stato})</option>`).join('');
+  $('#a-socio').innerHTML = opts;
+  openModal('modal-accesso');
+}
+function submitAccesso(e) {
+  e.preventDefault();
+  const m = DATA.members.find((x) => x.sid === $('#a-socio').value);
+  if (!m) return;
+  const ok = m.stato !== 'Scaduto';
+  const now = new Date();
+  DATA.accessi.unshift({
+    time: now.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }),
+    nome: m.nome, id: m.id, av: m.av, plan: m.plan.name, ing: $('#a-ingresso').value,
+    ok, warnScad: m.stato === 'In scadenza',
+  });
+  $('#c-acc').textContent = DATA.accessi.length;
+  renderAccessi();
+  closeModal('modal-accesso');
+  toast(ok ? `Accesso registrato · ${m.nome}` : `Accesso NEGATO · ${m.nome} (abbonamento scaduto)`, ok ? 'ok' : 'warn');
+}
+
+// ---------- navigazione ----------
 const titles = {
   dashboard: ['Dashboard', 'Panoramica attività'], anagrafiche: ['Anagrafiche soci', 'Gestione iscritti e tesseramenti'],
   abbonamenti: ['Abbonamenti', 'Listino piani e incasso ricorrente'], entrate: ['Entrate / Accessi', 'Controllo ingressi'],
+  posta: ['Posta', 'Comunicazioni automatiche agli iscritti'],
 };
 function go(view) {
   document.querySelectorAll('.view').forEach((v) => (v.hidden = true));
@@ -128,7 +268,7 @@ function go(view) {
   window.scrollTo(0, 0);
 }
 
-// ---- login (solo se Supabase configurato) ----
+// ---------- login ----------
 async function ensureAuth() {
   const supa = await getSupa();
   if (!supa) return true; // demo mode
@@ -158,6 +298,18 @@ function wireEvents() {
     const cur = r.getAttribute('data-theme') || (matchMedia('(prefers-color-scheme:dark)').matches ? 'dark' : 'light');
     r.setAttribute('data-theme', cur === 'dark' ? 'light' : 'dark');
   });
+
+  // azioni demo
+  $('#btn-nuovo').addEventListener('click', openSocioModal);
+  $('#socioform').addEventListener('submit', submitSocio);
+  $('#btn-accesso').addEventListener('click', openAccessoModal);
+  $('#accessoform').addEventListener('submit', submitAccesso);
+  $('#btn-reminders').addEventListener('click', sendReminders);
+  $('#posta tbody').addEventListener('click', (e) => { const tr = e.target.closest('tr[data-i]'); if (tr) openMailPreview(+tr.dataset.i); });
+  document.querySelectorAll('[data-close]').forEach((b) => b.addEventListener('click', () => closeModal(b.dataset.close)));
+  document.querySelectorAll('.overlay').forEach((o) => o.addEventListener('click', (e) => { if (e.target === o) closeModal(o.id); }));
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') document.querySelectorAll('.overlay:not([hidden])').forEach((o) => closeModal(o.id)); });
+
   $('#loginform')?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const supa = await getSupa();

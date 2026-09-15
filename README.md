@@ -53,6 +53,17 @@ npm run web
 
 > Senza `web/config.js` il frontend parte comunque in **modalità demo** con dati finti: utile per vedere subito la UI senza configurare nulla.
 
+### Modalità demo interattiva
+
+Anche senza Supabase la demo è pienamente operativa (stato in memoria):
+
+- **Nuovo socio** → form con scelta abbonamento; calcola la scadenza, aggiorna dashboard e fatturato, e genera la **mail di benvenuto**.
+- **Registra accesso** → l'esito (valido / negato) dipende dallo stato dell'abbonamento del socio.
+- **Invia promemoria** → genera le mail di rinnovo per i soci in scadenza.
+- **Posta** → elenco delle mail generate, con **anteprima del template reale**.
+
+Le mail in demo sono anteprime. Per farle arrivare **davvero** in Mailpit senza backend, avvia Mailpit (`npm run mailpit:up`) e imposta `MAILPIT_URL: 'http://localhost:8025'` in `web/config.js`: l'app userà l'API HTTP di Mailpit.
+
 ### Utente staff (per il login)
 
 Con Supabase locale crea un utente dalla dashboard (`http://localhost:54323` → Authentication → Add user) oppure via SQL. Le policy RLS danno accesso completo agli utenti **autenticati**.
