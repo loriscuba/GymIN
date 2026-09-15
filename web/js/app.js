@@ -106,7 +106,7 @@ function renderMembers() {
   const pages = Math.max(1, Math.ceil(list.length / memState.PER));
   if (memState.page > pages) memState.page = pages;
   const slice = list.slice((memState.page - 1) * memState.PER, memState.page * memState.PER);
-  $('#memtable tbody').innerHTML = slice.map((m) => `<tr><td>${who(m)}</td><td class="mono">${m.id}</td><td><span class="plan-pill">${m.plan.name}</span></td><td class="mono">${fmtDate(m.start)}</td><td class="mono">${fmtDate(m.end)}</td><td>${tagFor(m.stato)}</td></tr>`).join('') || '<tr><td colspan="6" style="text-align:center;color:var(--ink-3);padding:28px">Nessun socio trovato</td></tr>';
+  $('#memtable tbody').innerHTML = slice.map((m) => `<tr><td>${who(m)}</td><td class="mono">${m.id}</td><td><span class="plan-pill">${m.plan.name}</span></td><td class="mono">${fmtDate(m.start)}</td><td class="mono">${fmtDate(m.end)}</td><td>${tagFor(m.stato)}</td><td><button class="btn-row" data-renew="${m.sid}">Rinnova</button></td></tr>`).join('') || '<tr><td colspan="7" style="text-align:center;color:var(--ink-3);padding:28px">Nessun socio trovato</td></tr>';
   $('#memcount').textContent = `${list.length} soci · pagina ${memState.page} di ${pages}`;
   let pg = `<button ${memState.page === 1 ? 'disabled' : ''} data-p="prev">‹</button>`;
   for (let i = 1; i <= pages && i <= 6; i++) pg += `<button class="${i === memState.page ? 'active' : ''}" data-p="${i}">${i}</button>`;
@@ -262,6 +262,43 @@ function submitAccesso(e) {
   toast(ok ? `Accesso registrato · ${m.nome}` : `Accesso NEGATO · ${m.nome} (abbonamento scaduto)`, ok ? 'ok' : 'warn');
 }
 
+// ---------- rinnovo abbonamento ----------
+let renewSid = null;
+function renewBase(m) { const t = new Date(); t.setHours(0, 0, 0, 0); return new Date(m.end) >= t ? new Date(m.end) : t; }
+function openRinnovoModal(sid) {
+  const m = DATA.members.find((x) => x.sid === sid); if (!m) return;
+  renewSid = sid;
+  $('#r-socio').textContent = `${m.nome} · ${m.id}`;
+  $('#r-piano').innerHTML = DATA.plans.map((p) => `<option value="${p.name}"${p.name === m.plan.name ? ' selected' : ''}>${p.name} — ${euro(p.price)} · ${p.dur} mese/i</option>`).join('');
+  $('#r-old').textContent = fmtDate(m.end);
+  updateRinnovoPreview();
+  openModal('modal-rinnovo');
+}
+function updateRinnovoPreview() {
+  const m = DATA.members.find((x) => x.sid === renewSid); if (!m) return;
+  const plan = DATA.plans.find((p) => p.name === $('#r-piano').value);
+  $('#r-new').textContent = fmtDate(addMonths(renewBase(m), plan.dur));
+}
+async function doRenew(e) {
+  e.preventDefault();
+  const m = DATA.members.find((x) => x.sid === renewSid); if (!m) return;
+  const plan = DATA.plans.find((p) => p.name === $('#r-piano').value);
+  const newEnd = addMonths(renewBase(m), plan.dur);
+  m.plan = { name: plan.name, price: plan.price, mcost: plan.mcost, dur: plan.dur, color: plan.color };
+  m.end = newEnd; m.dleft = giorniTo(newEnd); m.stato = statoDa(m.dleft);
+  reminded.delete(m.sid);                       // riabilita eventuali futuri promemoria
+  DATA.revenue.at(-1).value += plan.price;      // incassa la quota nel mese corrente
+  recomputePlans();
+  renderAll();
+  closeModal('modal-rinnovo');
+  toast(`Abbonamento rinnovato · ${m.nome} → scad. ${fmtDate(newEnd)}`);
+  if ($('#r-ricevuta').checked && m.email) {
+    const { subject, html } = templates.ricevuta(m);
+    const mail = await sendMail({ tipo: 'ricevuta', tipoLabel: 'Ricevuta', member: m, subject, html });
+    toast(mail.channel === 'mailpit' ? `Ricevuta inviata a Mailpit · ${m.email}` : `Ricevuta generata (anteprima) · apri Posta`, 'mail');
+  }
+}
+
 // ---------- navigazione ----------
 const titles = {
   dashboard: ['Dashboard', 'Panoramica attività'], anagrafiche: ['Anagrafiche soci', 'Gestione iscritti e tesseramenti'],
@@ -316,6 +353,9 @@ function wireEvents() {
   $('#accessoform').addEventListener('submit', submitAccesso);
   $('#btn-reminders').addEventListener('click', sendReminders);
   $('#btn-clear-posta').addEventListener('click', clearPosta);
+  $('#memtable tbody').addEventListener('click', (e) => { const b = e.target.closest('[data-renew]'); if (b) openRinnovoModal(b.dataset.renew); });
+  $('#r-piano').addEventListener('change', updateRinnovoPreview);
+  $('#rinnovoform').addEventListener('submit', doRenew);
   $('#posta tbody').addEventListener('click', (e) => { const tr = e.target.closest('tr[data-i]'); if (tr) openMailPreview(+tr.dataset.i); });
   document.querySelectorAll('[data-close]').forEach((b) => b.addEventListener('click', () => closeModal(b.dataset.close)));
   document.querySelectorAll('.overlay').forEach((o) => o.addEventListener('click', (e) => { if (e.target === o) closeModal(o.id); }));
