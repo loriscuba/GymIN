@@ -1,0 +1,53 @@
+name: OCI · crea VM ARM quando c'è capacità
+
+# Prova a creare la VM ARM Always Free ogni 10 minuti, dai server di GitHub
+# (nessun PC da tenere acceso). Appena c'è capacità la crea e poi diventa un no-op.
+# Al primo successo DISATTIVA il workflow: Actions → questo workflow → ⋯ → Disable.
+on:
+  schedule:
+    - cron: "*/10 * * * *"   # ogni 10 minuti (UTC); può ritardare sotto carico
+  workflow_dispatch: {}       # per lanciarlo a mano dal tab Actions
+
+concurrency:
+  group: oci-launch
+  cancel-in-progress: false
+
+jobs:
+  launch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Installa OCI CLI
+        run: pip install --quiet oci-cli
+
+      - name: Configura credenziali OCI
+        env:
+          OCI_USER: ${{ secrets.OCI_USER }}
+          OCI_TENANCY: ${{ secrets.OCI_TENANCY }}
+          OCI_FINGERPRINT: ${{ secrets.OCI_FINGERPRINT }}
+          OCI_REGION: ${{ secrets.OCI_REGION }}
+          OCI_KEY_CONTENT: ${{ secrets.OCI_KEY_CONTENT }}
+        run: |
+          mkdir -p ~/.oci
+          printf '%s\n' "$OCI_KEY_CONTENT" > ~/.oci/key.pem
+          chmod 600 ~/.oci/key.pem
+          cat > ~/.oci/config <<CFG
+          [DEFAULT]
+          user=$OCI_USER
+          tenancy=$OCI_TENANCY
+          fingerprint=$OCI_FINGERPRINT
+          region=$OCI_REGION
+          key_file=$HOME/.oci/key.pem
+          CFG
+          chmod 600 ~/.oci/config
+
+      - name: Prova a creare la VM
+        env:
+          SSH_PUBKEY: ${{ secrets.SSH_PUBKEY }}
+          OCI_COMPARTMENT: ${{ secrets.OCI_COMPARTMENT }}   # opzionale (default: tenancy)
+          OCI_SUBNET: ${{ secrets.OCI_SUBNET }}             # consigliato se hai più subnet
+          DISPLAY_NAME: gymin-vm
+          OCPUS: "1"
+          MEMORY_GB: "6"
+        run: bash deploy/oci-launch-ci.sh

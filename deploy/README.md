@@ -71,6 +71,23 @@ bash GymIN/deploy/oci-launch-retry.sh
 Trova da solo compartment/AD/subnet/immagine, riprova finché entra e ti stampa
 l'IP pubblico. Prima serve aver creato la VCN con la procedura guidata.
 
+### Senza tenere il PC acceso (GitHub Actions)
+
+Il workflow `.github/workflows/oci-launch.yml` prova a creare la VM **ogni 10 minuti
+dai server di GitHub**. Appena c'è capacità la crea, poi diventa un no-op.
+
+1. **Crea una API key su OCI**: in alto a destra → profilo → **La mia profilo → Chiavi API → Aggiungi chiave API** → *Genera coppia di chiavi* → **scarica la chiave privata** e copia l'anteprima di configurazione (contiene user, tenancy, fingerprint, region).
+2. **Su GitHub** (repo → Settings → Secrets and variables → Actions → *New repository secret*) crea:
+   - `OCI_USER`, `OCI_TENANCY`, `OCI_FINGERPRINT`, `OCI_REGION` (dall'anteprima; region es. `eu-turin-1`)
+   - `OCI_KEY_CONTENT` = **contenuto** del file `.pem` della chiave privata (incolla tutto)
+   - `SSH_PUBKEY` = la tua chiave **pubblica** RSA (contenuto di `id_rsa.pub`)
+   - *(consigliati)* `OCI_SUBNET` = OCID della subnet della tua VCN; `OCI_COMPARTMENT` se non usi il compartment root
+3. **Avvialo**: tab **Actions** → *OCI · crea VM ARM* → **Run workflow** (poi va da solo ogni 10 min).
+4. **Al primo successo, disattivalo**: Actions → il workflow → **⋯ → Disable workflow**.
+
+> La API key dà accesso al tuo tenancy: i secret sono cifrati, ma per l'infra è
+> preferibile un **repo privato**. Il workflow non crea doppioni (controlla se la VM esiste già).
+
 ## Note
 - **Una VM basta** per molti progetti: l'ARM Always Free (fino a 4 OCPU / 24 GB)
   regge tanti siti statici / Node dietro un unico Nginx.
