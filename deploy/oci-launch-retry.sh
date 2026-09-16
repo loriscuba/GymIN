@@ -16,7 +16,7 @@ DISPLAY_NAME="${DISPLAY_NAME:-gymin-vm}"
 OCPUS="${OCPUS:-1}"
 MEMORY_GB="${MEMORY_GB:-6}"
 BOOT_GB="${BOOT_GB:-50}"
-SLEEP_SECONDS="${SLEEP_SECONDS:-60}"
+SLEEP_SECONDS="${SLEEP_SECONDS:-180}"   # non scendere sotto ~120s: Oracle limita i tentativi (errore 429)
 SHAPE="VM.Standard.A1.Flex"
 
 command -v oci >/dev/null || { echo "✖ OCI CLI non trovata. Apri la Cloud Shell dalla console OCI (icona >_)."; exit 1; }
@@ -78,6 +78,9 @@ while true; do
     if printf '%s' "$OUT" | grep -qiE 'Out of host capacity|capacit'; then
       echo "capacità esaurita, riprovo tra ${SLEEP_SECONDS}s"
       sleep "$SLEEP_SECONDS"
+    elif printf '%s' "$OUT" | grep -qiE 'TooManyRequests|Too many requests|"status": *429'; then
+      echo "throttling di Oracle (429): rallento, riprovo tra $((SLEEP_SECONDS * 2))s"
+      sleep "$((SLEEP_SECONDS * 2))"
     else
       echo "ERRORE (non di capacità):"
       printf '%s\n' "$OUT"

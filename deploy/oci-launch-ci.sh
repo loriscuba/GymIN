@@ -50,6 +50,10 @@ else
     echo "Capacità esaurita: riproverà al prossimo giro."
     exit 0
   fi
+  if printf '%s' "$OUT" | grep -qiE 'TooManyRequests|Too many requests|"status": *429'; then
+    echo "Throttling di Oracle (429): riproverà al prossimo giro."
+    exit 0
+  fi
   echo "✖ Errore (non di capacità):"
   printf '%s\n' "$OUT"
   exit 1
