@@ -57,6 +57,20 @@ bash deploy/setup.sh
 SERVER_NAME=gymin.miodominio.it bash deploy/setup.sh
 ```
 
+## Capacità ARM esaurita ("Out of host capacity")
+
+La shape gratuita `VM.Standard.A1.Flex` è spesso satura. Per crearla appena si
+libera capacità, usa lo script di retry **dalla OCI Cloud Shell** (CLI già autenticata):
+
+```bash
+git clone https://github.com/loriscuba/GymIN.git
+bash GymIN/deploy/oci-launch-retry.sh
+# opzioni:  OCPUS=1 MEMORY_GB=6 SLEEP_SECONDS=60 DISPLAY_NAME=hub bash ...
+```
+
+Trova da solo compartment/AD/subnet/immagine, riprova finché entra e ti stampa
+l'IP pubblico. Prima serve aver creato la VCN con la procedura guidata.
+
 ## Note
 - **Una VM basta** per molti progetti: l'ARM Always Free (fino a 4 OCPU / 24 GB)
   regge tanti siti statici / Node dietro un unico Nginx.
