@@ -98,7 +98,10 @@ const who = (m) => `<div class="who" data-member="${m.sid}" role="button" tabind
 const zapSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8z"/></svg>';
 const refreshSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v6h-6"/></svg>';
 const mailSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg>';
-const actionsCell = (m) => `<td><div class="actions-cell"><button class="ibtn remind" data-remind="${m.sid}" data-tip="Invia promemoria" aria-label="Invia promemoria">${mailSvg}</button><button class="ibtn quick" data-quickrenew="${m.sid}" data-tip="Rinnovo rapido · mantiene il piano" aria-label="Rinnovo rapido">${zapSvg}</button><button class="ibtn full" data-renew="${m.sid}" data-tip="Rinnova · scegli il piano" aria-label="Rinnova con opzioni">${refreshSvg}</button></div></td>`;
+const editSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>';
+// stessi pulsanti-icona usati sia in tabella sia nella scheda socio
+const actionIcons = (m) => `<button class="ibtn edit" data-edit="${m.sid}" data-tip="Modifica dati" aria-label="Modifica dati">${editSvg}</button><button class="ibtn remind" data-remind="${m.sid}" data-tip="Invia promemoria" aria-label="Invia promemoria">${mailSvg}</button><button class="ibtn quick" data-quickrenew="${m.sid}" data-tip="Rinnovo rapido · mantiene il piano" aria-label="Rinnovo rapido">${zapSvg}</button><button class="ibtn full" data-renew="${m.sid}" data-tip="Rinnova · scegli il piano" aria-label="Rinnova con opzioni">${refreshSvg}</button>`;
+const actionsCell = (m) => `<td><div class="actions-cell">${actionIcons(m)}</div></td>`;
 
 function renderDashboard() {
   const { members, revenue, plans } = DATA;
@@ -441,12 +444,9 @@ function openScheda(sid) {
       </div>
       ${m.note ? `<div class="scheda-grid" style="grid-template-columns:1fr;margin-top:12px"><div><span>Note</span><b style="font-weight:500">${m.note}</b></div></div>` : ''}
     </div>
-    <div class="mfoot">
+    <div class="mfoot" style="justify-content:space-between;align-items:center">
       <button type="button" class="btn-ghost" data-close="modal-scheda">Chiudi</button>
-      <button type="button" class="btn-ghost" data-edit="${m.sid}">Modifica dati</button>
-      <button type="button" class="btn-ghost" data-remind="${m.sid}">✉ Promemoria</button>
-      <button type="button" class="btn-ghost" data-renew="${m.sid}">Rinnova…</button>
-      <button type="button" class="btn-primary" style="background:var(--good);box-shadow:none" data-quickrenew="${m.sid}">⚡ Rinnovo rapido</button>
+      <div class="actions-cell">${actionIcons(m)}</div>
     </div>`;
   openModal('modal-scheda');
 }
