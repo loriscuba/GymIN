@@ -21,11 +21,11 @@ SHAPE="VM.Standard.A1.Flex"
 
 command -v oci >/dev/null || { echo "✖ OCI CLI non trovata. Apri la Cloud Shell dalla console OCI (icona >_)."; exit 1; }
 
-# chiave SSH: usa/crea una ed25519
-SSH_PUB="${SSH_PUB:-$HOME/.ssh/id_ed25519.pub}"
+# chiave SSH: usa/crea una RSA (la Cloud Shell OCI è in FIPS mode: niente ed25519)
+SSH_PUB="${SSH_PUB:-$HOME/.ssh/id_rsa.pub}"
 if [ ! -f "$SSH_PUB" ]; then
-  echo "▸ Genero una chiave SSH: $SSH_PUB"
-  ssh-keygen -t ed25519 -N "" -f "${SSH_PUB%.pub}" >/dev/null
+  echo "▸ Genero una chiave SSH RSA: $SSH_PUB"
+  ssh-keygen -t rsa -b 4096 -N "" -f "${SSH_PUB%.pub}" >/dev/null
 fi
 
 echo "▸ Scopro gli identificativi (compartment, AD, subnet, immagine)…"
