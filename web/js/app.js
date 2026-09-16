@@ -13,6 +13,9 @@ const reminded = new Set();
 const memState = { filter: 'all', query: '', page: 1, PER: 9 };
 let socioMode = 'new';
 let editSid = null;
+let expWindow = 7;   // finestra "in scadenza" della dashboard: 7 / 15 / 30 giorni
+// soci con abbonamento a tempo in scadenza entro expWindow giorni (esclude i carnet, che sono a consumo)
+const expiringList = () => DATA.members.filter((m) => !m.plan.entrate && m.dleft >= 0 && m.dleft <= expWindow).sort((a, b) => a.dleft - b.dleft);
 
 const ic = {
   euro: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 7a7 7 0 1 0 0 10M5 10h8M5 14h8"/></svg>',
@@ -124,8 +127,12 @@ function renderDashboard() {
     <div style="width:${scad.length / tot * 100}%;background:var(--warn)"></div>
     <div style="width:${scaduti.length / tot * 100}%;background:var(--bad)"></div></div>`;
 
-  const exp = [...scad].sort((a, b) => a.dleft - b.dleft).slice(0, 10);
-  $('#expiring tbody').innerHTML = exp.map((m) => `<tr><td>${who(m)}</td><td><span class="plan-pill">${m.plan.name}</span></td><td class="mono">${m.plan.entrate ? `<span style="color:var(--warn);font-weight:600">${m.entrateResidue} entrate rimaste</span>` : `${fmtDate(m.end)} <span style="color:var(--warn);font-weight:600">· ${m.dleft}gg</span>`}</td><td class="mono">${euro(m.plan.price)}</td>${actionsCell(m)}</tr>`).join('') || '<tr><td colspan="5" style="text-align:center;color:var(--ink-3);padding:20px">Nessuno in scadenza</td></tr>';
+  const expAll = expiringList();
+  const exp = expAll.slice(0, 12);
+  $('#exp-title').textContent = `In scadenza nei prossimi ${expWindow} giorni`;
+  $('#exp-sub').textContent = `${expAll.length} ${expAll.length === 1 ? 'socio' : 'soci'} · da contattare per il rinnovo`;
+  document.querySelectorAll('#exp-filters .chip').forEach((c) => c.classList.toggle('active', +c.dataset.w === expWindow));
+  $('#expiring tbody').innerHTML = exp.map((m) => `<tr><td>${who(m)}</td><td><span class="plan-pill">${m.plan.name}</span></td><td class="mono">${fmtDate(m.end)} <span style="color:var(--warn);font-weight:600">· ${m.dleft}gg</span></td><td class="mono">${euro(m.plan.price)}</td>${actionsCell(m)}</tr>`).join('') || `<tr><td colspan="5" style="text-align:center;color:var(--ink-3);padding:20px">Nessun socio in scadenza nei prossimi ${expWindow} giorni</td></tr>`;
 }
 
 function renderMembers() {
@@ -221,7 +228,7 @@ async function sendReminderTo(sid) {
   toast(mail.channel === 'mailpit' ? `Promemoria inviato a Mailpit · ${m.email}` : `Promemoria generato (anteprima) · ${m.nome}`, 'mail');
 }
 async function sendReminders() {
-  const list = DATA.members.filter((m) => m.stato === 'In scadenza' && m.email && !reminded.has(m.sid));
+  const list = expiringList().filter((m) => m.email && !reminded.has(m.sid));
   if (!list.length) { toast('Nessun nuovo promemoria da inviare', 'warn'); return; }
   for (const m of list) {
     const { subject, html } = templates.rinnovo(m, Math.max(0, m.dleft));
@@ -503,6 +510,7 @@ function wireEvents() {
   $('#btn-accesso').addEventListener('click', openAccessoModal);
   $('#accessoform').addEventListener('submit', submitAccesso);
   $('#btn-reminders').addEventListener('click', sendReminders);
+  $('#exp-filters').addEventListener('click', (e) => { const b = e.target.closest('.chip'); if (!b) return; expWindow = +b.dataset.w; renderDashboard(); });
   $('#btn-clear-posta').addEventListener('click', clearPosta);
   $('#r-piano').addEventListener('change', updateRinnovoPreview);
   $('#rinnovoform').addEventListener('submit', doRenew);
