@@ -1,47 +1,65 @@
-# Deploy su Oracle Cloud (VM Always Free)
+# Deploy su Oracle Cloud — base riusabile multi-progetto
 
-Script per pubblicare il frontend GymIN su una VM Ubuntu.
-Guida completa passo-passo: vedi l'artifact **GymIN Deploy**.
+Ospita **più progetti su una sola VM** (Always Free), un **sottodominio** ciascuno
+con il suo vhost Nginx. Aggiungere un progetto non tocca gli altri.
+
+Guida completa passo-passo: artifact **GymIN Deploy**.
 
 ## Prerequisiti
-- Una VM Ubuntu 22.04 (Oracle Cloud Always Free, Ampere ARM)
-- Porte **80/443** aperte nella **Security List** della VCN (dalla console OCI)
-- Accesso SSH alla VM
+- VM Ubuntu 22.04 (Oracle Cloud Always Free, Ampere ARM)
+- Porte **80/443** aperte nella **Security List** della VCN (console OCI)
+- Un dominio con un **record A per ogni sottodominio** → IP pubblico della VM
+  (es. `gymin.miodominio.it`, `sito2.miodominio.it` → stesso IP)
 
-## Primo deploy
+## 1 · Prepara la VM (una sola volta)
 
 ```bash
-# sulla VM
 git clone https://github.com/loriscuba/GymIN.git ~/gymin
 cd ~/gymin
-bash deploy/setup.sh
+bash deploy/host-init.sh          # nginx, git, certbot, rsync, firewall 80/443
+# bash deploy/host-init.sh --node # aggiungi Node.js 20 se ti servono backend
 ```
 
-Lo script: aggiorna il sistema, installa Nginx, apre 80/443 nel firewall del SO,
-copia `web/` in `/var/www/gymin` e configura Nginx. Al termine GymIN è su `http://IP_PUBBLICO`.
-
-Opzioni:
+## 2 · Pubblica un progetto (ripeti per ognuno)
 
 ```bash
-SERVER_NAME=gymin.miodominio.it bash deploy/setup.sh   # imposta il dominio
-INSTALL_NODE=1 bash deploy/setup.sh                    # installa anche Node.js (per il mailer)
+sudo bash deploy/site.sh <nome> <sottodominio> --repo <giturl> [--webdir web] [--branch main]
+
+# esempi
+sudo bash deploy/site.sh gymin gymin.miodominio.it --repo https://github.com/loriscuba/GymIN.git
+sudo bash deploy/site.sh sito2 sito2.miodominio.it --repo https://github.com/loriscuba/sito2.git --webdir public
 ```
 
-## HTTPS (serve un dominio)
+- `<nome>` — cartella/etichetta interna del progetto (a-z, 0-9, - _)
+- `<sottodominio>` — il dominio che punterà a questo progetto
+- `--webdir` — cartella statica dentro il repo (default `web`; usa `public`, `dist`, …)
+- Il repo viene clonato in `/opt/sites/<nome>` e servito da `/var/www/<nome>`
+
+## 3 · HTTPS per un sottodominio (dopo aver puntato il DNS)
 
 ```bash
-sudo apt -y install certbot python3-certbot-nginx
 sudo certbot --nginx -d gymin.miodominio.it
 ```
 
-## Aggiornare dopo un push
+## 4 · Aggiornare un progetto dopo un push
 
 ```bash
-cd ~/gymin
-bash deploy/update.sh
+sudo bash deploy/site-update.sh <nome>            # es: gymin
+sudo bash deploy/site-update.sh sito2 --webdir public
 ```
 
-## Modulo mail (opzionale)
+## Scorciatoia solo-GymIN
 
-Vedi la sezione "Backend" della guida: Mailpit via `docker compose`, worker con PM2,
-relay SMTP su porta **587** (la 25 è bloccata da Oracle).
+Prepara la VM e pubblica GymIN in un colpo solo (usa host-init + site sotto):
+
+```bash
+bash deploy/setup.sh
+SERVER_NAME=gymin.miodominio.it bash deploy/setup.sh
+```
+
+## Note
+- **Una VM basta** per molti progetti: l'ARM Always Free (fino a 4 OCPU / 24 GB)
+  regge tanti siti statici / Node dietro un unico Nginx.
+- Per backend con database/mail: un **container Docker per progetto** + Nginx come
+  reverse proxy (vedi la sezione "Backend" della guida). Relay SMTP su porta **587**
+  (la 25 è bloccata da Oracle).
