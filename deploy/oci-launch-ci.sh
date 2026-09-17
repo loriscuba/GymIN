@@ -40,9 +40,14 @@ if OUT="$(oci compute instance launch \
     --assign-public-ip true \
     --boot-volume-size-in-gbs "$BOOT_GB" \
     --display-name "$DISPLAY_NAME" \
-    --metadata "{\"ssh_authorized_keys\":\"$SSH_PUBKEY\"}" 2>&1)"; then
-  echo "✔ VM creata!"
-  printf '%s\n' "$OUT" | grep -oE 'ocid1\.instance\.[a-z0-9._-]+' | head -1
+    --metadata "{\"ssh_authorized_keys\":\"$SSH_PUBKEY\"}" \
+    --wait-for-state RUNNING 2>&1)"; then
+  INST_ID="$(printf '%s' "$OUT" | grep -oE 'ocid1\.instance\.[a-z0-9._-]+' | head -1)"
+  IP="$(oci compute instance list-vnics --instance-id "$INST_ID" --query 'data[0]."public-ip"' --raw-output 2>/dev/null || true)"
+  echo "✔ VM creata!  $INST_ID  IP: ${IP:-?}"
+  if [ -n "${GITHUB_OUTPUT:-}" ]; then
+    { echo "created=true"; echo "ocid=$INST_ID"; echo "ip=${IP:-}"; } >> "$GITHUB_OUTPUT"
+  fi
   echo "Ora puoi disattivare il workflow (Actions → OCI launch → ⋯ → Disable)."
   exit 0
 else

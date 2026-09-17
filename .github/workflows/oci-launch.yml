@@ -12,6 +12,10 @@ concurrency:
   group: oci-launch
   cancel-in-progress: false
 
+permissions:
+  contents: read
+  issues: write        # per aprire l'issue di notifica al successo
+
 jobs:
   launch:
     runs-on: ubuntu-latest
@@ -43,6 +47,7 @@ jobs:
           chmod 600 ~/.oci/config
 
       - name: Prova a creare la VM
+        id: launch
         env:
           SSH_PUBKEY: ${{ secrets.SSH_PUBKEY }}
           OCI_COMPARTMENT: ${{ secrets.OCI_COMPARTMENT }}   # opzionale (default: tenancy)
@@ -51,3 +56,29 @@ jobs:
           OCPUS: "1"
           MEMORY_GB: "6"
         run: bash deploy/oci-launch-ci.sh
+
+      - name: Avvisami via email (issue GitHub)
+        if: steps.launch.outputs.created == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const ip = "${{ steps.launch.outputs.ip }}";
+            const ocid = "${{ steps.launch.outputs.ocid }}";
+            const owner = context.repo.owner;
+            const body = [
+              `@${owner} la VM ARM su Oracle è stata **creata** 🎉`,
+              ``,
+              `- **IP pubblico:** ${ip || '(in provisioning — controlla in console)'}`,
+              `- **OCID:** \`${ocid}\``,
+              ``,
+              ip ? `Connettiti: \`ssh -i ~/.ssh/id_rsa ubuntu@${ip}\`` : ``,
+              ``,
+              `Prossimi passi: apri **80/443** nella Security List, poi sulla VM \`bash deploy/host-init.sh\`.`,
+              ``,
+              `➡️ Ora puoi **disattivare questo workflow**: Actions → "OCI · crea VM ARM…" → ⋯ → Disable.`,
+            ].join("\n");
+            await github.rest.issues.create({
+              owner, repo: context.repo.repo,
+              title: "✅ VM Oracle creata",
+              body, assignees: [owner],
+            });
