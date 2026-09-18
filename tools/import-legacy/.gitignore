@@ -1,0 +1,9 @@
+# ⚠️  DATI PERSONALI — non committare mai i dati reali dei soci nel repository
+# (la demo GymIN è pubblica). Qui restano solo gli script.
+data/
+*.dbf
+*.fpt
+*.cdx
+*.csv
+.env
+node_modules/

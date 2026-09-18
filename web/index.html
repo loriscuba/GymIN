@@ -111,6 +111,7 @@
   .who b{font-weight:600;font-size:13.5px;display:block}.who span{font-size:12px;color:var(--ink-3)}.mono{font-variant-numeric:tabular-nums}
   .tag{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:20px;font-size:12px;font-weight:600}
   .tag.g{background:var(--good-bg);color:var(--good)}.tag.w{background:var(--warn-bg);color:var(--warn)}.tag.b{background:var(--bad-bg);color:var(--bad)}
+  .tag.n{background:rgba(100,116,139,.16);color:#64748b}
   .tag::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
   .plan-pill{padding:3px 9px;border-radius:7px;font-size:12px;font-weight:600;background:var(--surface-2);border:1px solid var(--line)}
   .tfoot{display:flex;align-items:center;justify-content:space-between;padding:13px 18px;font-size:13px;color:var(--ink-3)}
@@ -257,7 +258,7 @@
     <section class="view" id="view-anagrafiche" hidden>
       <div class="toolbar">
         <div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg><input id="memsearch" placeholder="Cerca per nome, email o tessera…"></div>
-        <div class="filters" id="memfilters"><button class="chip active" data-f="all">Tutti</button><button class="chip" data-f="Attivo">Attivi</button><button class="chip" data-f="In scadenza">In scadenza</button><button class="chip" data-f="Scaduto">Scaduti</button></div>
+        <div class="filters" id="memfilters"><button class="chip active" data-f="all">Tutti</button><button class="chip" data-f="Attivo">Attivi</button><button class="chip" data-f="In scadenza">In scadenza</button><button class="chip" data-f="Scaduto">Scaduti</button><button class="chip" data-f="Senza abbonamento">Senza abbonamento</button></div>
         <button class="btn-primary" id="btn-nuovo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg> Nuovo socio</button>
       </div>
       <div class="tablewrap"><div class="scroll"><table id="memtable"><thead><tr><th>Socio</th><th>Tessera</th><th>Abbonamento</th><th>Iscritto il</th><th>Scadenza</th><th>Stato</th><th>Azioni</th></tr></thead><tbody></tbody></table></div>
