@@ -18,7 +18,7 @@ e opzionalmente `cnt_bank.dbf`) si ottengono i CSV mappati sullo schema GymIN:
 | `soci.csv` | `soci` | anagrafica completa; `cod_cli` = codice cliente legacy; `senza_abbonamento` = socio senza alcun abbonamento |
 | `piani.csv` | `piani` | dedotti dai servizi delle tessere; **prezzo 0** (vedi sotto) |
 | `abbonamenti.csv` | `abbonamenti` | dalle tessere; collegati ai soci via `cod_cli`; `entrate_residue` dei carnet dalle ricariche |
-| `ricariche.csv` | (riferimento) | solo con `cnt_bank.dbf`: scatti/ingressi ricaricati e importi per socio |
+| `ricariche.csv` | (riferimento) | solo con `cnt_bank.dbf`: scatti ricaricati e importi per socio; con `accessi.dbf` anche `consumati` e `residuo` esatto |
 
 ### Prezzi ed entrate — cosa è realmente recuperabile
 
@@ -29,11 +29,19 @@ Il gestionale legacy è un **sistema di controllo accessi prepagato "a scatti"**
   e le tabelle tariffe non hanno un campo prezzo. I soci pagano ricaricando
   ingressi (importi variabili). Perciò `piani.prezzo` resta `0`, da compilare nel
   gestionale nuovo.
-- **Entrate dei carnet ("N ingressi"): stimate dalle ricariche.** Da `cnt_bank.dbf`
-  si leggono i movimenti "Ricarica N scatti" per socio; `entrate_residue`
-  dell'ultimo carnet viene impostato al numero di scatti dell'ultima ricarica
-  (best-effort, da verificare: il residuo esatto richiederebbe di sottrarre gli
-  accessi consumati da `accessi.dbf`).
+- **Entrate dei carnet ("N ingressi"): residuo esatto se disponibile.** Da
+  `cnt_bank.dbf` si leggono i movimenti "Ricarica N scatti" per socio. Se è
+  presente anche `accessi.dbf`, l'`entrate_residue` viene calcolato in modo
+  **esatto**:
+
+  ```
+  residuo = scatti ricaricati − accessi 'N ingressi' validi consumati   (mai < 0)
+  ```
+
+  Gli accessi ignorati/negati (campo COMMENTO) sono esclusi; ogni accesso valido
+  sul servizio "N ingressi" consuma 1 scatto (verificato: sono quasi tutti
+  entrate, `DIREZIONE=A`, nessun doppio conteggio). Senza `accessi.dbf` si usa
+  invece la stima dall'ultima ricarica.
 
 ### Soci senza abbonamento
 
@@ -57,7 +65,8 @@ la sostituisce con `data_inizio + durata del piano`.
 
 1. Estrai dal backup del gestionale questi file in `./data/`:
    - `anagraf.dbf`, `anagraf.fpt`, `tessere.dbf` (obbligatori)
-   - `cnt_bank.dbf` (opzionale, per le entrate dei carnet)
+   - `cnt_bank.dbf` (opzionale, per le ricariche/entrate dei carnet)
+   - `accessi.dbf` (opzionale, per il residuo esatto dei carnet)
 2. Python 3 (nessuna dipendenza esterna per la conversione).
 3. Node 18+ e le dipendenze per l'import:
    ```bash
@@ -113,9 +122,8 @@ npm run import:replace     # rimuove gli abbonamenti esistenti dei soci e reimpo
 - **Prezzi dei piani** (`piani.prezzo = 0`): non esistono nel gestionale legacy
   (sistema prepagato a scatti, listino vuoto). Vanno inseriti a mano nel nuovo
   gestionale in base al listino attuale della palestra.
-- **Entrate dei carnet** (`N ingressi`): impostate dall'ultima ricarica del socio
-  (`cnt_bank.dbf`). È una stima: il residuo esatto richiederebbe di sottrarre gli
-  accessi consumati (`accessi.dbf`, ~60 MB).
+- **Entrate dei carnet** (`N ingressi`): con `accessi.dbf` il residuo è esatto
+  (scatti ricaricati − accessi consumati); senza, è stimato dall'ultima ricarica.
 - **Soci senza abbonamento**: importati e marcati (`senza_abbonamento`); l'app li
   mostra con badge e filtro dedicati (modifiche in `web/js/data.js`,
   `web/js/app.js`, `web/index.html`).

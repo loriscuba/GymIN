@@ -12,7 +12,8 @@ mappati sullo schema GymIN:
 
 File di input attesi in --in:
   anagraf.dbf, anagraf.fpt, tessere.dbf   (obbligatori)
-  cnt_bank.dbf                            (opzionale, per prezzi/entrate carnet)
+  cnt_bank.dbf                            (opzionale, per le ricariche/entrate carnet)
+  accessi.dbf                             (opzionale, per il residuo ESATTO dei carnet)
 
 IMPORTANTE sul gestionale legacy: è un sistema di controllo accessi PREPAGATO
 "a scatti" (ingressi), non ad abbonamenti a prezzo fisso. Il listino prezzi
@@ -20,8 +21,9 @@ IMPORTANTE sul gestionale legacy: è un sistema di controllo accessi PREPAGATO
 ricaricano ingressi ("Ricarica N scatti") pagando importi variabili, registrati
 in cnt_bank.dbf. Quindi:
   - piani.prezzo resta 0 (da compilare a mano nel gestionale nuovo);
-  - le "entrate" dei carnet (N ingressi) vengono stimate dall'ultima ricarica
-    del socio (campo entrate_residue negli abbonamenti carnet).
+  - le "entrate" dei carnet (N ingressi): se è presente accessi.dbf si calcola
+    il RESIDUO ESATTO (scatti ricaricati - accessi 'N ingressi' consumati),
+    altrimenti si stima dall'ultima ricarica.
 
 Nessuna dipendenza esterna: parser DBF/FPT minimale incluso.
 
@@ -170,6 +172,47 @@ def read_ricariche(path):
     return per, movimenti
 
 
+def count_ingressi_consumati(path):
+    """Conta, per socio (COD_CLI), gli accessi VALIDI sul servizio carnet
+    'N ingressi' dal registro accessi. Ogni accesso valido consuma 1 scatto.
+    Esclude gli accessi ignorati/negati (COMMENTO). Ritorna dict cod_cli->int."""
+    with open(path, "rb") as f:
+        data = f.read()
+    numrec = struct.unpack("<I", data[4:8])[0]
+    hdrlen = struct.unpack("<H", data[8:10])[0]
+    reclen = struct.unpack("<H", data[10:12])[0]
+    fields = []
+    pos = 32
+    while data[pos] != 0x0D:
+        fields.append((data[pos:pos + 11].split(b"\x00")[0].decode("latin1"),
+                       chr(data[pos + 11]), data[pos + 16]))
+        pos += 32
+    idx = {}
+    off = 1
+    for n, t, l in fields:
+        idx[n] = (off, l, t)
+        off += l
+    used = collections.Counter()
+    for r in range(numrec):
+        rec = data[hdrlen + r * reclen: hdrlen + (r + 1) * reclen]
+        if len(rec) < reclen or rec[0:1] == b"*":
+            continue
+        o, l, _ = idx["SERVIZIO"]
+        serv = rec[o:o + l].decode("latin1", "replace").strip()
+        if "ingress" not in serv.lower():
+            continue
+        o, l, _ = idx["COMMENTO"]
+        com = rec[o:o + l].decode("latin1", "replace").lower()
+        if "ignorat" in com or "negat" in com:
+            continue
+        o, l, _ = idx["COD_CLI"]
+        raw = rec[o:o + l]
+        cod = struct.unpack("<i", raw)[0] if len(raw) == 4 else 0
+        if cod:
+            used[str(cod)] += 1
+    return used
+
+
 def write_csv(path, cols, rows):
     with open(path, "w", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=cols)
@@ -188,11 +231,20 @@ def main():
                     os.path.join(args.indir, "anagraf.fpt"))
     tess = read_dbf(os.path.join(args.indir, "tessere.dbf"))
 
-    # ricariche (opzionale)
+    # ricariche (opzionale) + eventuale riconciliazione con gli accessi
     cnt_path = os.path.join(args.indir, "cnt_bank.dbf")
+    acc_path = os.path.join(args.indir, "accessi.dbf")
     ricariche_per_cli, movimenti = ({}, [])
     if os.path.exists(cnt_path):
         ricariche_per_cli, movimenti = read_ricariche(cnt_path)
+    # residuo ESATTO dei carnet = scatti ricaricati - accessi 'N ingressi' consumati
+    consumati = {}
+    if ricariche_per_cli and os.path.exists(acc_path):
+        consumati = count_ingressi_consumati(acc_path)
+        for cod, p in ricariche_per_cli.items():
+            usati = consumati.get(cod, 0)
+            p["consumati"] = usati
+            p["residuo"] = max(0, p["scatti_totali"] - usati)
 
     # ---- ABBONAMENTI (dalle tessere, escluso il record tecnico "Ufficio") ---
     # (calcolati prima dei soci per sapere chi è "senza abbonamento")
@@ -226,11 +278,15 @@ def main():
             latest[k] = i
     for i, a in enumerate(abb):
         a["is_latest"] = "1" if latest.get(a["cod_cli"]) == i else "0"
-        # entrate carnet: stima dall'ultima ricarica del socio (best-effort)
+        # entrate carnet: residuo ESATTO se abbiamo gli accessi, altrimenti
+        # stima dall'ultima ricarica (best-effort).
         if a["is_latest"] == "1" and "ingress" in a["piano_nome"].lower():
             ric = ricariche_per_cli.get(a["cod_cli"])
-            if ric and ric["ultimi_scatti"]:
-                a["entrate_residue"] = str(ric["ultimi_scatti"])
+            if ric:
+                if "residuo" in ric:
+                    a["entrate_residue"] = str(ric["residuo"])
+                elif ric["ultimi_scatti"]:
+                    a["entrate_residue"] = str(ric["ultimi_scatti"])
     soci_con_abb = set(latest)
 
     # ---- SOCI ---------------------------------------------------------------
@@ -295,6 +351,7 @@ def main():
 
     # ---- RICARICHE (per socio) ---------------------------------------------
     if ricariche_per_cli:
+        has_res = bool(consumati)
         ric_rows = [{
             "cod_cli": cod,
             "scatti_totali": v["scatti_totali"],
@@ -302,14 +359,23 @@ def main():
             "ultima_ricarica": (f"{v['ultima_ricarica'][0:4]}-{v['ultima_ricarica'][4:6]}-{v['ultima_ricarica'][6:8]}"
                                 if len(v["ultima_ricarica"]) == 8 else ""),
             "ultimi_scatti": v["ultimi_scatti"],
-        } for cod, v in sorted(ricariche_per_cli.items(), key=lambda kv: -kv[1]["scatti_totali"])]
-        write_csv(os.path.join(args.outdir, "ricariche.csv"),
-                  ["cod_cli", "scatti_totali", "importo_totale", "ultima_ricarica", "ultimi_scatti"],
-                  ric_rows)
+            "consumati": v.get("consumati", ""),
+            "residuo": v.get("residuo", ""),
+        } for cod, v in sorted(ricariche_per_cli.items(), key=lambda kv: -kv[1].get("residuo", kv[1]["scatti_totali"]))]
+        cols = ["cod_cli", "scatti_totali", "importo_totale", "ultima_ricarica", "ultimi_scatti"]
+        if has_res:
+            cols += ["consumati", "residuo"]
+        write_csv(os.path.join(args.outdir, "ricariche.csv"), cols,
+                  [{k: r[k] for k in cols} for r in ric_rows])
 
     senza = sum(1 for s in soci if s["senza_abbonamento"] == "true")
-    print(f"OK · soci={len(soci)} (senza abbonamento={senza}) · piani={len(piani)}"
-          f" · abbonamenti={len(abb)} · ricariche_soci={len(ricariche_per_cli)}")
+    msg = (f"OK · soci={len(soci)} (senza abbonamento={senza}) · piani={len(piani)}"
+           f" · abbonamenti={len(abb)} · ricariche_soci={len(ricariche_per_cli)}")
+    if consumati:
+        tot_res = sum(v.get("residuo", 0) for v in ricariche_per_cli.values())
+        pos_res = sum(1 for v in ricariche_per_cli.values() if v.get("residuo", 0) > 0)
+        msg += f" · residuo carnet ESATTO: {tot_res} scatti su {pos_res} soci"
+    print(msg)
     print(f"CSV in: {args.outdir}")
 
 
