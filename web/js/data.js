@@ -48,27 +48,61 @@ function statoMembro(plan, dleft, entrateResidue) {
 // ---------------------------------------------------------------------------
 // SUPABASE
 // ---------------------------------------------------------------------------
+// Legge TUTTE le righe di una tabella/select, aggirando il limite di 1000
+// righe per richiesta di Supabase (paginazione con range()).
+async function fetchAll(supa, table, select) {
+  const PAGE = 1000;
+  let out = [], from = 0;
+  for (;;) {
+    const { data, error } = await supa.from(table).select(select).range(from, from + PAGE - 1);
+    if (error) throw error;
+    out = out.concat(data);
+    if (data.length < PAGE) break;
+    from += PAGE;
+  }
+  return out;
+}
+
 async function loadSupabase(supa) {
   const today = new Date(); today.setHours(0, 0, 0, 0);
 
-  const { data: abb, error } = await supa
-    .from('abbonamenti')
-    .select('id,data_inizio,data_scadenza,entrate_residue,socio:soci(id,nome,cognome,email,telefono,data_nascita,sesso,codice_fiscale,indirizzo,citta,cap,note,consenso_mail,tessera),piano:piani(nome,prezzo,durata_mesi,entrate)');
-  if (error) throw error;
+  // Tutti i soci (anche quelli senza abbonamento) + tutti gli abbonamenti.
+  const soci = await fetchAll(supa, 'soci',
+    'id,nome,cognome,email,telefono,data_nascita,sesso,codice_fiscale,indirizzo,citta,cap,note,consenso_mail,tessera,creato_il');
+  const abb = await fetchAll(supa, 'abbonamenti',
+    'id,socio_id,data_inizio,data_scadenza,entrate_residue,piano:piani(nome,prezzo,durata_mesi,entrate)');
 
-  const members = abb.filter((a) => a.socio).map((a, i) => {
+  // Ultimo abbonamento per socio (data_scadenza massima).
+  const lastBySocio = {};
+  for (const a of abb) {
+    const cur = lastBySocio[a.socio_id];
+    if (!cur || new Date(a.data_scadenza) > new Date(cur.data_scadenza)) lastBySocio[a.socio_id] = a;
+  }
+
+  const members = soci.map((s, i) => {
+    const nome = `${s.nome} ${s.cognome}`;
+    const base = {
+      sid: s.id, id: s.tessera || s.id.slice(0, 8), nome, firstName: s.nome, lastName: s.cognome,
+      email: s.email || '', telefono: s.telefono, dataNascita: s.data_nascita, sesso: s.sesso,
+      cf: s.codice_fiscale, indirizzo: s.indirizzo, citta: s.citta, cap: s.cap,
+      note: s.note, consenso: s.consenso_mail, av: AV[i % AV.length],
+    };
+    const a = lastBySocio[s.id];
+    if (!a) {
+      // socio in anagrafica ma senza alcun abbonamento
+      return {
+        ...base, plan: planMeta('—', 0, 1, 0), entrateResidue: undefined,
+        start: s.creato_il ? new Date(s.creato_il) : null, end: null, dleft: null,
+        stato: 'Senza abbonamento',
+      };
+    }
     const end = new Date(a.data_scadenza);
     const dleft = giorni(end, today);
-    const s = a.socio;
-    const nome = `${s.nome} ${s.cognome}`;
     const plan = planMeta(a.piano?.nome || '—', a.piano?.prezzo || 0, a.piano?.durata_mesi || 1, a.piano?.entrate || 0);
     const entrateResidue = plan.entrate ? (a.entrate_residue ?? plan.entrate) : undefined;
     return {
-      sid: s.id, id: s.tessera || s.id.slice(0, 8), nome, firstName: s.nome, lastName: s.cognome, email: s.email || '',
-      telefono: s.telefono, dataNascita: s.data_nascita, sesso: s.sesso, cf: s.codice_fiscale,
-      indirizzo: s.indirizzo, citta: s.citta, cap: s.cap,
-      note: s.note, consenso: s.consenso_mail, entrateResidue,
-      plan, start: new Date(a.data_inizio), end, dleft, stato: statoMembro(plan, dleft, entrateResidue), av: AV[i % AV.length],
+      ...base, plan, entrateResidue,
+      start: new Date(a.data_inizio), end, dleft, stato: statoMembro(plan, dleft, entrateResidue),
     };
   });
   const bySid = Object.fromEntries(members.map((m) => [m.sid, m]));
@@ -183,7 +217,8 @@ function loadDemo() {
 
 // ---------------------------------------------------------------------------
 function finalize(members, accessi, revenue, source) {
-  const names = [...new Set(members.map((m) => m.plan.name))];
+  // esclude il piano segnaposto dei soci senza abbonamento ('—')
+  const names = [...new Set(members.map((m) => m.plan.name))].filter((n) => n && n !== '—');
   const plans = (Object.keys(PLAN_COLORS).filter((n) => names.includes(n)).concat(names.filter((n) => !PLAN_COLORS[n])))
     .map((name) => {
       const list = members.filter((m) => m.plan.name === name);

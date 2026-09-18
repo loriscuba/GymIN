@@ -155,12 +155,17 @@ async function main() {
     const inizio = dz(a.data_inizio) || today;
     let scad = dz(a.data_scadenza);
     if (!scad) scad = addMonths(inizio, meta.durata);           // open-ended (3000) o vuota
+    // entrate carnet: valore reale dalle ricariche (CSV) se presente, altrimenti
+    // la taglia nominale del piano; null per gli abbonamenti a tempo.
+    let entrate = null;
+    if (nz(a.entrate_residue)) entrate = Number(a.entrate_residue);
+    else if (meta.entrate > 0) entrate = meta.entrate;
     abbRows.push({
       socio_id: sid,
       piano_id: pid,
       data_inizio: inizio,
       data_scadenza: scad,
-      entrate_residue: meta.entrate > 0 ? meta.entrate : null,   // carnet: crediti pieni (da verificare)
+      entrate_residue: entrate,
       stato: a.disabilitato === 'true' ? 'disdetto' : (scad < today ? 'scaduto' : 'attivo'),
     });
   }

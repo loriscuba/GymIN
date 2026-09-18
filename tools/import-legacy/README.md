@@ -10,14 +10,37 @@ Strumenti per recuperare **anagrafiche** e **abbonamenti** dal vecchio gestional
 
 ## Cosa produce
 
-Dal database legacy (`anagraf.dbf` + memo `anagraf.fpt`, `tessere.dbf`) si ottengono
-tre CSV mappati sullo schema GymIN:
+Dal database legacy (`anagraf.dbf` + memo `anagraf.fpt`, `tessere.dbf`,
+e opzionalmente `cnt_bank.dbf`) si ottengono i CSV mappati sullo schema GymIN:
 
 | CSV | Tabella GymIN | Note |
 |-----|---------------|------|
-| `soci.csv` | `soci` | anagrafica completa; `cod_cli` = codice cliente legacy |
-| `piani.csv` | `piani` | dedotti dai servizi delle tessere; **prezzo/entrate da verificare** |
-| `abbonamenti.csv` | `abbonamenti` | dalle tessere; collegati ai soci via `cod_cli` |
+| `soci.csv` | `soci` | anagrafica completa; `cod_cli` = codice cliente legacy; `senza_abbonamento` = socio senza alcun abbonamento |
+| `piani.csv` | `piani` | dedotti dai servizi delle tessere; **prezzo 0** (vedi sotto) |
+| `abbonamenti.csv` | `abbonamenti` | dalle tessere; collegati ai soci via `cod_cli`; `entrate_residue` dei carnet dalle ricariche |
+| `ricariche.csv` | (riferimento) | solo con `cnt_bank.dbf`: scatti/ingressi ricaricati e importi per socio |
+
+### Prezzi ed entrate — cosa è realmente recuperabile
+
+Il gestionale legacy è un **sistema di controllo accessi prepagato "a scatti"**
+(ingressi), non ad abbonamenti a prezzo fisso:
+
+- **Prezzi degli abbonamenti: non esistono.** Il listino (`listini.dbf`) è vuoto
+  e le tabelle tariffe non hanno un campo prezzo. I soci pagano ricaricando
+  ingressi (importi variabili). Perciò `piani.prezzo` resta `0`, da compilare nel
+  gestionale nuovo.
+- **Entrate dei carnet ("N ingressi"): stimate dalle ricariche.** Da `cnt_bank.dbf`
+  si leggono i movimenti "Ricarica N scatti" per socio; `entrate_residue`
+  dell'ultimo carnet viene impostato al numero di scatti dell'ultima ricarica
+  (best-effort, da verificare: il residuo esatto richiederebbe di sottrarre gli
+  accessi consumati da `accessi.dbf`).
+
+### Soci senza abbonamento
+
+I soci presenti in anagrafica ma senza alcun abbonamento reale (nel legacy
+avevano solo il record tecnico "Ufficio") vengono **importati comunque** e
+marcati con `senza_abbonamento = true`. L'app li mostra in anagrafica con il
+badge **"Senza abbonamento"** e un filtro dedicato.
 
 Mappatura anagrafica: `NOME→nome`, `COGNOME→cognome`, `EMAIL→email`,
 `CELLULARE`/`TELEFONO→telefono`, `DATA_NASC→data_nascita`, `SESSO→sesso`,
@@ -33,7 +56,8 @@ la sostituisce con `data_inizio + durata del piano`.
 ## Prerequisiti
 
 1. Estrai dal backup del gestionale questi file in `./data/`:
-   - `anagraf.dbf`, `anagraf.fpt`, `tessere.dbf`
+   - `anagraf.dbf`, `anagraf.fpt`, `tessere.dbf` (obbligatori)
+   - `cnt_bank.dbf` (opzionale, per le entrate dei carnet)
 2. Python 3 (nessuna dipendenza esterna per la conversione).
 3. Node 18+ e le dipendenze per l'import:
    ```bash
@@ -86,15 +110,15 @@ npm run import:replace     # rimuove gli abbonamenti esistenti dei soci e reimpo
 
 ## Punti da verificare dopo l'import
 
-- **Prezzi dei piani** (`piani.prezzo = 0`): i listini stanno in altre tabelle
-  del gestionale (`tariffe.dbf`, `listini.dbf`). Vanno inseriti a mano o con un
-  secondo giro di import.
-- **Entrate dei carnet** (`N ingressi`): il numero reale di ingressi non è nelle
-  tessere; è impostato a un valore placeholder (10) da correggere.
-- **Soci senza abbonamento** (~670): nel gestionale avevano solo il record
-  tecnico "Ufficio". Con lo schema attuale dell'app compaiono solo i soci che
-  hanno almeno un abbonamento (la home elenca gli abbonamenti). Se servono anche
-  loro nell'elenco, valutare una vista/patch lato app.
+- **Prezzi dei piani** (`piani.prezzo = 0`): non esistono nel gestionale legacy
+  (sistema prepagato a scatti, listino vuoto). Vanno inseriti a mano nel nuovo
+  gestionale in base al listino attuale della palestra.
+- **Entrate dei carnet** (`N ingressi`): impostate dall'ultima ricarica del socio
+  (`cnt_bank.dbf`). È una stima: il residuo esatto richiederebbe di sottrarre gli
+  accessi consumati (`accessi.dbf`, ~60 MB).
+- **Soci senza abbonamento**: importati e marcati (`senza_abbonamento`); l'app li
+  mostra con badge e filtro dedicati (modifiche in `web/js/data.js`,
+  `web/js/app.js`, `web/index.html`).
 
 ## Note tecniche
 
