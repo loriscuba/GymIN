@@ -57,19 +57,35 @@ bash deploy/setup.sh
 SERVER_NAME=gymin.miodominio.it bash deploy/setup.sh
 ```
 
-## Capacità ARM esaurita ("Out of host capacity")
+## Tenant Oracle NUOVO (rete + VM in un colpo solo)
 
-La shape gratuita `VM.Standard.A1.Flex` è spesso satura. Per crearla appena si
-libera capacità, usa lo script di retry **dalla OCI Cloud Shell** (CLI già autenticata):
+Se hai appena creato un account Oracle (es. regione Amsterdam) e la rete è
+ancora vuota, **un unico script** crea tutto: VCN, Internet Gateway, rotta di
+default, regole firewall 22/80/443, subnet pubblica **e** la VM ARM (con retry
+finché c'è capacità). Lancialo **dalla OCI Cloud Shell** (CLI già autenticata):
 
 ```bash
-git clone https://github.com/loriscuba/GymIN.git
-bash GymIN/deploy/oci-launch-retry.sh
-# opzioni:  OCPUS=1 MEMORY_GB=6 SLEEP_SECONDS=60 DISPLAY_NAME=hub bash ...
+git clone https://github.com/loriscuba/gymin.git
+bash gymin/deploy/oci-provision.sh
+# opzioni:  OCPUS=2 MEMORY_GB=12 DISPLAY_NAME=hub SLEEP_SECONDS=180 bash ...
+```
+
+È idempotente: se rete o VM esistono già, non le ricrea. Al successo stampa
+l'IP pubblico e il comando `ssh`. Poi sulla VM lancia `bash deploy/host-init.sh`.
+
+## Capacità ARM esaurita ("Out of host capacity")
+
+Se la **rete esiste già** e ti manca solo la VM, usa lo script di retry
+**dalla OCI Cloud Shell** (CLI già autenticata):
+
+```bash
+git clone https://github.com/loriscuba/gymin.git
+bash gymin/deploy/oci-launch-retry.sh
+# opzioni:  OCPUS=1 MEMORY_GB=6 SLEEP_SECONDS=180 DISPLAY_NAME=hub bash ...
 ```
 
 Trova da solo compartment/AD/subnet/immagine, riprova finché entra e ti stampa
-l'IP pubblico. Prima serve aver creato la VCN con la procedura guidata.
+l'IP pubblico. Prima serve aver creato la VCN (o usa `oci-provision.sh` sopra).
 
 ### Senza tenere il PC acceso (GitHub Actions)
 
