@@ -1,0 +1,18 @@
+{
+  "name": "gymin-import-legacy",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Import dati dal vecchio gestionale (DBF/FoxPro) in Supabase per GymIN",
+  "scripts": {
+    "convert": "python3 dbf_to_csv.py --in ./data --out ./data/out",
+    "import:dry": "node import.mjs --dir ./data/out --dry-run",
+    "import": "node import.mjs --dir ./data/out",
+    "import:all": "node import.mjs --dir ./data/out --all-history",
+    "import:replace": "node import.mjs --dir ./data/out --replace"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.0",
+    "dotenv": "^16.4.5"
+  }
+}

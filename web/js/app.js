@@ -33,7 +33,7 @@ const statoDa = (dleft) => (dleft < 0 ? 'Scaduto' : dleft <= 30 ? 'In scadenza' 
 // stato che tiene conto dei carnet a consumo
 const computeStato = (m) => m.plan.entrate ? (m.entrateResidue <= 0 ? 'Scaduto' : m.entrateResidue <= 1 ? 'In scadenza' : 'Attivo') : statoDa(m.dleft);
 // testo colonna "Scadenza": data per gli abbonamenti a tempo, entrate residue per i carnet
-const scadCell = (m) => m.plan.entrate ? `${m.entrateResidue}/${m.plan.entrate} entrate` : fmtDate(m.end);
+const scadCell = (m) => m.stato === 'Senza abbonamento' || !m.end ? '<span style="color:var(--ink-3)">—</span>' : m.plan.entrate ? `${m.entrateResidue}/${m.plan.entrate} entrate` : fmtDate(m.end);
 function nextTessera() {
   const nums = DATA.members.map((m) => +(String(m.id).match(/(\d+)/)?.[1] || 0));
   return 'GY-' + (Math.max(1200, ...nums) + 1);
@@ -87,7 +87,7 @@ function kpi(label, icon, bg, col, val, trend, tclass, spark) {
   return `<div class="kpi"><div class="klabel"><span class="kbadge" style="background:${bg};color:${col}">${icon}</span>${label}</div>
     <div class="kval num">${val}</div><div class="ktrend"><span class="${tclass}">${trend}</span></div>${spark || ''}</div>`;
 }
-const tagFor = (s) => s === 'Attivo' ? '<span class="tag g">Attivo</span>' : s === 'In scadenza' ? '<span class="tag w">In scadenza</span>' : '<span class="tag b">Scaduto</span>';
+const tagFor = (s) => s === 'Attivo' ? '<span class="tag g">Attivo</span>' : s === 'In scadenza' ? '<span class="tag w">In scadenza</span>' : s === 'Senza abbonamento' ? '<span class="tag n">Senza abbonamento</span>' : '<span class="tag b">Scaduto</span>';
 const who = (m) => `<div class="who" data-member="${m.sid}" role="button" tabindex="0" data-tip="Apri scheda socio"><div class="av" style="background:${m.av}">${initials(m.nome)}</div><div><b>${m.nome}</b><span>${m.id}</span></div></div>`;
 const zapSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8z"/></svg>';
 const refreshSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v6h-6"/></svg>';
@@ -430,11 +430,13 @@ function openScheda(sid) {
         ${row('Sesso', m.sesso)}
         ${row('Codice fiscale', m.cf)}
         ${row('Indirizzo', indirizzo)}
-        ${row('Abbonamento', `${m.plan.name} · ${euro(m.plan.price)}`)}
-        ${row('Iscritto il', fmtDate(m.start))}
-        ${m.plan.entrate
-      ? row('Entrate residue', `${m.entrateResidue} / ${m.plan.entrate}`)
-      : row('Scadenza', `${fmtDate(m.end)} · ${m.dleft >= 0 ? m.dleft + 'gg' : 'scaduto'}`)}
+        ${row('Abbonamento', m.stato === 'Senza abbonamento' ? 'Nessun abbonamento' : `${m.plan.name} · ${euro(m.plan.price)}`)}
+        ${row('Iscritto il', m.start ? fmtDate(m.start) : '')}
+        ${m.stato === 'Senza abbonamento'
+      ? row('Scadenza', '—')
+      : m.plan.entrate
+        ? row('Entrate residue', `${m.entrateResidue} / ${m.plan.entrate}`)
+        : row('Scadenza', `${fmtDate(m.end)} · ${m.dleft >= 0 ? m.dleft + 'gg' : 'scaduto'}`)}
       </div>
       ${m.note ? `<div class="scheda-grid" style="grid-template-columns:1fr;margin-top:12px"><div><span>Note</span><b style="font-weight:500">${m.note}</b></div></div>` : ''}
     </div>

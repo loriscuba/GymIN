@@ -23,6 +23,22 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+      # Collega l'ambiente di test a Supabase generando web/config.js dalle
+      # Variables del repo. La chiave "anon" è pubblica per design (protetta da
+      # RLS): va bene esporla nel sito. Se le variabili non sono impostate, il
+      # sito parte in modalità demo (comportamento invariato).
+      - name: Genera web/config.js (se Supabase è configurato)
+        env:
+          SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ vars.SUPABASE_ANON_KEY }}
+        run: |
+          if [ -n "$SUPABASE_URL" ] && [ -n "$SUPABASE_ANON_KEY" ]; then
+            printf "window.GYMIN_CONFIG = { SUPABASE_URL: '%s', SUPABASE_ANON_KEY: '%s', MAILPIT_URL: '' };\n" \
+              "$SUPABASE_URL" "$SUPABASE_ANON_KEY" > web/config.js
+            echo "config.js generato: ambiente di test collegato a Supabase."
+          else
+            echo "Variabili Supabase assenti: build in modalità demo."
+          fi
       - uses: actions/configure-pages@v5
         with:
           enablement: true

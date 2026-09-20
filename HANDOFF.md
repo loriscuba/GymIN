@@ -82,6 +82,35 @@ Obiettivo: una VM Always Free (ARM Ampere) che ospita più progetti demo dietro 
 4. (Quando si vuole uscire dalla demo) Collegare Supabase: applicare le migration,
    impostare le chiavi in `web/js/data.js`, attivare il mailer sulla VM.
 
+## Aggiornamento — recupero dati legacy + go-live (set 2026)
+
+Lavoro sul branch `claude/friendly-mendel-lf67dq` → **PR #2** (da unire a `main`).
+
+### Migrazione dati dal vecchio gestionale (DBF/FoxPro)
+- Recuperati **3.431 soci** (`anagraf.dbf` + note memo `anagraf.fpt`) e **2.842
+  abbonamenti** (`tessere.dbf`), collegati via `COD_CLI`; **10 piani** dai servizi.
+- Il gestionale legacy è un **sistema di accessi prepagato "a scatti"**, non ad
+  abbonamenti a prezzo: **i prezzi non esistono** (listino vuoto) → `piani.prezzo=0`.
+- **Carnet "N ingressi"**: entrate = scatti ricaricati (`cnt_bank.dbf`); **residuo
+  esatto** riconciliato con `accessi.dbf` (293.761 accessi) = *ricaricati − consumati*
+  → 671 scatti su 100 soci. **672 soci senza abbonamento** importati e segnalati.
+- Strumenti in `tools/import-legacy/`: `dbf_to_csv.py` (DBF→CSV) + `import.mjs`
+  (import Supabase idempotente). Vedi il suo `README.md`.
+- Migration `20260918140000_import_legacy.sql`: aggiunge `soci.provincia` e
+  `soci.cod_cli` (unique).
+- App: l'anagrafica ora mostra anche i **soci senza abbonamento** (badge + filtro).
+- ⚠️ **I dati reali dei soci NON sono nel repo** (GDPR): il repo resta pubblico,
+  il `.gitignore` di `tools/import-legacy/` esclude `data/`, CSV e DBF.
+
+### Go-live
+- Guida passo-passo: **`deploy/GO-LIVE.md`** (test su GitHub Pages + Supabase,
+  produzione su Oracle VM + Supabase).
+- Scelte: **repo pubblico** (Pages gratis), **niente dominio per ora** (prod su IP
+  HTTP), **due progetti Supabase** separati (test/prod).
+- `pages.yml` genera `web/config.js` dalle Variables `SUPABASE_URL`/`SUPABASE_ANON_KEY`
+  (collega il test a Supabase; senza variabili resta demo).
+- Regola d'oro: la `service_role` key solo lato server (`.env`), mai nel repo/frontend.
+
 ## Convenzioni
 - Commit direttamente su `main` (autorizzato dall'utente).
 - Nessun dato reale finché non si collega Supabase.
