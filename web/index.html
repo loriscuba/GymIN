@@ -266,6 +266,13 @@
     </section>
 
     <section class="view" id="view-abbonamenti" hidden>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap">
+        <div><h3 style="font-size:15.5px">Listino piani</h3><div class="psub">Prezzi, durata e carnet</div></div>
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <div class="filters" id="planfilters"><button class="chip active" data-plan-state="all">Tutti</button><button class="chip" data-plan-state="attivo">Attivi</button><button class="chip" data-plan-state="disattivo">Disattivi</button></div>
+          <button class="btn-primary" id="btn-gestisci-piani"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/><path d="M15 3h6v6" opacity=".6"/></svg> Nuovo piano</button>
+        </div>
+      </div>
       <div class="plans" id="plans"></div>
       <div class="panel"><div class="phead"><div><h3>Incasso ricorrente per piano</h3><div class="psub">MRR stimato · quota media × soci attivi</div></div><div class="psub num" id="mrr-tot"></div></div><div class="dist" id="mrrchart"></div></div>
     </section>
@@ -332,6 +339,28 @@
     </div>
     <div class="mfoot"><button type="button" class="btn-ghost" data-close="modal-rinnovo">Annulla</button><button type="submit" class="btn-primary">Conferma rinnovo</button></div>
   </form>
+</div>
+
+<!-- Modale: gestione piani -->
+<div class="overlay" id="modal-plan-manager" hidden>
+  <div class="modal wide">
+    <div class="mhead"><div><h3>Gestione piani</h3><div class="msub">Prezzi, durata e carnet</div></div><button type="button" class="xbtn" data-close="modal-plan-manager">×</button></div>
+    <div class="mbody">
+      <form id="planform">
+        <div class="field row"><div><label for="plan-name">Nome piano *</label><input id="plan-name" required></div><div><label for="plan-price">Prezzo € *</label><input id="plan-price" type="number" min="0" step="0.01" required></div></div>
+        <div class="field row"><div><label for="plan-durata">Durata (mesi)</label><input id="plan-durata" type="number" min="1" step="1" value="1"></div><div><label for="plan-entrate">Entrate carnet</label><input id="plan-entrate" type="number" min="0" step="1" value="0"></div></div>
+        <div class="field"><label for="plan-descrizione">Descrizione</label><textarea id="plan-descrizione" rows="2" placeholder="Descrizione interna del piano"></textarea></div>
+        <label class="check"><input type="checkbox" id="plan-attivo" checked> Piano attivo</label>
+        <div class="mfoot" style="padding:16px 0 0;border-top:0;justify-content:flex-end">
+          <button type="button" class="btn-ghost" id="plan-reset">Nuovo</button>
+          <button type="submit" class="btn-primary" id="plan-save">Salva piano</button>
+        </div>
+      </form>
+
+
+    </div>
+    <div class="mfoot"><button type="button" class="btn-ghost" data-close="modal-plan-manager">Chiudi</button></div>
+  </div>
 </div>
 
 <!-- Modale: scheda socio (contenuto generato da JS) -->
