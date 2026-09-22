@@ -35,9 +35,19 @@ const giorni = (a, b) => Math.round((a - b) / 86400000);
 function statoDa(dleft) {
   return dleft < 0 ? 'Scaduto' : dleft <= 30 ? 'In scadenza' : 'Attivo';
 }
-function planMeta(nome, prezzo, durata, entrate) {
+function planMeta(nome, prezzo, durata, entrate, extra = {}) {
   const dur = durata || 1;
-  return { name: nome, price: Number(prezzo), dur, mcost: Number(prezzo) / dur, color: PLAN_COLORS[nome] || 'var(--slate)', entrate: Number(entrate) || 0 };
+  return {
+    id: extra.id || null,
+    name: nome,
+    price: Number(prezzo),
+    dur,
+    mcost: Number(prezzo) / dur,
+    color: PLAN_COLORS[nome] || 'var(--slate)',
+    entrate: Number(entrate) || 0,
+    active: extra.active !== false,
+    descrizione: extra.descrizione || '',
+  };
 }
 // stato tenendo conto dei carnet (a consumo) oltre alle date
 function statoMembro(plan, dleft, entrateResidue) {
@@ -71,6 +81,7 @@ async function loadSupabase(supa) {
     'id,nome,cognome,email,telefono,data_nascita,sesso,codice_fiscale,indirizzo,citta,cap,note,consenso_mail,tessera,creato_il');
   const abb = await fetchAll(supa, 'abbonamenti',
     'id,socio_id,data_inizio,data_scadenza,entrate_residue,piano:piani(nome,prezzo,durata_mesi,entrate)');
+  const planCatalog = await fetchAll(supa, 'piani', 'id,nome,prezzo,durata_mesi,entrate,descrizione,attivo');
 
   // Ultimo abbonamento per socio (data_scadenza massima).
   const lastBySocio = {};
@@ -124,18 +135,30 @@ async function loadSupabase(supa) {
     };
   });
 
-  // fatturato ultimi 12 mesi da pagamenti
+  // fatturato ultimi 12 mesi da pagamenti; fallback da piani attivi
   const from = new Date(today); from.setMonth(from.getMonth() - 11); from.setDate(1);
   const { data: pag } = await supa.from('pagamenti').select('importo,data').gte('data', from.toISOString());
-  const revenue = build12Months(today);
+  let revenue = build12Months(today);
   for (const p of pag || []) {
     const d = new Date(p.data);
     const k = d.getFullYear() * 12 + d.getMonth();
     const hit = revenue.find((r) => r.key === k);
     if (hit) hit.value += Number(p.importo);
   }
+  const totalPagamenti = (pag || []).reduce((sum, p) => sum + Number(p.importo || 0), 0);
+  if ((pag || []).length === 0 || totalPagamenti === 0) {
+    const fallback = revenueFromActivePlans(members, today);
+    if (fallback.at(-1)?.value > 0) revenue = fallback;
+  }
 
-  return finalize(members, accessi, revenue, 'supabase');
+  const planMap = new Map((planCatalog || []).filter((p) => p && p.nome).map((p) => [p.nome, planMeta(p.nome, p.prezzo ?? 0, p.durata_mesi ?? 1, p.entrate ?? 0, { id: p.id, active: p.attivo !== false, descrizione: p.descrizione || '' })]));
+  for (const m of members) {
+    if (m.plan && m.plan.name && m.plan.name !== '—' && !planMap.has(m.plan.name)) {
+      planMap.set(m.plan.name, { ...m.plan, active: true, descrizione: '' });
+    }
+  }
+
+  return finalize(members, accessi, revenue, 'supabase', [...planMap.values()]);
 }
 
 function build12Months(today) {
@@ -145,6 +168,18 @@ function build12Months(today) {
     out.push({ key: d.getFullYear() * 12 + d.getMonth(), label: MESI[d.getMonth()], value: 0 });
   }
   return out;
+}
+
+function revenueFromActivePlans(members, today) {
+  const revenue = build12Months(today);
+  const current = revenue.at(-1);
+  for (const m of members) {
+    if (!m.plan || m.plan.name === '—') continue;
+    if (m.stato === 'Attivo' || m.stato === 'In scadenza') {
+      current.value += Number(m.plan.price || 0);
+    }
+  }
+  return revenue;
 }
 
 // ---------------------------------------------------------------------------
@@ -216,16 +251,32 @@ function loadDemo() {
 }
 
 // ---------------------------------------------------------------------------
-function finalize(members, accessi, revenue, source) {
-  // esclude il piano segnaposto dei soci senza abbonamento ('—')
-  const names = [...new Set(members.map((m) => m.plan.name))].filter((n) => n && n !== '—');
+function finalize(members, accessi, revenue, source, planCatalog = []) {
+  const catalogByName = new Map((planCatalog || []).map((p) => [p.name, p]));
+  const names = [...new Set([
+    ...members.map((m) => m.plan.name),
+    ...(planCatalog || []).map((p) => p.name),
+  ])].filter((n) => n && n !== '—');
   const plans = (Object.keys(PLAN_COLORS).filter((n) => names.includes(n)).concat(names.filter((n) => !PLAN_COLORS[n])))
     .map((name) => {
       const list = members.filter((m) => m.plan.name === name);
-      return {
+      const planDef = catalogByName.get(name) || {
         name, color: PLAN_COLORS[name] || 'var(--slate)',
         price: list[0]?.plan.price || 0, mcost: list[0]?.plan.mcost || 0, dur: list[0]?.plan.dur || 1, entrate: list[0]?.plan.entrate || 0,
-        count: list.length, active: list.filter((m) => m.stato === 'Attivo').length,
+        active: true, descrizione: '', id: null,
+      };
+      return {
+        id: planDef.id || null,
+        name,
+        color: planDef.color || PLAN_COLORS[name] || 'var(--slate)',
+        price: Number(planDef.price ?? list[0]?.plan.price ?? 0),
+        mcost: Number(planDef.mcost ?? planDef.price / (planDef.dur || 1) ?? 0),
+        dur: Number(planDef.dur ?? list[0]?.plan.dur ?? 1),
+        entrate: Number(planDef.entrate ?? list[0]?.plan.entrate ?? 0),
+        descrizione: planDef.descrizione || '',
+        attivo: planDef.active !== false,
+        count: list.length,
+        active: list.filter((m) => m.stato === 'Attivo').length,
       };
     });
   return { source, members, accessi, revenue, plans };

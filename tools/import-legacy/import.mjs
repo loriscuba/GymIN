@@ -125,8 +125,26 @@ async function main() {
     };
   });
   if (!DRY) {
-    for (const part of chunk(sociRows, CHUNK)) {
-      const { error } = await supa.from('soci').upsert(part, { onConflict: 'cod_cli' });
+    const existing = await supa.from('soci').select('id,cod_cli');
+    if (existing.error) throw existing.error;
+    const existingByCodCli = new Map((existing.data || []).filter((r) => r.cod_cli).map((r) => [r.cod_cli, r.id]));
+
+    const toInsert = [];
+    const toUpdate = [];
+    for (const row of sociRows) {
+      if (row.cod_cli && existingByCodCli.has(row.cod_cli)) {
+        toUpdate.push({ ...row, id: existingByCodCli.get(row.cod_cli) });
+      } else {
+        toInsert.push(row);
+      }
+    }
+
+    for (const part of chunk(toInsert, CHUNK)) {
+      const { error } = await supa.from('soci').insert(part);
+      if (error) throw error;
+    }
+    for (const part of chunk(toUpdate, CHUNK)) {
+      const { error } = await supa.from('soci').upsert(part, { onConflict: 'id' });
       if (error) throw error;
     }
   }

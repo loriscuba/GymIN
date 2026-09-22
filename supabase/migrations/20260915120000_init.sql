@@ -176,6 +176,7 @@ do $$
 declare t text;
 begin
   foreach t in array array['piani','soci','abbonamenti','pagamenti','accessi','mail_log'] loop
+    execute format('drop policy if exists %I on %I;', 'staff_all_' || t, t);
     execute format(
       'create policy %I on %I for all to authenticated using (true) with check (true);',
       'staff_all_' || t, t

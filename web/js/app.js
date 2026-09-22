@@ -1,4 +1,4 @@
-import { loadData, getSupa } from './data.js';
+import { loadData, getSupa, PLAN_COLORS } from './data.js';
 import { templates } from './mailtemplates.js';
 
 const $ = (s, r = document) => r.querySelector(s);
@@ -11,6 +11,7 @@ let DATA = null;
 const MAILBOX = [];
 const reminded = new Set();
 const memState = { filter: 'all', query: '', page: 1, PER: 9 };
+let planFilter = 'attivo';
 let socioMode = 'new';
 let editSid = null;
 let expWindow = 7;   // finestra "in scadenza" della dashboard: 7 / 15 / 30 giorni
@@ -152,13 +153,25 @@ function renderMembers() {
 
 function renderPlans() {
   const { plans } = DATA;
-  $('#plans').innerHTML = plans.map((p) => `<div class="plancard${p.name === 'Annuale' ? ' feat' : ''}">${p.name === 'Annuale' ? '<div class="ribbon">Più venduto</div>' : ''}
+  const list = plans.filter((p) => {
+    if (planFilter === 'attivo') return p.attivo !== false;
+    if (planFilter === 'disattivo') return p.attivo === false;
+    return true;
+  });
+
+  $('#plans').innerHTML = list.map((p) => `<div class="plancard${p.name === 'Annuale' ? ' feat' : ''}">${p.name === 'Annuale' ? '<div class="ribbon">Più venduto</div>' : ''}
     <h3>${p.name}</h3><div class="price num">${euro(p.price)}</div>
-    <div class="sub-metric"><span>Soci attivi</span><b class="num">${p.active} / ${p.count}</b></div></div>`).join('');
-  const mrr = plans.map((p) => ({ p, v: p.active * p.mcost }));
+    <div class="sub-metric"><span>Soci attivi</span><b class="num">${p.active} / ${p.count}</b></div>
+    <div class="sub-metric"><span>Durata</span><b>${p.dur} ${p.dur === 1 ? 'mese' : 'mesi'}</b></div>
+    ${p.entrate ? `<div class="sub-metric"><span>Entrate</span><b>${p.entrate} ticket</b></div>` : ''}
+    ${!p.attivo ? `<div class="sub-metric"><span>Stato</span><b style="color:var(--warn)">Disattivo</b></div>` : ''}
+    <div style="margin-top:16px;display:flex;justify-content:flex-end"><button class="btn-row" data-plan-edit="${p.id || p.name}">Modifica</button></div>
+    </div>`).join('') || '<div style="grid-column:1/-1;text-align:center;color:var(--ink-3);padding:28px;border:1px dashed var(--line);border-radius:12px">Nessun piano trovato per questo filtro.</div>';
+
+  const mrr = plans.filter((p) => planFilter === 'all' || (planFilter === 'attivo' ? p.attivo !== false : p.attivo === false ? false : true)).map((p) => ({ p, v: p.active * p.mcost }));
   const tot = mrr.reduce((a, b) => a + b.v, 0), mx = Math.max(...mrr.map((m) => m.v), 1);
   $('#mrr-tot').textContent = 'MRR totale: ' + euro(tot);
-  $('#mrrchart').innerHTML = mrr.map((m) => `<div class="distrow"><span class="dl">${m.p.name}</span><div class="track"><div class="fill" style="width:${(m.v / mx * 100).toFixed(0)}%;background:${m.p.color}"></div></div><span class="dv">${euro(m.v)}</span></div>`).join('');
+  $('#mrrchart').innerHTML = mrr.map((m) => `<div class="distrow"><span class="dl">${m.p.name}</span><div class="track"><div class="fill" style="width:${(m.v / mx * 100).toFixed(0)}%;background:${m.p.color}"></div></div><span class="dv">${euro(m.v)}</span></div>`).join('') || '<div style="padding:14px 0;color:var(--ink-3)">Nessun dato per il filtro attuale.</div>';
 }
 
 function renderAccessi() {
@@ -174,6 +187,14 @@ function renderAccessi() {
 function renderPosta() {
   $('#c-posta').textContent = MAILBOX.length || '';
   $('#posta tbody').innerHTML = MAILBOX.map((m, i) => `<tr data-i="${i}" style="cursor:pointer"><td class="mono">${m.when.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}</td><td><span class="plan-pill">${m.tipoLabel}</span></td><td><b>${m.nome}</b><br><span style="color:var(--ink-3);font-size:12px">${m.destinatario}</span></td><td>${m.subject}</td><td>${m.channel === 'mailpit' ? '<span class="tag g">Mailpit</span>' : '<span class="tag w">Anteprima demo</span>'}</td></tr>`).join('') || '<tr><td colspan="5" style="text-align:center;color:var(--ink-3);padding:28px">Nessuna mail inviata. Aggiungi un socio o invia i promemoria di rinnovo.</td></tr>';
+}
+
+async function canManagePlans() {
+  const supa = await getSupa();
+  if (!supa) return true;
+  const { data: { user }, error } = await supa.auth.getUser();
+  if (error || !user) return false;
+  return (user.app_metadata?.role === 'admin') || (user.user_metadata?.role === 'admin');
 }
 
 function renderAll() {
@@ -481,6 +502,13 @@ function wireEvents() {
     document.querySelectorAll('#memfilters .chip').forEach((c) => c.classList.remove('active'));
     b.classList.add('active'); memState.filter = b.dataset.f; memState.page = 1; renderMembers();
   });
+  $('#planfilters').addEventListener('click', (e) => {
+    const b = e.target.closest('.chip'); if (!b) return;
+    document.querySelectorAll('#planfilters .chip').forEach((c) => c.classList.remove('active'));
+    b.classList.add('active');
+    planFilter = b.dataset.planState || 'attivo';
+    renderPlans();
+  });
   $('#mempager').addEventListener('click', (e) => {
     const b = e.target.closest('button[data-p]'); if (!b) return;
     const p = b.dataset.p; if (p === 'prev') memState.page--; else if (p === 'next') memState.page++; else memState.page = +p;
@@ -508,12 +536,17 @@ function wireEvents() {
   $('#btn-reminders').addEventListener('click', sendReminders);
   $('#exp-filters').addEventListener('click', (e) => { const b = e.target.closest('.chip'); if (!b) return; expWindow = +b.dataset.w; renderDashboard(); });
   $('#btn-clear-posta').addEventListener('click', clearPosta);
+  $('#btn-gestisci-piani').addEventListener('click', openPlanManager);
+  $('#planform').addEventListener('submit', submitPlanForm);
+  $('#plan-reset').addEventListener('click', resetPlanForm);
   $('#r-piano').addEventListener('change', updateRinnovoPreview);
   $('#rinnovoform').addEventListener('submit', doRenew);
   $('#posta tbody').addEventListener('click', (e) => { const tr = e.target.closest('tr[data-i]'); if (tr) openMailPreview(+tr.dataset.i); });
   // delega globale: chiusura modali, rinnovo rapido, rinnovo con opzioni, apri scheda
   document.addEventListener('click', (e) => {
     const c = e.target.closest('[data-close]'); if (c) return closeModal(c.dataset.close);
+    const planEdit = e.target.closest('[data-plan-edit]'); if (planEdit) return editPlan(planEdit.dataset.planEdit);
+    const planDel = e.target.closest('[data-plan-delete]'); if (planDel) return deletePlan(planDel.dataset.planDelete);
     const ed = e.target.closest('[data-edit]'); if (ed) return openSocioModal('edit', ed.dataset.edit);
     const rd = e.target.closest('[data-remind]'); if (rd) return sendReminderTo(rd.dataset.remind);
     const q = e.target.closest('[data-quickrenew]'); if (q) return quickRenew(q.dataset.quickrenew);
@@ -534,6 +567,154 @@ function wireEvents() {
     if (error) { err.textContent = 'Accesso non riuscito: ' + error.message; return; }
     $('#login').hidden = true; boot();
   });
+}
+
+async function savePlanToSupabase(plan) {
+  const supa = await getSupa();
+  if (!supa) {
+    if (!Array.isArray(DATA.plans)) DATA.plans = [];
+    if (plan.id) {
+      const idx = DATA.plans.findIndex((p) => p.id === plan.id || p.name === plan.name);
+      if (idx >= 0) Object.assign(DATA.plans[idx], plan);
+      else DATA.plans.push(plan);
+    } else {
+      const next = { ...plan, id: 'demo-' + Date.now() };
+      DATA.plans.push(next);
+    }
+    renderAll();
+    return true;
+  }
+
+  if (!(await canManagePlans())) {
+    throw new Error('Solo gli admin possono modificare i piani');
+  }
+
+  const payload = {
+    nome: plan.name,
+    prezzo: Number(plan.price || 0),
+    durata_mesi: Number(plan.dur || 1),
+    entrate: Number(plan.entrate || 0),
+    descrizione: plan.descrizione || null,
+    attivo: plan.attivo !== false,
+  };
+
+  if (plan.id) {
+    const { error } = await supa.from('piani').update(payload).eq('id', plan.id);
+    if (error) throw error;
+  } else {
+    const { data, error } = await supa.from('piani').insert(payload).select('id').single();
+    if (error) throw error;
+    plan.id = data.id;
+  }
+  DATA = await loadData();
+  renderAll();
+  return true;
+}
+
+async function deletePlanFromSupabase(id) {
+  const supa = await getSupa();
+  if (!supa) {
+    DATA.plans = DATA.plans.filter((p) => p.id !== id && p.name !== id);
+    renderAll();
+    return true;
+  }
+  if (!(await canManagePlans())) {
+    throw new Error('Solo gli admin possono eliminare i piani');
+  }
+  const { error } = await supa.from('piani').delete().eq('id', id);
+  if (error) throw error;
+  DATA = await loadData();
+  renderAll();
+  return true;
+}
+
+function resetPlanForm() {
+  $('#plan-name').value = '';
+  $('#plan-price').value = '0';
+  $('#plan-durata').value = '1';
+  $('#plan-entrate').value = '0';
+  $('#plan-descrizione').value = '';
+  $('#plan-attivo').checked = true;
+  $('#plan-save').textContent = 'Salva piano';
+  $('#planform').dataset.planId = '';
+}
+
+async function openPlanManager() {
+  if (!(await canManagePlans())) {
+    toast('Solo gli admin possono gestire i piani', 'warn');
+    return;
+  }
+  resetPlanForm();
+  openModal('modal-plan-manager');
+}
+
+async function submitPlanForm(e) {
+  e.preventDefault();
+  const name = $('#plan-name').value.trim();
+  const price = Number($('#plan-price').value || 0);
+  const dur = Number($('#plan-durata').value || 1);
+  const entrate = Number($('#plan-entrate').value || 0);
+  const descrizione = $('#plan-descrizione').value.trim();
+  const attivo = $('#plan-attivo').checked;
+  if (!name) { toast('Inserisci un nome per il piano', 'warn'); return; }
+
+  const plan = {
+    id: $('#planform').dataset.planId || null,
+    name,
+    price,
+    dur,
+    entrate,
+    descrizione,
+    attivo,
+    color: PLAN_COLORS[name] || 'var(--slate)',
+    mcost: price / (dur || 1),
+  };
+
+  try {
+    await savePlanToSupabase(plan);
+    toast(plan.id ? `Piano aggiornato · ${name}` : `Piano creato · ${name}`);
+    closeModal('modal-plan-manager');
+  } catch (err) {
+    console.error(err);
+    toast('Errore salvataggio piano: ' + (err.message || err), 'warn');
+  }
+}
+
+async function editPlan(id) {
+  if (!(await canManagePlans())) {
+    toast('Solo gli admin possono modificare i piani', 'warn');
+    return;
+  }
+  const plan = DATA.plans.find((p) => (p.id || p.name) === id) || DATA.plans.find((p) => p.name === id);
+  if (!plan) return;
+  $('#planform').dataset.planId = plan.id || plan.name;
+  $('#plan-name').value = plan.name;
+  $('#plan-price').value = String(plan.price || 0);
+  $('#plan-durata').value = String(plan.dur || 1);
+  $('#plan-entrate').value = String(plan.entrate || 0);
+  $('#plan-descrizione').value = plan.descrizione || '';
+  $('#plan-attivo').checked = plan.attivo !== false;
+  $('#plan-save').textContent = 'Aggiorna piano';
+  openModal('modal-plan-manager');
+}
+
+async function deletePlan(id) {
+  if (!(await canManagePlans())) {
+    toast('Solo gli admin possono eliminare i piani', 'warn');
+    return;
+  }
+  const plan = DATA.plans.find((p) => (p.id || p.name) === id) || DATA.plans.find((p) => p.name === id);
+  if (!plan) return;
+  const ok = window.confirm(`Eliminare il piano "${plan.name}"?`);
+  if (!ok) return;
+  try {
+    await deletePlanFromSupabase(plan.id || plan.name);
+    toast(`Piano eliminato · ${plan.name}`);
+    closeModal('modal-plan-manager');
+  } catch (err) {
+    console.error(err);
+    toast('Errore eliminazione piano: ' + (err.message || err), 'warn');
+  }
 }
 
 async function boot() {
