@@ -191,7 +191,7 @@ function renderPosta() {
 
 async function canManagePlans() {
   const supa = await getSupa();
-  if (!supa) return true;
+  if (!supa) return false;
   const { data: { user }, error } = await supa.auth.getUser();
   if (error || !user) return false;
   return (user.app_metadata?.role === 'admin') || (user.user_metadata?.role === 'admin');
@@ -572,6 +572,10 @@ function wireEvents() {
     e.preventDefault();
     const supa = await getSupa();
     const err = $('#loginerr'); err.textContent = '';
+    if (!supa) {
+      err.textContent = 'Configurazione Supabase mancante. Verifica il file config.js e le variabili del deploy.';
+      return;
+    }
     const { error } = await supa.auth.signInWithPassword({ email: $('#email').value, password: $('#pwd').value });
     if (error) { err.textContent = 'Accesso non riuscito: ' + error.message; return; }
     $('#login').hidden = true; boot();
