@@ -27,7 +27,7 @@ const ic = {
   mail: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg>',
 };
 
-// ---------- helpers stato demo ----------
+// ---------- helpers di stato ----------
 const addMonths = (d, m) => { const x = new Date(d); x.setMonth(x.getMonth() + m); return x; };
 const giorniTo = (d) => { const t = new Date(); t.setHours(0, 0, 0, 0); return Math.round((new Date(d) - t) / 86400000); };
 const statoDa = (dleft) => (dleft < 0 ? 'Scaduto' : dleft <= 30 ? 'In scadenza' : 'Attivo');
@@ -186,7 +186,7 @@ function renderAccessi() {
 
 function renderPosta() {
   $('#c-posta').textContent = MAILBOX.length || '';
-  $('#posta tbody').innerHTML = MAILBOX.map((m, i) => `<tr data-i="${i}" style="cursor:pointer"><td class="mono">${m.when.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}</td><td><span class="plan-pill">${m.tipoLabel}</span></td><td><b>${m.nome}</b><br><span style="color:var(--ink-3);font-size:12px">${m.destinatario}</span></td><td>${m.subject}</td><td>${m.channel === 'mailpit' ? '<span class="tag g">Mailpit</span>' : '<span class="tag w">Anteprima demo</span>'}</td></tr>`).join('') || '<tr><td colspan="5" style="text-align:center;color:var(--ink-3);padding:28px">Nessuna mail inviata. Aggiungi un socio o invia i promemoria di rinnovo.</td></tr>';
+  $('#posta tbody').innerHTML = MAILBOX.map((m, i) => `<tr data-i="${i}" style="cursor:pointer"><td class="mono">${m.when.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}</td><td><span class="plan-pill">${m.tipoLabel}</span></td><td><b>${m.nome}</b><br><span style="color:var(--ink-3);font-size:12px">${m.destinatario}</span></td><td>${m.subject}</td><td>${m.channel === 'mailpit' ? '<span class="tag g">Mailpit</span>' : '<span class="tag w">Anteprima</span>'}</td></tr>`).join('') || '<tr><td colspan="5" style="text-align:center;color:var(--ink-3);padding:28px">Nessuna mail inviata. Aggiungi un socio o invia i promemoria di rinnovo.</td></tr>';
 }
 
 async function canManagePlans() {
@@ -200,7 +200,6 @@ async function canManagePlans() {
 function renderAll() {
   $('#c-mem').textContent = DATA.members.length;
   $('#c-acc').textContent = DATA.accessi.length;
-  $('#modebadge').hidden = DATA.source !== 'demo';
   renderDashboard(); renderMembers(); renderPlans(); renderAccessi(); renderPosta();
 }
 
@@ -217,7 +216,7 @@ async function toMailpit(mail) {
   } catch { return false; }
 }
 async function sendMail({ tipo, tipoLabel, member, subject, html }) {
-  const mail = { tipo, tipoLabel, nome: member.nome, destinatario: member.email, subject, html, when: new Date(), channel: 'demo' };
+  const mail = { tipo, tipoLabel, nome: member.nome, destinatario: member.email, subject, html, when: new Date(), channel: 'preview' };
   if (await toMailpit(mail)) mail.channel = 'mailpit';
   MAILBOX.unshift(mail);
   renderPosta();
@@ -487,8 +486,19 @@ function go(view) {
 // ---------- login ----------
 async function ensureAuth() {
   const supa = await getSupa();
-  if (!supa) return true; // demo mode
-  const { data: { session } } = await supa.auth.getSession();
+  if (!supa) {
+    $('#loginerr').textContent = 'Configurazione Supabase mancante. Verifica il file di configurazione del deploy.';
+    $('#login').hidden = false;
+    return false;
+  }
+
+  const { data: { session }, error } = await supa.auth.getSession();
+  if (error) {
+    $('#loginerr').textContent = error.message || 'Sessione non disponibile.';
+    $('#login').hidden = false;
+    return false;
+  }
+
   if (session) return true;
   $('#login').hidden = false;
   return false;
@@ -528,7 +538,6 @@ function wireEvents() {
     r.setAttribute('data-theme', cur === 'dark' ? 'light' : 'dark');
   });
 
-  // azioni demo
   $('#btn-nuovo').addEventListener('click', () => openSocioModal('new'));
   $('#socioform').addEventListener('submit', submitSocio);
   $('#btn-accesso').addEventListener('click', openAccessoModal);
@@ -572,17 +581,7 @@ function wireEvents() {
 async function savePlanToSupabase(plan) {
   const supa = await getSupa();
   if (!supa) {
-    if (!Array.isArray(DATA.plans)) DATA.plans = [];
-    if (plan.id) {
-      const idx = DATA.plans.findIndex((p) => p.id === plan.id || p.name === plan.name);
-      if (idx >= 0) Object.assign(DATA.plans[idx], plan);
-      else DATA.plans.push(plan);
-    } else {
-      const next = { ...plan, id: 'demo-' + Date.now() };
-      DATA.plans.push(next);
-    }
-    renderAll();
-    return true;
+    throw new Error('Connessione Supabase non disponibile. Verifica la configurazione del database.');
   }
 
   if (!(await canManagePlans())) {
@@ -614,9 +613,7 @@ async function savePlanToSupabase(plan) {
 async function deletePlanFromSupabase(id) {
   const supa = await getSupa();
   if (!supa) {
-    DATA.plans = DATA.plans.filter((p) => p.id !== id && p.name !== id);
-    renderAll();
-    return true;
+    throw new Error('Connessione Supabase non disponibile. Verifica la configurazione del database.');
   }
   if (!(await canManagePlans())) {
     throw new Error('Solo gli admin possono eliminare i piani');
@@ -718,9 +715,17 @@ async function deletePlan(id) {
 }
 
 async function boot() {
-  if (!(await ensureAuth())) return;
-  DATA = await loadData();
-  renderAll();
+  const ok = await ensureAuth();
+  if (!ok) return;
+
+  try {
+    DATA = await loadData();
+    renderAll();
+  } catch (err) {
+    console.error(err);
+    $('#loginerr').textContent = err.message || 'Impossibile connettersi al database Supabase.';
+    $('#login').hidden = false;
+  }
 }
 
 wireEvents();

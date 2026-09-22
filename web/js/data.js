@@ -1,23 +1,23 @@
 // Livello dati GymIN.
-// - Se Supabase è configurato (web/config.js) e c'è una sessione, legge dal DB.
-// - Altrimenti genera dati demo coerenti (stessa forma dei dati reali).
+// L'app usa sempre Supabase: se la config o la sessione non sono valide,
+// il codice deve bloccare il caricamento invece di generare dati demo.
 let _supa;
 let _tried = false;
-// Carica il client Supabase SOLO se configurato, con import dinamico:
-// così la modalità demo non dipende dalla rete e parte sempre.
+
 export async function getSupa() {
   if (_tried) return _supa;
   _tried = true;
   const cfg = window.GYMIN_CONFIG || {};
-  if (cfg.SUPABASE_URL && cfg.SUPABASE_ANON_KEY) {
-    try {
-      const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
-      _supa = createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
-    } catch (e) {
-      console.error('Supabase non caricato, uso la modalità demo:', e);
-      _supa = null;
-    }
-  } else {
+  if (!cfg.SUPABASE_URL || !cfg.SUPABASE_ANON_KEY) {
+    _supa = null;
+    return null;
+  }
+
+  try {
+    const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
+    _supa = createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+  } catch (e) {
+    console.error('Supabase non caricato:', e);
     _supa = null;
   }
   return _supa;
@@ -183,74 +183,6 @@ function revenueFromActivePlans(members, today) {
 }
 
 // ---------------------------------------------------------------------------
-// DEMO (nessuna configurazione richiesta)
-// ---------------------------------------------------------------------------
-function loadDemo() {
-  let seed = 20260915;
-  const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
-  const pick = (a) => a[Math.floor(rnd() * a.length)];
-  const nomi = ['Marco', 'Giulia', 'Luca', 'Sara', 'Andrea', 'Chiara', 'Matteo', 'Francesca', 'Davide', 'Elena', 'Simone', 'Martina', 'Alessandro', 'Valentina', 'Federico', 'Alice', 'Lorenzo', 'Giorgia', 'Riccardo', 'Aurora', 'Gabriele', 'Sofia', 'Tommaso', 'Beatrice', 'Stefano', 'Noemi', 'Nicola', 'Ilaria', 'Paolo', 'Greta'];
-  const cognomi = ['Rossi', 'Russo', 'Ferrari', 'Esposito', 'Bianchi', 'Romano', 'Colombo', 'Ricci', 'Marino', 'Greco', 'Bruno', 'Gallo', 'Conti', 'De Luca', 'Mancini', 'Costa', 'Giordano', 'Rizzo', 'Lombardi', 'Moretti', 'Barbieri', 'Fontana', 'Santoro', 'Mariani', 'Rinaldi', 'Caruso', 'Ferrara', 'Galli', 'Martini', 'Leone'];
-  const PLANS = [
-    { name: 'Open Mese', price: 59, dur: 1, w: .18 }, { name: 'Trimestrale', price: 159, dur: 3, w: .16 },
-    { name: 'Annuale', price: 499, dur: 12, w: .26 }, { name: 'Student', price: 39, dur: 1, w: .15 },
-    { name: 'Personal 10', price: 350, dur: 4, w: .13 }, { name: 'Carnet 5 entrate', price: 45, dur: 6, w: .12, entrate: 5 },
-  ];
-  const today = new Date(); today.setHours(0, 0, 0, 0);
-  const citaArr = ['Milano', 'Monza', 'Como', 'Bergamo', 'Lecco', 'Varese'];
-  const members = [];
-  for (let i = 0; i < 90; i++) {
-    const fn = pick(nomi), ln = pick(cognomi), nome = fn + ' ' + ln;
-    let acc = 0, pr = rnd(), P = PLANS[0];
-    for (const p of PLANS) { acc += p.w; if (pr <= acc) { P = p; break; } }
-    let start = new Date(today); start.setDate(start.getDate() - Math.floor(rnd() * 400));
-    let end = new Date(start); end.setMonth(end.getMonth() + P.dur);
-    while (end < today && rnd() < 0.72) { start = new Date(end); end.setMonth(end.getMonth() + P.dur); }
-    const dleft = giorni(end, today);
-    const nasc = new Date(today); nasc.setFullYear(nasc.getFullYear() - (18 + Math.floor(rnd() * 40))); nasc.setMonth(Math.floor(rnd() * 12), 1 + Math.floor(rnd() * 27));
-    const plan = planMeta(P.name, P.price, P.dur, P.entrate);
-    const entrateResidue = plan.entrate ? Math.floor(rnd() * (plan.entrate + 1)) : undefined; // 0..5 per i carnet
-    members.push({
-      sid: 'demo-' + i, id: 'GY-' + (1200 + i), nome, firstName: fn, lastName: ln,
-      email: nome.toLowerCase().replace(/ /g, '.') + i + '@email.it',
-      telefono: '+39 3' + (10 + Math.floor(rnd() * 89)) + ' ' + (1000000 + Math.floor(rnd() * 8999999)),
-      sesso: pick(['M', 'F']), dataNascita: nasc.toISOString().slice(0, 10),
-      citta: pick(citaArr), consenso: rnd() < 0.85, entrateResidue,
-      plan, start, end, dleft, stato: statoMembro(plan, dleft, entrateResidue), av: AV[i % AV.length],
-    });
-  }
-  // porta un buon numero di soci nella finestra "in scadenza" (demo più leggibile)
-  const targetScad = 18;
-  let inScad = members.filter((m) => m.stato === 'In scadenza').length;
-  for (const m of members) {
-    if (inScad >= targetScad) break;
-    if (m.stato === 'Attivo' && !m.plan.entrate) {
-      const end = new Date(today); end.setDate(end.getDate() + 3 + Math.floor(rnd() * 27)); // 3-29 gg
-      m.end = end; m.dleft = giorni(end, today); m.stato = 'In scadenza';
-      inScad++;
-    }
-  }
-
-  // accessi
-  const accessi = [];
-  let t = 7 * 60 + 5;
-  for (let i = 0; i < 14; i++) {
-    t += Math.floor(rnd() * 34) + 6;
-    const m = members[Math.floor(rnd() * members.length)];
-    accessi.push({
-      time: String(Math.floor(t / 60)).padStart(2, '0') + ':' + String(t % 60).padStart(2, '0'),
-      nome: m.nome, id: m.id, av: m.av, plan: m.plan.name, ing: pick(['Tornello A', 'Tornello B', 'Reception']),
-      ok: m.stato !== 'Scaduto', warnScad: m.stato === 'In scadenza',
-    });
-  }
-  accessi.reverse();
-  // fatturato demo: incassi mensili con stagionalità
-  const base = [15200, 11800, 9600, 16400, 17100, 18200, 19600, 21400, 22850, 14200, 15100, 16800];
-  const revenue = build12Months(today).map((r, i) => ({ ...r, value: base[i % 12] }));
-  return finalize(members, accessi, revenue, 'demo');
-}
-
-// ---------------------------------------------------------------------------
 function finalize(members, accessi, revenue, source, planCatalog = []) {
   const catalogByName = new Map((planCatalog || []).map((p) => [p.name, p]));
   const names = [...new Set([
@@ -284,9 +216,15 @@ function finalize(members, accessi, revenue, source, planCatalog = []) {
 
 export async function loadData() {
   const supa = await getSupa();
-  if (supa) {
-    const { data: { session } } = await supa.auth.getSession();
-    if (session) return loadSupabase(supa);
+  if (!supa) {
+    throw new Error('Nessuna configurazione Supabase trovata. Verifica il file config.js e le variabili del deploy.');
   }
-  return loadDemo();
+
+  const { data: { session }, error } = await supa.auth.getSession();
+  if (error) throw error;
+  if (!session) {
+    throw new Error('Sessione non autenticata. Esegui il login prima di aprire il gestionale.');
+  }
+
+  return loadSupabase(supa);
 }
