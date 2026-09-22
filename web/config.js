@@ -1,0 +1,5 @@
+window.GYMIN_CONFIG = {
+  SUPABASE_URL: 'https://aprufgirtymgadzmzjbk.supabase.co',
+  SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFwcnVmZ2lydHltZ2Fkem16amJrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk5ODA2NjcsImV4cCI6MjEwNTU1NjY2N30.m60fTFS31zH_q0esQT1gBFcIKGhZhRb8Sup2ENQj8MQ',
+  MAILPIT_URL: ''
+};
