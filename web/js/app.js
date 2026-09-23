@@ -270,6 +270,9 @@ function openSocioModal(mode = 'new', sid = null) {
   }
   socioMode = mode; editSid = sid;
   $('#socioform').reset();
+  dupSig = '';
+  socioError('');
+  $('#socio-dup').hidden = true;
   $('#f-piano').innerHTML = DATA.plans.map((p) => `<option value="${p.name}">${p.name} — ${euro(p.price)} · ${p.dur} mese/i</option>`).join('');
   const isNew = mode === 'new';
   $('#socio-title').textContent = isNew ? 'Nuovo socio' : 'Modifica socio';
@@ -297,8 +300,8 @@ function openSocioModal(mode = 'new', sid = null) {
 function readSocioForm() {
   const nome = $('#f-nome').value.trim(), cognome = $('#f-cognome').value.trim();
   return {
-    ok: !!(nome && cognome), firstName: nome, lastName: cognome, nome: `${nome} ${cognome}`,
-    email: $('#f-email').value.trim(), telefono: $('#f-tel').value.trim(),
+    firstName: nome, lastName: cognome, nome: `${nome} ${cognome}`,
+    email: $('#f-email').value.trim().toLowerCase(), telefono: $('#f-tel').value.trim(),
     sesso: $('#f-sesso').value, dataNascita: $('#f-nascita').value, cf: $('#f-cf').value.trim().toUpperCase(),
     indirizzo: $('#f-indirizzo').value.trim(), citta: $('#f-citta').value.trim(), cap: $('#f-cap').value.trim(),
     note: $('#f-note').value.trim(), consenso: $('#f-consenso').checked,
@@ -432,11 +435,82 @@ async function saveMemberToSupabase({ form, plan, start, end, tessera }) {
   return sof;
 }
 
+// ---------- validazione + controllo duplicati anagrafica ----------
+const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+// confronto "morbido": minuscolo, senza accenti/apostrofi, spazi compattati
+const normName = (v) => String(v || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+const normTel = (v) => String(v || '').replace(/\D/g, '').replace(/^(0039|39)(?=3\d{8,9}$)/, '');
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// Soci già presenti con stesso nome+cognome (anche invertiti), stessa email o stesso telefono.
+function findDuplicates(f) {
+  const n = normName(f.firstName), c = normName(f.lastName);
+  const email = f.email.toLowerCase(), tel = normTel(f.telefono);
+  const out = { email: [], name: [], tel: [] };
+  for (const m of DATA.members) {
+    if (socioMode === 'edit' && m.sid === editSid) continue;
+    const mn = normName(m.firstName ?? m.nome.split(' ')[0]), mc = normName(m.lastName ?? m.nome.split(' ').slice(1).join(' '));
+    if (email && (m.email || '').toLowerCase() === email) out.email.push(m);
+    else if (n && c && ((mn === n && mc === c) || (mn === c && mc === n))) out.name.push(m);
+    else if (tel.length >= 6 && normTel(m.telefono) === tel) out.tel.push(m);
+  }
+  return out;
+}
+
+let dupSig = '';   // firma dei duplicati per cui l'operatore ha confermato "persona diversa"
+function renderDuplicates() {
+  const box = $('#socio-dup');
+  const f = readSocioForm();
+  const d = findDuplicates(f);
+  const soft = [...d.name, ...d.tel];
+  if (!d.email.length && !soft.length) { box.hidden = true; box.innerHTML = ''; dupSig = ''; return d; }
+  const row = (m) => `<li><span>${esc(m.nome)} <small>· ${esc(m.id)}${m.email ? ' · ' + esc(m.email) : ''}${m.telefono ? ' · ' + esc(m.telefono) : ''}${m.dataNascita ? ' · nato/a ' + esc(fmtDate(m.dataNascita)) : ''}</small></span><button type="button" data-dup-open="${esc(m.sid)}">Apri scheda</button></li>`;
+  let html = '';
+  if (d.email.length) {
+    html += `<b>Email già usata da un altro socio: non è possibile salvare.</b><ul>${d.email.map(row).join('')}</ul>`;
+  }
+  if (soft.length) {
+    const sig = soft.map((m) => m.sid).sort().join(',');
+    const checked = sig === dupSig ? 'checked' : '';
+    html += `<b>Possibile socio duplicato${d.name.length ? ' (stesso nome e cognome)' : ''}${d.tel.length ? (d.name.length ? ' / ' : ' (') + 'stesso telefono' + (d.name.length ? '' : ')') : ''}:</b>
+      <ul>${soft.map(row).join('')}</ul>
+      <label class="check"><input type="checkbox" id="f-dupok" data-sig="${sig}" ${checked}> È una persona diversa, salva comunque</label>`;
+  }
+  box.className = 'dupbox' + (d.email.length ? ' block' : '');
+  box.innerHTML = html;
+  box.hidden = false;
+  return d;
+}
+
+function socioError(msg, fields = []) {
+  ['#f-nome', '#f-cognome', '#f-tel', '#f-email'].forEach((id) => $(id).classList.toggle('invalid', fields.includes(id)));
+  const el = $('#socio-err');
+  el.textContent = msg || '';
+  el.hidden = !msg;
+  if (fields[0]) $(fields[0]).focus();
+  return !msg;
+}
+
+// Regole: nome e cognome obbligatori; almeno uno tra telefono ed email; email valida; niente duplicati.
+function validateSocio(f) {
+  if (!f.firstName || !f.lastName) {
+    return socioError('Nome e cognome sono obbligatori.', [!f.firstName && '#f-nome', !f.lastName && '#f-cognome'].filter(Boolean));
+  }
+  if (!f.telefono && !f.email) return socioError('Inserisci almeno un recapito: telefono oppure email.', ['#f-tel', '#f-email']);
+  if (f.email && !EMAIL_RE.test(f.email)) return socioError('L\'indirizzo email non è valido.', ['#f-email']);
+  if (f.telefono && normTel(f.telefono).length < 6) return socioError('Il numero di telefono non è valido.', ['#f-tel']);
+  const d = renderDuplicates();
+  if (d.email.length) return socioError(`L'email ${f.email} è già associata a ${d.email[0].nome}. Usa un'altra email o apri la sua scheda.`, ['#f-email']);
+  if ((d.name.length || d.tel.length) && !$('#f-dupok')?.checked) {
+    return socioError('Esiste già un socio simile: controlla la lista qui sotto e conferma che è una persona diversa.');
+  }
+  return socioError('');
+}
+
 async function submitSocio(e) {
   e.preventDefault();
   const f = readSocioForm();
-  if (!f.ok) return;
-  delete f.ok;
+  if (!validateSocio(f)) return;
 
   if (socioMode === 'edit') {
     const m = DATA.members.find((x) => x.sid === editSid); if (!m) return;
@@ -479,7 +553,6 @@ async function submitSocio(e) {
   const dleft = giorniTo(end);
   const member = {
     sid: 'new-' + Date.now(), id: nextTessera(), ...f,
-    email: f.email || `${f.firstName}.${f.lastName}`.toLowerCase().replace(/ /g, '') + '@email.it',
     plan: { name: plan.name, price: plan.price, mcost: plan.mcost, dur: plan.dur, color: plan.color, entrate: plan.entrate },
     entrateResidue: plan.entrate ? plan.entrate : undefined,
     start, end, dleft, av: AV[DATA.members.length % AV.length],
@@ -735,6 +808,21 @@ function wireEvents() {
 
   $('#btn-nuovo').addEventListener('click', () => openSocioModal('new'));
   $('#socioform').addEventListener('submit', submitSocio);
+  // controllo duplicati mentre si digita nome / cognome / email / telefono
+  let dupTimer;
+  ['#f-nome', '#f-cognome', '#f-email', '#f-tel'].forEach((id) => $(id).addEventListener('input', () => {
+    $(id).classList.remove('invalid');
+    clearTimeout(dupTimer);
+    dupTimer = setTimeout(renderDuplicates, 250);
+  }));
+  $('#socio-dup').addEventListener('change', (e) => {
+    if (e.target.id === 'f-dupok') dupSig = e.target.checked ? e.target.dataset.sig : '';
+  });
+  $('#socio-dup').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-dup-open]'); if (!b) return;
+    closeModal('modal-socio');
+    openScheda(b.dataset.dupOpen);
+  });
   $('#btn-accesso').addEventListener('click', openAccessoModal);
   $('#accessoform').addEventListener('submit', submitAccesso);
   $('#btn-reminders').addEventListener('click', sendReminders);
