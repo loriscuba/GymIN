@@ -136,9 +136,12 @@ function renderDashboard() {
 function renderMembers() {
   const list = DATA.members.filter((m) => {
     const mf = memState.filter === 'all' || m.stato === memState.filter;
-    const q = memState.query.toLowerCase();
-    const mq = !q || m.nome.toLowerCase().includes(q) || m.email.toLowerCase().includes(q) || m.id.toLowerCase().includes(q);
-    return mf && mq;
+    const q = (memState.query || '').toLowerCase();
+    const nome = (m.nome || '').toLowerCase();
+    const email = (m.email || '').toLowerCase();
+    const id = String(m.id || '').toLowerCase();
+    const mailQuery = !q || nome.includes(q) || email.includes(q) || id.includes(q);
+    return mf && mailQuery;
   });
   const pages = Math.max(1, Math.ceil(list.length / memState.PER));
   if (memState.page > pages) memState.page = pages;
@@ -261,6 +264,10 @@ function openModal(id) { $('#' + id).hidden = false; document.body.style.overflo
 function closeModal(id) { $('#' + id).hidden = true; document.body.style.overflow = ''; }
 
 function openSocioModal(mode = 'new', sid = null) {
+  if (!DATA || !Array.isArray(DATA.plans) || !Array.isArray(DATA.members)) {
+    toast('Dati non ancora pronti: aspetta il caricamento dell’anagrafica.', 'warn');
+    return;
+  }
   socioMode = mode; editSid = sid;
   $('#socioform').reset();
   $('#f-piano').innerHTML = DATA.plans.map((p) => `<option value="${p.name}">${p.name} — ${euro(p.price)} · ${p.dur} mese/i</option>`).join('');
@@ -297,6 +304,134 @@ function readSocioForm() {
     note: $('#f-note').value.trim(), consenso: $('#f-consenso').checked,
   };
 }
+
+async function normalizeMemberEmail(supa, email, currentId = null) {
+  const clean = (email || '').trim().toLowerCase();
+  if (!clean) return null;
+
+  let query = supa.from('soci').select('id,email').eq('email', clean);
+  if (currentId) query = query.neq('id', currentId);
+  const { data, error } = await query.limit(1);
+  if (error) throw error;
+  return data && data.length ? null : clean;
+}
+
+async function findExistingSocioByEmail(supa, email) {
+  const clean = (email || '').trim().toLowerCase();
+  if (!clean) return null;
+  const { data, error } = await supa.from('soci').select('id,nome,cognome,email,tessera').eq('email', clean).limit(1);
+  if (error) throw error;
+  return data && data.length ? data[0] : null;
+}
+
+async function saveMemberToSupabase({ form, plan, start, end, tessera }) {
+  const supa = await getSupa();
+  if (!supa) {
+    throw new Error('Connessione Supabase non disponibile. Verifica la configurazione del database.');
+  }
+
+  const cleanEmail = (form.email || '').trim().toLowerCase();
+  const existing = cleanEmail ? await findExistingSocioByEmail(supa, cleanEmail) : null;
+  if (existing) {
+    const existingName = [existing.nome, existing.cognome].filter(Boolean).join(' ') || existing.email || 'socio esistente';
+    toast(`Email già registrata per ${existingName}. Verrà usato il socio esistente.`, 'warn');
+    const useExisting = window.confirm(`Esiste già un socio con questa email (${cleanEmail}). Vuoi usare il profilo già presente: ${existingName}?`);
+    if (!useExisting) {
+      throw new Error(`Email già registrata per ${existingName}.`);
+    }
+
+    const updatePayload = {
+      nome: form.firstName || existing.nome,
+      cognome: form.lastName || existing.cognome,
+      email: cleanEmail,
+      telefono: form.telefono || existing.telefono || null,
+      data_nascita: form.dataNascita || null,
+      sesso: form.sesso || existing.sesso || null,
+      codice_fiscale: form.cf || existing.codice_fiscale || null,
+      indirizzo: form.indirizzo || existing.indirizzo || null,
+      citta: form.citta || existing.citta || null,
+      cap: form.cap || existing.cap || null,
+      note: form.note || existing.note || null,
+      consenso_mail: !!form.consenso,
+      tessera: tessera || existing.tessera || null,
+    };
+    const { error: updErr } = await supa.from('soci').update(updatePayload).eq('id', existing.id);
+    if (updErr) throw updErr;
+
+    const planLookup = plan.id ? { key: 'id', value: plan.id } : { key: 'nome', value: plan.name };
+    const { data: planRow, error: planErr } = await supa.from('piani').select('id').eq(planLookup.key, planLookup.value).maybeSingle();
+    if (planErr) throw planErr;
+    if (!planRow) throw new Error(`Piano non trovato in database: ${plan.name}`);
+
+    const abbRow = {
+      socio_id: existing.id,
+      piano_id: planRow.id,
+      data_inizio: start.toISOString().slice(0, 10),
+      data_scadenza: end.toISOString().slice(0, 10),
+      entrate_residue: plan.entrate ? Number(plan.entrate) : null,
+      stato: 'attivo',
+    };
+    const { data: ab, error: abbErr } = await supa.from('abbonamenti').insert(abbRow).select('id').single();
+    if (abbErr) throw abbErr;
+
+    const { error: payErr } = await supa.from('pagamenti').insert({
+      abbonamento_id: ab.id,
+      importo: Number(plan.price || 0),
+      metodo: 'contanti',
+      data: new Date().toISOString(),
+    });
+    if (payErr) throw payErr;
+
+    return { id: existing.id, tessera: existing.tessera || tessera || null, existingUser: existing };
+  }
+
+  const payload = {
+    nome: form.firstName,
+    cognome: form.lastName,
+    email: cleanEmail || null,
+    telefono: form.telefono || null,
+    data_nascita: form.dataNascita || null,
+    sesso: form.sesso || null,
+    codice_fiscale: form.cf || null,
+    indirizzo: form.indirizzo || null,
+    citta: form.citta || null,
+    cap: form.cap || null,
+    note: form.note || null,
+    consenso_mail: !!form.consenso,
+    tessera: tessera || null,
+  };
+
+  const { data: sof, error: socErr } = await supa.from('soci').insert(payload).select('id,tessera').single();
+  if (socErr) throw socErr;
+
+  const planLookup = plan.id ? { key: 'id', value: plan.id } : { key: 'nome', value: plan.name };
+  const { data: planRow, error: planErr } = await supa.from('piani').select('id').eq(planLookup.key, planLookup.value).maybeSingle();
+  if (planErr) throw planErr;
+  if (!planRow) throw new Error(`Piano non trovato in database: ${plan.name}`);
+
+  const abbRow = {
+    socio_id: sof.id,
+    piano_id: planRow.id,
+    data_inizio: start.toISOString().slice(0, 10),
+    data_scadenza: end.toISOString().slice(0, 10),
+    entrate_residue: plan.entrate ? Number(plan.entrate) : null,
+    stato: 'attivo',
+  };
+
+  const { data: ab, error: abbErr } = await supa.from('abbonamenti').insert(abbRow).select('id').single();
+  if (abbErr) throw abbErr;
+
+  const { error: payErr } = await supa.from('pagamenti').insert({
+    abbonamento_id: ab.id,
+    importo: Number(plan.price || 0),
+    metodo: 'contanti',
+    data: new Date().toISOString(),
+  });
+  if (payErr) throw payErr;
+
+  return sof;
+}
+
 async function submitSocio(e) {
   e.preventDefault();
   const f = readSocioForm();
@@ -305,6 +440,31 @@ async function submitSocio(e) {
 
   if (socioMode === 'edit') {
     const m = DATA.members.find((x) => x.sid === editSid); if (!m) return;
+    try {
+      const supa = await getSupa();
+      if (supa) {
+        const safeEmail = await normalizeMemberEmail(supa, f.email, m.sid);
+        const { error } = await supa.from('soci').update({
+          nome: f.firstName,
+          cognome: f.lastName,
+          email: safeEmail,
+          telefono: f.telefono || null,
+          data_nascita: f.dataNascita || null,
+          sesso: f.sesso || null,
+          codice_fiscale: f.cf || null,
+          indirizzo: f.indirizzo || null,
+          citta: f.citta || null,
+          cap: f.cap || null,
+          note: f.note || null,
+          consenso_mail: !!f.consenso,
+        }).eq('id', m.sid);
+        if (error) throw error;
+      }
+    } catch (err) {
+      console.error(err);
+      toast('Errore aggiornamento socio: ' + (err.message || err), 'warn');
+      return;
+    }
     Object.assign(m, f);
     renderAll();
     closeModal('modal-socio');
@@ -325,6 +485,41 @@ async function submitSocio(e) {
     start, end, dleft, av: AV[DATA.members.length % AV.length],
   };
   member.stato = computeStato(member);
+
+  try {
+    const supa = await getSupa();
+    if (supa) {
+      const socRow = await saveMemberToSupabase({ form: f, plan, start, end, tessera: member.id });
+      member.sid = socRow.id;
+      member.id = socRow.tessera || member.id;
+      DATA = await loadData();
+      renderAll();
+      closeModal('modal-socio');
+      if (socRow.existingUser) {
+        const existingName = [socRow.existingUser.nome, socRow.existingUser.cognome].filter(Boolean).join(' ') || socRow.existingUser.email || 'socio esistente';
+        toast(`Email già presente: usato ${existingName} e creato un nuovo abbonamento`, 'warn');
+      } else {
+        toast(`Socio ${member.nome} aggiunto · ${plan.name}`);
+      }
+      if (member.consenso) {
+        const { subject, html } = templates.benvenuto(member);
+        const mail = await sendMail({ tipo: 'benvenuto', tipoLabel: 'Benvenuto', member, subject, html });
+        toast(mail.channel === 'mailpit'
+          ? `Mail di benvenuto inviata a Mailpit · ${member.email}`
+          : `Mail di benvenuto generata (anteprima) · apri la sezione Posta`, 'mail');
+      }
+      memState.filter = 'all'; memState.query = ''; memState.page = 1;
+      $('#memsearch').value = '';
+      document.querySelectorAll('#memfilters .chip').forEach((c) => c.classList.toggle('active', c.dataset.f === 'all'));
+      go('anagrafiche');
+      return;
+    }
+  } catch (err) {
+    console.error(err);
+    toast('Errore inserimento socio: ' + (err.message || err), 'warn');
+    return;
+  }
+
   DATA.members.unshift(member);
   recomputePlans();
   DATA.revenue.at(-1).value += plan.price;       // incassa la quota nel mese corrente
