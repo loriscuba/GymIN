@@ -1,8 +1,15 @@
 import { loadData, getSupa, fetchAll, PLAN_COLORS } from './data.js?v=__BUILD__';
 import { templates } from './mailtemplates.js?v=__BUILD__';
+import {
+  loadInformative, informativaAttiva, loadEventi, registraEventi, eventiDaModulo, eventoRevoca,
+  schedaPrivacyHtml, storicoHtml, informativaHtml, moduloSocioHtml, privacyFromRow,
+} from './privacy.js?v=__BUILD__';
 
 const $ = (s, r = document) => r.querySelector(s);
 const euro = (n) => '€ ' + Math.round(n).toLocaleString('it-IT');
+// Nessun dato personale (email, telefono) nei log o nei messaggi di errore.
+const redact = (v) => String(v ?? '').replace(/[^\s@]+@[^\s@]+\.[^\s@]+/g, '[email]').replace(/\+?\d[\d\s.-]{7,}\d/g, '[tel]');
+const errMsg = (err) => redact(err?.message || err);
 const fmtDate = (d) => new Date(d).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' });
 const initials = (n) => n.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase();
 const AV = ['#f4511e', '#2563eb', '#0d9488', '#7c3aed', '#db2777', '#0891b2', '#ca8a04', '#4f46e5'];
@@ -348,7 +355,7 @@ async function findSocioByEmail(supa, email, excludeId = null) {
   if (error) throw error;
   return data && data.length ? data[0] : null;
 }
-const emailTakenError = (s) => new Error(`Record già presente: l'email ${s.email} è già usata da ${[s.nome, s.cognome].filter(Boolean).join(' ') || 'un altro socio'}.`);
+const emailTakenError = () => new Error('Record già presente: l’email indicata è già usata da un altro socio.');
 
 const socioPayload = (f) => ({
   nome: f.firstName,
@@ -537,8 +544,8 @@ async function saveSocio(f) {
     try {
       await updateSocio(supa, m.sid, f);
     } catch (err) {
-      console.error(err);
-      toast('Errore aggiornamento socio: ' + (err.message || err), 'warn');
+      console.error(errMsg(err));
+      toast('Errore aggiornamento socio: ' + errMsg(err), 'warn');
       return;
     }
     Object.assign(m, f);
@@ -559,8 +566,8 @@ async function saveSocio(f) {
     payCache = null;
     DATA = await loadData();
   } catch (err) {
-    console.error(err);
-    toast('Errore inserimento socio: ' + (err.message || err), 'warn');
+    console.error(errMsg(err));
+    toast('Errore inserimento socio: ' + errMsg(err), 'warn');
     return;
   }
   renderAll();
@@ -588,8 +595,8 @@ async function useExistingSocio(sid) {
     payCache = null;
     DATA = await loadData();
   } catch (err) {
-    console.error(err);
-    toast('Errore creazione abbonamento: ' + (err.message || err), 'warn');
+    console.error(errMsg(err));
+    toast('Errore creazione abbonamento: ' + errMsg(err), 'warn');
     $('#modal-dup').querySelectorAll('button').forEach((b) => { b.disabled = false; });
     return;
   }
@@ -663,8 +670,8 @@ async function applyRenewal(m, plan, sendRicevuta, metodo = 'contanti') {
   try {
     await insertAbbonamento(supa, m.sid, plan, renewBase(m), newEnd, metodo);
   } catch (err) {
-    console.error(err);
-    toast('Errore rinnovo: ' + (err.message || err), 'warn');
+    console.error(errMsg(err));
+    toast('Errore rinnovo: ' + errMsg(err), 'warn');
     return false;
   }
   payCache = null;
@@ -745,12 +752,83 @@ function openScheda(sid) {
         : row('Scadenza', `${fmtDate(m.end)} · ${m.dleft >= 0 ? m.dleft + 'gg' : 'scaduto'}`)}
       </div>
       ${m.note ? `<div class="scheda-grid" style="grid-template-columns:1fr;margin-top:12px"><div><span>Note</span><b style="font-weight:500">${m.note}</b></div></div>` : ''}
+      <div id="scheda-privacy">${schedaPrivacyHtml(m, null)}</div>
     </div>
     <div class="mfoot" style="justify-content:space-between;align-items:center">
       <button type="button" class="btn-ghost" data-close="modal-scheda">Chiudi</button>
       <div class="actions-cell">${actionIcons(m)}</div>
     </div>`;
   openModal('modal-scheda');
+  hydratePrivacy(m);
+}
+
+// ---------- privacy socio ----------
+async function hydratePrivacy(m) {
+  const supa = await getSupa(); if (!supa) return;
+  try {
+    const [inf, eventi] = await Promise.all([loadInformative(supa), loadEventi(supa, m.sid)]);
+    const box = $('#scheda-privacy'); if (!box || schedaSid !== m.sid) return;
+    box.innerHTML = schedaPrivacyHtml(m, informativaAttiva(inf)?.versione);
+    box.querySelector('.pv-histbody').innerHTML = storicoHtml(eventi);
+  } catch (err) {
+    console.error(errMsg(err));
+    const h = $('#scheda-privacy .pv-histbody'); if (h) h.textContent = 'Storico non disponibile.';
+  }
+}
+async function reloadSocioPrivacy(sid) {
+  const supa = await getSupa();
+  const { data, error } = await supa.from('soci').select('privacy_acknowledged,privacy_acknowledged_at,privacy_policy_version,marketing_email_consent,marketing_email_consent_at,marketing_email_revoked_at').eq('id', sid).single();
+  if (error) throw error;
+  const m = DATA.members.find((x) => x.sid === sid);
+  if (m) Object.assign(m, privacyFromRow(data));
+}
+async function openInformativa(versione = null) {
+  const supa = await getSupa(); if (!supa) return;
+  try {
+    const list = await loadInformative(supa);
+    const body = $('#informativa-body');
+    body.innerHTML = informativaHtml(list, versione);
+    $('#inf-ver')?.addEventListener('change', (e) => openInformativa(e.target.value));
+    openModal('modal-informativa');
+  } catch (err) { console.error(errMsg(err)); toast('Informativa non disponibile: ' + errMsg(err), 'warn'); }
+}
+let privacySid = null, privacyVer = null;
+async function openPrivacySocio(sid) {
+  const m = DATA.members.find((x) => x.sid === sid); if (!m) return;
+  const supa = await getSupa(); if (!supa) return;
+  try {
+    const inf = informativaAttiva(await loadInformative(supa));
+    if (!inf) { toast('Nessuna informativa pubblicata', 'warn'); return; }
+    privacySid = sid; privacyVer = inf.versione;
+    $('#privacy-socio-body').innerHTML = moduloSocioHtml(m, inf);
+    openModal('modal-privacy-socio');
+  } catch (err) { console.error(errMsg(err)); toast('Informativa non disponibile: ' + errMsg(err), 'warn'); }
+}
+async function submitPrivacySocio(e) {
+  e.preventDefault();
+  const m = DATA.members.find((x) => x.sid === privacySid); if (!m) return;
+  const ack = $('#ps-ack'), mkt = $('#ps-mkt');
+  const eventi = eventiDaModulo(m, privacyVer, { ack: ack.checked && !ack.disabled, marketing: mkt.checked && !mkt.disabled });
+  if (!eventi.length) { toast('Nessuna nuova scelta da registrare', 'warn'); return; }
+  try {
+    const supa = await getSupa();
+    await registraEventi(supa, m.sid, eventi);
+    await reloadSocioPrivacy(m.sid);
+  } catch (err) { console.error(errMsg(err)); toast('Errore registrazione privacy: ' + errMsg(err), 'warn'); return; }
+  closeModal('modal-privacy-socio');
+  toast('Scelte privacy registrate');
+  openScheda(m.sid);
+}
+async function revocaMarketing(sid) {
+  const m = DATA.members.find((x) => x.sid === sid); if (!m || !m.marketing?.consent) return;
+  if (!confirm(`Registrare la revoca del consenso marketing email di ${m.nome}?`)) return;
+  try {
+    const supa = await getSupa();
+    await registraEventi(supa, sid, [eventoRevoca()]);
+    await reloadSocioPrivacy(sid);
+  } catch (err) { console.error(errMsg(err)); toast('Errore revoca consenso: ' + errMsg(err), 'warn'); return; }
+  toast('Consenso marketing revocato');
+  openScheda(sid);
 }
 
 // ---------- pagamenti ----------
@@ -783,8 +861,8 @@ async function loadPayments() {
       if (key !== `${payState.period}|${payState.sid || ''}`) return;   // filtro cambiato nel frattempo
       payCache = { key, rows };
     } catch (err) {
-      console.error(err);
-      $('#paytable tbody').innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--bad);padding:28px">Errore caricamento pagamenti: ${esc(err.message || err)}</td></tr>`;
+      console.error(errMsg(err));
+      $('#paytable tbody').innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--bad);padding:28px">Errore caricamento pagamenti: ${escerrMsg(err)}</td></tr>`;
       return;
     }
   }
@@ -921,6 +999,7 @@ function wireEvents() {
     await saveSocio(f);
   });
   $('#btn-accesso').addEventListener('click', openAccessoModal);
+  $('#privacyform').addEventListener('submit', submitPrivacySocio);
   $('#accessoform').addEventListener('submit', submitAccesso);
   $('#btn-reminders').addEventListener('click', sendReminders);
   $('#exp-filters').addEventListener('click', (e) => { const b = e.target.closest('.chip'); if (!b) return; expWindow = +b.dataset.w; renderDashboard(); });
@@ -954,6 +1033,9 @@ function wireEvents() {
     const q = e.target.closest('[data-quickrenew]'); if (q) return quickRenew(q.dataset.quickrenew);
     const r = e.target.closest('[data-renew]'); if (r) return openRinnovoModal(r.dataset.renew);
     const pay = e.target.closest('[data-payments]'); if (pay) return openPayments(pay.dataset.payments);
+    if (e.target.closest('[data-informativa]')) return openInformativa();
+    const ps = e.target.closest('[data-privacy-socio]'); if (ps) return openPrivacySocio(ps.dataset.privacySocio);
+    const rv = e.target.closest('[data-revoca]'); if (rv) return revocaMarketing(rv.dataset.revoca);
     const mm = e.target.closest('[data-member]'); if (mm) return openScheda(mm.dataset.member);
   });
   document.querySelectorAll('.overlay').forEach((o) => o.addEventListener('click', (e) => { if (e.target === o) closeModal(o.id); }));
@@ -1070,8 +1152,8 @@ async function submitPlanForm(e) {
     toast(plan.id ? `Piano aggiornato · ${name}` : `Piano creato · ${name}`);
     closeModal('modal-plan-manager');
   } catch (err) {
-    console.error(err);
-    toast('Errore salvataggio piano: ' + (err.message || err), 'warn');
+    console.error(errMsg(err));
+    toast('Errore salvataggio piano: ' + errMsg(err), 'warn');
   }
 }
 
@@ -1107,8 +1189,8 @@ async function deletePlan(id) {
     toast(`Piano eliminato · ${plan.name}`);
     closeModal('modal-plan-manager');
   } catch (err) {
-    console.error(err);
-    toast('Errore eliminazione piano: ' + (err.message || err), 'warn');
+    console.error(errMsg(err));
+    toast('Errore eliminazione piano: ' + errMsg(err), 'warn');
   }
 }
 
@@ -1120,8 +1202,8 @@ async function boot() {
     DATA = await loadData();
     renderAll();
   } catch (err) {
-    console.error(err);
-    $('#loginerr').textContent = err.message || 'Impossibile connettersi al database Supabase.';
+    console.error(errMsg(err));
+    $('#loginerr').textContent = errMsg(err) || 'Impossibile connettersi al database Supabase.';
     $('#login').hidden = false;
   }
 }

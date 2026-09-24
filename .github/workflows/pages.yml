@@ -44,7 +44,7 @@ jobs:
       - name: Versiona i file (cache busting)
         run: |
           V="${GITHUB_SHA::8}"
-          sed -i "s/__BUILD__/$V/g" web/index.html web/js/app.js
+          sed -i "s/__BUILD__/$V/g" web/index.html web/js/app.js web/js/data.js
       - uses: actions/configure-pages@v5
         with:
           enablement: true
