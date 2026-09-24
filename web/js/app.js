@@ -214,6 +214,61 @@ function renderAll() {
   renderDashboard(); renderMembers(); renderPlans(); renderAccessi(); renderPosta();
 }
 
+// ---------- CONFIG RUNTIME / SETTINGS ----------
+const SETTINGS_STORAGE_KEY = 'gymin-settings';
+
+function loadSettingsFromStorage() {
+  try {
+    const raw = localStorage.getItem(SETTINGS_STORAGE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+function applyStoredConfig() {
+  const stored = loadSettingsFromStorage();
+  const base = window.GYMIN_CONFIG || {};
+  window.GYMIN_CONFIG = { ...base, ...stored };
+}
+function saveSettingsToStorage(next) {
+  try {
+    localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(next));
+  } catch {}
+  window.GYMIN_CONFIG = { ...(window.GYMIN_CONFIG || {}), ...next };
+}
+function resetSettingsToDefault() {
+  try { localStorage.removeItem(SETTINGS_STORAGE_KEY); } catch {}
+  const base = window.GYMIN_CONFIG || {};
+  window.GYMIN_CONFIG = { ...base };
+  populateSettingsForm();
+  toast('Impostazioni ripristinate ai valori di default', 'warn');
+}
+function populateSettingsForm() {
+  const cfg = { ...(window.GYMIN_CONFIG || {}), ...loadSettingsFromStorage() };
+  $('#s-mailpit-url').value = cfg.MAILPIT_URL || '';
+  $('#s-mailer-api-url').value = cfg.MAILER_API_URL || '';
+  $('#s-mailer-api-key').value = cfg.MAILER_API_KEY || '';
+}
+function openSettingsModal() {
+  populateSettingsForm();
+  openModal('modal-settings');
+}
+function saveSettingsFromModal(e) {
+  e.preventDefault();
+  const form = {
+    MAILPIT_URL: $('#s-mailpit-url').value.trim(),
+    MAILER_API_URL: $('#s-mailer-api-url').value.trim(),
+    MAILER_API_KEY: $('#s-mailer-api-key').value.trim(),
+  };
+  saveSettingsToStorage(form);
+  closeModal('modal-settings');
+  toast('Impostazioni email salvate nel browser', 'mail');
+}
+
+applyStoredConfig();
+
 // ---------- MAIL ----------
 async function toMailpit(mail) {
   const url = window.GYMIN_CONFIG && window.GYMIN_CONFIG.MAILPIT_URL;
@@ -244,8 +299,7 @@ async function sendRealMail() {
   if (!mail) { toast('Nessuna mail in coda da inviare.', 'warn'); return; }
 
   try {
-    const headers = { 'Content-Type': 'application/json' };
-    if (cfg.MAILER_API_KEY) headers['X-Mailer-Key'] = cfg.MAILER_API_KEY;
+    const headers = buildMailerHeaders(cfg);
     const r = await fetch(url.replace(/\/$/, ''), {
       method: 'POST',
       headers,
@@ -1005,6 +1059,9 @@ function wireEvents() {
   $('#exp-filters').addEventListener('click', (e) => { const b = e.target.closest('.chip'); if (!b) return; expWindow = +b.dataset.w; renderDashboard(); });
   $('#btn-send-real-mail').addEventListener('click', sendRealMail);
   $('#btn-clear-posta').addEventListener('click', clearPosta);
+  $('#btn-settings').addEventListener('click', openSettingsModal);
+  $('#settingsform').addEventListener('submit', saveSettingsFromModal);
+  $('#settings-reset').addEventListener('click', resetSettingsToDefault);
   $('#btn-gestisci-piani').addEventListener('click', openPlanManager);
   $('#planform').addEventListener('submit', submitPlanForm);
   $('#plan-reset').addEventListener('click', resetPlanForm);

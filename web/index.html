@@ -277,6 +277,7 @@
     <button class="nav" data-view="pagamenti" data-tip="Pagamenti"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20M6 15h4"/></svg> <span class="nav-label">Pagamenti</span></button>
     <button class="nav" data-view="entrate" data-tip="Entrate / Accessi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"/></svg> <span class="nav-label">Entrate / Accessi</span> <span class="count" id="c-acc"></span></button>
     <button class="nav" data-view="posta" data-tip="Posta"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg> <span class="nav-label">Posta</span> <span class="count" id="c-posta"></span></button>
+    <button class="nav" id="btn-settings" data-tip="Impostazioni"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.86l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06A1.7 1.7 0 0 0 15.8 19.4a1.7 1.7 0 0 0-1 .97 1.7 1.7 0 0 0-.2 1.06V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-.2-1.06 1.7 1.7 0 0 0-1-.97 1.7 1.7 0 0 0-1.86.34l-.06.06A2 2 0 1 1 4.7 17.7l.06-.06A1.7 1.7 0 0 0 4.6 15.8a1.7 1.7 0 0 0-1.06-.2H3.4a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.06-.2 1.7 1.7 0 0 0 .97-1 1.7 1.7 0 0 0-.34-1.86l-.06-.06A2 2 0 1 1 8.3 4.7l.06.06A1.7 1.7 0 0 0 8.2 4.6a1.7 1.7 0 0 0 .97-1 .97.97 0 0 0-.2-1.06V2.4a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 .2 1.06 1.7 1.7 0 0 0 .97 1 1.7 1.7 0 0 0 1.86-.34l.06-.06A2 2 0 1 1 19.3 8.3l-.06.06A1.7 1.7 0 0 0 19.4 8.2a1.7 1.7 0 0 0 1.06.2h.1a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.06.2 1.7 1.7 0 0 0-.97 1Z"/></svg> <span class="nav-label">Impostazioni</span></button>
     <div class="sidebar-foot"><div class="avatar">TV</div><div class="foot-txt"><b>Tommaso V.</b><span>Direttore</span></div></div>
   </aside>
 
@@ -349,6 +350,23 @@
       <div class="tablewrap"><div class="phead" style="padding:16px 18px 0;align-items:center"><div><h3 style="font-size:15.5px">Mail inviate</h3><div class="psub">Clicca una riga per l'anteprima</div></div><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><button class="btn-primary" id="btn-send-real-mail" style="margin:0 4px 8px 0;padding:8px 13px;font-size:12.5px;display:inline-flex;align-items:center;gap:6px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px"><path d="M4 7.5A2.5 2.5 0 0 1 6.5 5h11A2.5 2.5 0 0 1 20 7.5v9A2.5 2.5 0 0 1 17.5 19h-11A2.5 2.5 0 0 1 4 16.5v-9Z"/><path d="m5 7 7 5 7-5"/></svg> Invia mail reale</button><button class="btn-ghost" id="btn-clear-posta" style="margin:0 4px 8px 0;padding:8px 13px;font-size:12.5px;display:inline-flex;align-items:center;gap:6px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg> Svuota posta</button></div></div>
         <div class="scroll"><table id="posta"><thead><tr><th>Orario</th><th>Tipo</th><th>Destinatario</th><th>Oggetto</th><th>Canale</th></tr></thead><tbody></tbody></table></div></div>
     </section>
+  </div>
+</div>
+
+<!-- Modale: impostazioni -->
+<div class="overlay" id="modal-settings" hidden>
+  <div class="modal wide">
+    <div class="mhead"><div><h3>Impostazioni</h3><div class="msub">Configura Supabase e i canali email senza aprire i file di runtime</div></div><button type="button" class="xbtn" data-close="modal-settings">×</button></div>
+    <form id="settingsform" class="mbody">
+      <div class="field"><label for="s-mailpit-url">Mailpit URL</label><input id="s-mailpit-url" placeholder="http://localhost:8025"></div>
+      <div class="field"><label for="s-mailer-api-url">Mailer API URL</label><input id="s-mailer-api-url" placeholder="http://localhost:3001/api/send"></div>
+      <div class="field"><label for="s-mailer-api-key">Mailer API key</label><input id="s-mailer-api-key" type="password" placeholder="opzionale"></div>
+      <div class="fhint" style="margin-top:8px"><span class="k">Supabase URL e anon key sono già configurate in config.js: qui puoi solo gestire le impostazioni di posta.</span></div>
+      <div class="mfoot" style="padding:16px 0 0;border-top:0;justify-content:flex-end;gap:8px">
+        <button type="button" class="btn-ghost" id="settings-reset">Ripristina default</button>
+        <button type="submit" class="btn-primary">Salva impostazioni</button>
+      </div>
+    </form>
   </div>
 </div>
 
@@ -480,6 +498,7 @@
 
 <!-- config.js è generato in runtime e punta al database live di Supabase -->
 <script src="config.js?v=__BUILD__" onerror="void 0"></script>
+<script src="js/mailerHeaders.cjs?v=__BUILD__"></script>
 <script type="module" src="js/app.js?v=__BUILD__"></script>
 </body>
 </html>
