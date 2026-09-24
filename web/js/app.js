@@ -23,7 +23,7 @@ let socioMode = 'new';
 let editSid = null;
 let expWindow = 7;   // finestra "in scadenza" della dashboard: 7 / 15 / 30 giorni
 // soci con abbonamento a tempo in scadenza entro expWindow giorni (esclude i carnet, che sono a consumo)
-const expiringList = () => DATA.members.filter((m) => !m.plan.entrate && m.dleft >= 0 && m.dleft <= expWindow).sort((a, b) => a.dleft - b.dleft);
+const expiringList = () => DATA.members.filter((m) => m.end && !m.plan.entrate && m.dleft >= 0 && m.dleft <= expWindow).sort((a, b) => a.dleft - b.dleft);
 
 const ic = {
   euro: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 7a7 7 0 1 0 0 10M5 10h8M5 14h8"/></svg>',
