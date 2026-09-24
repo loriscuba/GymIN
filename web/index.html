@@ -37,6 +37,7 @@
   .sidebar{background:var(--sidebar);color:var(--sidebar-ink);padding:22px 14px;display:flex;flex-direction:column;gap:6px;position:sticky;top:0;height:100vh}
   .brand{display:flex;align-items:center;gap:11px;padding:6px 10px 18px}
   .mark{width:38px;height:38px;border-radius:11px;background:linear-gradient(135deg,var(--accent),#ff8a3c);display:grid;place-items:center;flex:none;box-shadow:0 6px 16px rgba(244,81,30,.4)}.mark svg{width:22px;height:22px}
+  .mark.logo{background:#fff;box-shadow:none;overflow:hidden}.mark.logo img{width:100%;height:100%;object-fit:contain;padding:3px}.mark.logo svg,.mark:not(.logo) img{display:none}
   .brand b{font-family:"Archivo";color:#fff;font-size:21px;font-weight:800;line-height:1}
   .brand small{display:block;color:#6f7889;font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;margin-top:3px}
   .navlabel{font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:#5c6576;padding:14px 12px 6px}
@@ -253,7 +254,7 @@
 <!-- login (mostrato solo se Supabase è configurato e non c'è sessione) -->
 <div class="login" id="login" hidden>
   <form class="loginbox" id="loginform">
-    <div class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"><path d="M6.5 7v10M17.5 7v10M4 9.5v5M20 9.5v5M6.5 12h11"/></svg></div>
+    <div class="mark logo"><img src="img/logo.png" alt="Kinesia" onerror="this.parentNode.classList.remove('logo')"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"><path d="M6.5 7v10M17.5 7v10M4 9.5v5M20 9.5v5M6.5 12h11"/></svg></div>
     <h1>GymIN</h1><p>Accedi al gestionale</p>
     <label for="email">Email</label><input id="email" type="email" autocomplete="username" required>
     <label for="pwd">Password</label><input id="pwd" type="password" autocomplete="current-password" required>
@@ -266,8 +267,8 @@
   <div class="scrim" id="scrim"></div>
   <aside class="sidebar" id="sidebar">
     <div class="brand">
-      <div class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"><path d="M6.5 7v10M17.5 7v10M4 9.5v5M20 9.5v5M6.5 12h11"/></svg></div>
-      <div class="brand-txt"><b>GymIN</b><small>Gestionale</small></div>
+      <div class="mark logo"><img src="img/logo.png" alt="Kinesia" onerror="this.parentNode.classList.remove('logo')"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"><path d="M6.5 7v10M17.5 7v10M4 9.5v5M20 9.5v5M6.5 12h11"/></svg></div>
+      <div class="brand-txt"><b>GymIN</b><small>Palestra Kinesia</small></div>
     </div>
     <div class="navlabel">Generale</div>
     <button class="nav active" data-view="dashboard" data-tip="Dashboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg> <span class="nav-label">Dashboard</span></button>
