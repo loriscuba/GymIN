@@ -169,6 +169,10 @@
   .dupbox li{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:5px 0;border-top:1px solid color-mix(in srgb,currentColor 18%,transparent);color:var(--ink-2)}
   .dupbox li span small{color:var(--ink-3)}
   .dupbox li button{flex:none;padding:4px 10px;font-size:12px;border:1px solid var(--line);border-radius:7px;background:var(--surface);color:var(--ink-2);cursor:pointer}
+  .paysum{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px}
+  .paysum .pbox{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 14px;min-width:120px}
+  .paysum .pbox span{display:block;font-size:12px;color:var(--ink-3)}.paysum .pbox b{font-size:17px}
+  .chip.payfor{background:var(--accent-soft);color:var(--accent-ink);border-color:var(--accent)}
   .dupcard{border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:12px;background:var(--surface-2)}
   .dupcard-head{display:flex;align-items:center;gap:12px}
   .dupcard-head small{display:block;font-size:12px;color:var(--ink-3);margin-top:2px}
@@ -196,6 +200,7 @@
   .ibtn svg{width:17px;height:17px}
   .ibtn.quick{color:var(--good);background:var(--good-bg)}
   .ibtn.full{color:var(--accent-ink);background:var(--accent-soft)}
+  .ibtn.pay{color:var(--teal);background:color-mix(in srgb,var(--teal) 12%,transparent)}
   .ibtn.remind{color:var(--blue);background:color-mix(in srgb,var(--blue) 15%,transparent)}
   .ibtn.edit{color:var(--ink-2);background:var(--surface-2);border-color:var(--line)}
   .ibtn:hover{filter:brightness(.96);border-color:currentColor}
@@ -252,6 +257,7 @@
     <div class="navlabel">Gestione</div>
     <button class="nav" data-view="anagrafiche" data-tip="Anagrafiche"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg> <span class="nav-label">Anagrafiche</span> <span class="count" id="c-mem"></span></button>
     <button class="nav" data-view="abbonamenti" data-tip="Abbonamenti"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg> <span class="nav-label">Abbonamenti</span></button>
+    <button class="nav" data-view="pagamenti" data-tip="Pagamenti"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20M6 15h4"/></svg> <span class="nav-label">Pagamenti</span></button>
     <button class="nav" data-view="entrate" data-tip="Entrate / Accessi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"/></svg> <span class="nav-label">Entrate / Accessi</span> <span class="count" id="c-acc"></span></button>
     <button class="nav" data-view="posta" data-tip="Posta"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg> <span class="nav-label">Posta</span> <span class="count" id="c-posta"></span></button>
     <div class="sidebar-foot"><div class="avatar">TV</div><div class="foot-txt"><b>Tommaso V.</b><span>Direttore</span></div></div>
@@ -304,6 +310,17 @@
       <div class="panel"><div class="phead"><div><h3>Incasso ricorrente per piano</h3><div class="psub">MRR stimato · quota media × soci attivi</div></div><div class="psub num" id="mrr-tot"></div></div><div class="dist" id="mrrchart"></div></div>
     </section>
 
+    <section class="view" id="view-pagamenti" hidden>
+      <div class="toolbar">
+        <div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg><input id="paysearch" placeholder="Cerca per nome, tessera o metodo…"></div>
+        <div class="filters" id="payfilters"><button class="chip" data-p="oggi">Oggi</button><button class="chip active" data-p="mese">Mese</button><button class="chip" data-p="anno">Anno</button><button class="chip" data-p="tutti">Tutti</button></div>
+        <button class="chip payfor" id="payfor" hidden></button>
+      </div>
+      <div class="paysum" id="paysum"></div>
+      <div class="tablewrap"><div class="scroll"><table id="paytable"><thead><tr><th>Data</th><th>Socio</th><th>Tessera</th><th>Abbonamento</th><th>Metodo</th><th style="text-align:right">Importo</th></tr></thead><tbody></tbody></table></div>
+        <div class="tfoot"><span id="paycount"></span></div></div>
+    </section>
+
     <section class="view" id="view-entrate" hidden>
       <div class="kpis" id="acckpis" style="grid-template-columns:repeat(3,1fr)"></div>
       <div class="tablewrap"><div class="phead" style="padding:16px 18px 0;align-items:center"><div><h3 style="font-size:15.5px">Accessi di oggi</h3><div class="psub">Validazione ingressi in tempo reale</div></div><button class="btn-sm" id="btn-accesso" style="margin:0 4px 8px 0"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"/></svg> Registra accesso</button></div>
@@ -337,6 +354,7 @@
       <div id="socio-abbsection" style="margin-top:16px;padding-top:16px;border-top:1px dashed var(--line)">
         <div style="font-size:12.5px;font-weight:700;color:var(--ink-2);margin-bottom:10px;letter-spacing:.02em">PRIMO ABBONAMENTO</div>
         <div class="field row" style="margin-bottom:0"><div><label for="f-piano">Abbonamento</label><select id="f-piano"></select></div><div><label for="f-inizio">Data inizio</label><input id="f-inizio" type="date"></div></div>
+        <div class="field" style="margin:12px 0 0"><label for="f-metodo">Tipo di pagamento</label><select id="f-metodo"><option value="contanti">Contanti</option><option value="bancomat">Bancomat</option><option value="carta">Carta di credito</option><option value="bonifico">Bonifico</option><option value="satispay">Satispay</option><option value="altro">Altro</option></select></div>
       </div>
     </div>
     <div class="mfoot"><button type="button" class="btn-ghost" data-close="modal-socio">Annulla</button><button type="submit" class="btn-primary" id="socio-submit">Aggiungi socio</button></div>
@@ -356,11 +374,26 @@
 </div>
 
 <!-- Modale: rinnova abbonamento -->
+<div class="overlay" id="modal-quick" hidden>
+  <form class="modal" id="quickform">
+    <div class="mhead"><div><h3>Rinnovo rapido</h3><div class="msub" id="q-socio">—</div></div><button type="button" class="xbtn" data-close="modal-quick">×</button></div>
+    <div class="mbody">
+      <div class="renew-info">
+        <div><span>Abbonamento</span><b id="q-piano">—</b></div>
+        <div><span>Nuova scadenza</span><b id="q-new" style="color:var(--good)">—</b></div>
+      </div>
+      <div class="field" style="margin-top:14px"><label for="q-metodo">Tipo di pagamento</label><select id="q-metodo"><option value="contanti">Contanti</option><option value="bancomat">Bancomat</option><option value="carta">Carta di credito</option><option value="bonifico">Bonifico</option><option value="satispay">Satispay</option><option value="altro">Altro</option></select></div>
+    </div>
+    <div class="mfoot"><button type="button" class="btn-ghost" data-close="modal-quick">Annulla</button><button type="submit" class="btn-primary">Conferma rinnovo</button></div>
+  </form>
+</div>
+
 <div class="overlay" id="modal-rinnovo" hidden>
   <form class="modal" id="rinnovoform">
     <div class="mhead"><div><h3>Rinnova abbonamento</h3><div class="msub" id="r-socio">—</div></div><button type="button" class="xbtn" data-close="modal-rinnovo">×</button></div>
     <div class="mbody">
       <div class="field"><label for="r-piano">Abbonamento</label><select id="r-piano"></select></div>
+      <div class="field"><label for="r-metodo">Tipo di pagamento</label><select id="r-metodo"><option value="contanti">Contanti</option><option value="bancomat">Bancomat</option><option value="carta">Carta di credito</option><option value="bonifico">Bonifico</option><option value="satispay">Satispay</option><option value="altro">Altro</option></select></div>
       <div class="renew-info">
         <div><span>Scadenza attuale</span><b id="r-old">—</b></div>
         <div><span>Nuova scadenza</span><b id="r-new" style="color:var(--good)">—</b></div>
@@ -410,7 +443,7 @@
 <div id="toasts"></div>
 
 <!-- config.js è generato in runtime e punta al database live di Supabase -->
-<script src="config.js" onerror="void 0"></script>
-<script type="module" src="js/app.js"></script>
+<script src="config.js?v=__BUILD__" onerror="void 0"></script>
+<script type="module" src="js/app.js?v=__BUILD__"></script>
 </body>
 </html>

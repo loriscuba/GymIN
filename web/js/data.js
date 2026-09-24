@@ -60,11 +60,11 @@ function statoMembro(plan, dleft, entrateResidue) {
 // ---------------------------------------------------------------------------
 // Legge TUTTE le righe di una tabella/select, aggirando il limite di 1000
 // righe per richiesta di Supabase (paginazione con range()).
-async function fetchAll(supa, table, select) {
+export async function fetchAll(supa, table, select, modify = (q) => q) {
   const PAGE = 1000;
   let out = [], from = 0;
   for (;;) {
-    const { data, error } = await supa.from(table).select(select).range(from, from + PAGE - 1);
+    const { data, error } = await modify(supa.from(table).select(select)).range(from, from + PAGE - 1);
     if (error) throw error;
     out = out.concat(data);
     if (data.length < PAGE) break;

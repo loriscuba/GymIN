@@ -1,5 +1,5 @@
-import { loadData, getSupa, PLAN_COLORS } from './data.js';
-import { templates } from './mailtemplates.js';
+import { loadData, getSupa, fetchAll, PLAN_COLORS } from './data.js?v=__BUILD__';
+import { templates } from './mailtemplates.js?v=__BUILD__';
 
 const $ = (s, r = document) => r.querySelector(s);
 const euro = (n) => '€ ' + Math.round(n).toLocaleString('it-IT');
@@ -93,9 +93,10 @@ const who = (m) => `<div class="who" data-member="${m.sid}" role="button" tabind
 const zapSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8z"/></svg>';
 const refreshSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v6h-6"/></svg>';
 const mailSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg>';
+const cardSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20M6 15h4"/></svg>';
 const editSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>';
 // stessi pulsanti-icona usati sia in tabella sia nella scheda socio
-const actionIcons = (m) => `<button class="ibtn edit" data-edit="${m.sid}" data-tip="Modifica dati" aria-label="Modifica dati">${editSvg}</button><button class="ibtn remind" data-remind="${m.sid}" data-tip="Invia promemoria" aria-label="Invia promemoria">${mailSvg}</button><button class="ibtn quick" data-quickrenew="${m.sid}" data-tip="Rinnovo rapido · mantiene il piano" aria-label="Rinnovo rapido">${zapSvg}</button><button class="ibtn full" data-renew="${m.sid}" data-tip="Rinnova · scegli il piano" aria-label="Rinnova con opzioni">${refreshSvg}</button>`;
+const actionIcons = (m) => `<button class="ibtn edit" data-edit="${m.sid}" data-tip="Modifica dati" aria-label="Modifica dati">${editSvg}</button><button class="ibtn remind" data-remind="${m.sid}" data-tip="Invia promemoria" aria-label="Invia promemoria">${mailSvg}</button><button class="ibtn quick" data-quickrenew="${m.sid}" data-tip="Rinnovo rapido · mantiene il piano" aria-label="Rinnovo rapido">${zapSvg}</button><button class="ibtn full" data-renew="${m.sid}" data-tip="Rinnova · scegli il piano" aria-label="Rinnova con opzioni">${refreshSvg}</button><button class="ibtn pay" data-payments="${m.sid}" data-tip="Visualizza pagamenti" aria-label="Visualizza pagamenti">${cardSvg}</button>`;
 const actionsCell = (m) => `<td><div class="actions-cell">${actionIcons(m)}</div></td>`;
 
 function renderDashboard() {
@@ -352,7 +353,7 @@ async function updateSocio(supa, sid, f) {
 }
 
 // Nuovo abbonamento (+ pagamento) per un socio già salvato.
-async function insertAbbonamento(supa, socioId, plan, start, end) {
+async function insertAbbonamento(supa, socioId, plan, start, end, metodo = 'contanti') {
   const planLookup = plan.id ? { key: 'id', value: plan.id } : { key: 'nome', value: plan.name };
   const { data: planRow, error: planErr } = await supa.from('piani').select('id').eq(planLookup.key, planLookup.value).maybeSingle();
   if (planErr) throw planErr;
@@ -371,7 +372,7 @@ async function insertAbbonamento(supa, socioId, plan, start, end) {
   const { error: payErr } = await supa.from('pagamenti').insert({
     abbonamento_id: ab.id,
     importo: Number(plan.price || 0),
-    metodo: 'contanti',
+    metodo: metodo || 'contanti',
     data: new Date().toISOString(),
   });
   if (payErr) throw payErr;
@@ -496,7 +497,7 @@ function resetMemberList() {
 const formPlan = () => {
   const plan = DATA.plans.find((p) => p.name === $('#f-piano').value);
   const start = new Date($('#f-inizio').value || Date.now());
-  return { plan, start, end: addMonths(start, plan.dur) };
+  return { plan, start, end: addMonths(start, plan.dur), metodo: $('#f-metodo').value };
 };
 
 async function saveSocio(f) {
@@ -520,13 +521,14 @@ async function saveSocio(f) {
     return;
   }
 
-  const { plan, start, end } = formPlan();
+  const { plan, start, end, metodo } = formPlan();
   const member = { ...f, id: nextTessera() };
   try {
     const row = await insertSocio(supa, f, member.id);
-    await insertAbbonamento(supa, row.id, plan, start, end);
+    await insertAbbonamento(supa, row.id, plan, start, end, metodo);
     member.sid = row.id;
     member.id = row.tessera || member.id;
+    payCache = null;
     DATA = await loadData();
   } catch (err) {
     console.error(err);
@@ -552,9 +554,10 @@ async function useExistingSocio(sid) {
   const m = DATA.members.find((x) => x.sid === sid); if (!m) return;
   const supa = await getSupa();
   if (!supa) { toast('Connessione Supabase non disponibile. Verifica la configurazione del database.', 'warn'); return; }
-  const { plan, start, end } = formPlan();
+  const { plan, start, end, metodo } = formPlan();
   try {
-    await insertAbbonamento(supa, m.sid, plan, start, end);
+    await insertAbbonamento(supa, m.sid, plan, start, end, metodo);
+    payCache = null;
     DATA = await loadData();
   } catch (err) {
     console.error(err);
@@ -616,6 +619,7 @@ function openRinnovoModal(sid) {
   $('#r-socio').textContent = `${m.nome} · ${m.id}`;
   $('#r-piano').innerHTML = DATA.plans.map((p) => `<option value="${p.name}"${p.name === m.plan.name ? ' selected' : ''}>${p.name} — ${euro(p.price)} · ${p.dur} mese/i</option>`).join('');
   $('#r-old').textContent = fmtDate(m.end);
+  $('#r-metodo').value = 'contanti';
   updateRinnovoPreview();
   openModal('modal-rinnovo');
 }
@@ -624,8 +628,18 @@ function updateRinnovoPreview() {
   const plan = DATA.plans.find((p) => p.name === $('#r-piano').value);
   $('#r-new').textContent = fmtDate(addMonths(renewBase(m), plan.dur));
 }
-async function applyRenewal(m, plan, sendRicevuta) {
+async function applyRenewal(m, plan, sendRicevuta, metodo = 'contanti') {
   const newEnd = addMonths(renewBase(m), plan.dur);
+  const supa = await getSupa();
+  if (!supa) { toast('Connessione Supabase non disponibile. Verifica la configurazione del database.', 'warn'); return false; }
+  try {
+    await insertAbbonamento(supa, m.sid, plan, renewBase(m), newEnd, metodo);
+  } catch (err) {
+    console.error(err);
+    toast('Errore rinnovo: ' + (err.message || err), 'warn');
+    return false;
+  }
+  payCache = null;
   m.plan = { name: plan.name, price: plan.price, mcost: plan.mcost, dur: plan.dur, color: plan.color, entrate: plan.entrate };
   m.end = newEnd; m.dleft = giorniTo(newEnd);
   m.entrateResidue = plan.entrate ? plan.entrate : undefined;  // il carnet riparte pieno
@@ -634,7 +648,7 @@ async function applyRenewal(m, plan, sendRicevuta) {
   DATA.revenue.at(-1).value += plan.price;      // incassa la quota nel mese corrente
   recomputePlans();
   renderAll();
-  toast(`Abbonamento rinnovato · ${m.nome} → scad. ${fmtDate(newEnd)}`);
+  toast(`Abbonamento rinnovato · ${m.nome} → scad. ${fmtDate(newEnd)} · ${metodoLabel(metodo)}`);
   if (sendRicevuta && m.email) {
     const { subject, html } = templates.ricevuta(m);
     const mail = await sendMail({ tipo: 'ricevuta', tipoLabel: 'Ricevuta', member: m, subject, html });
@@ -647,13 +661,30 @@ async function doRenew(e) {
   const plan = DATA.plans.find((p) => p.name === $('#r-piano').value);
   const ricevuta = $('#r-ricevuta').checked;
   closeModal('modal-rinnovo');
-  await applyRenewal(m, plan, ricevuta);
+  await applyRenewal(m, plan, ricevuta, $('#r-metodo').value);
 }
-async function quickRenew(sid) {
+// rinnovo rapido: stesso piano, con ricevuta; chiede solo il tipo di pagamento
+let quickSid = null, quickFromScheda = false;
+function quickRenew(sid) {
   const m = DATA.members.find((x) => x.sid === sid); if (!m) return;
   const plan = DATA.plans.find((p) => p.name === m.plan.name) || m.plan;
-  await applyRenewal(m, plan, true);            // rinnovo rapido: stesso piano, con ricevuta
-  if (!$('#modal-scheda').hidden) openScheda(sid); // aggiorna la scheda se aperta
+  if (!plan || plan.name === '—') { openRinnovoModal(sid); return; }   // senza piano: serve il rinnovo completo
+  quickSid = sid;
+  quickFromScheda = !$('#modal-scheda').hidden;
+  closeModal('modal-scheda');
+  $('#q-socio').textContent = `${m.nome} · ${m.id}`;
+  $('#q-piano').textContent = `${plan.name} — ${euro(plan.price)}`;
+  $('#q-new').textContent = fmtDate(addMonths(renewBase(m), plan.dur));
+  $('#q-metodo').value = 'contanti';
+  openModal('modal-quick');
+}
+async function doQuickRenew(e) {
+  e.preventDefault();
+  const m = DATA.members.find((x) => x.sid === quickSid); if (!m) return;
+  const plan = DATA.plans.find((p) => p.name === m.plan.name) || m.plan;
+  closeModal('modal-quick');
+  await applyRenewal(m, plan, true, $('#q-metodo').value);
+  if (quickFromScheda) openScheda(m.sid);        // torna alla scheda aggiornata
 }
 
 // ---------- scheda socio ----------
@@ -694,11 +725,84 @@ function openScheda(sid) {
   openModal('modal-scheda');
 }
 
+// ---------- pagamenti ----------
+const METODI = { contanti: 'Contanti', bancomat: 'Bancomat', carta: 'Carta di credito', bonifico: 'Bonifico', satispay: 'Satispay', altro: 'Altro' };
+const metodoLabel = (k) => METODI[k] || (k ? k[0].toUpperCase() + k.slice(1) : '—');
+const payState = { period: 'mese', query: '', sid: null };
+let payCache = null;   // { key, rows } — svuotata dopo ogni nuovo pagamento
+
+function periodStart(period) {
+  const d = new Date(); d.setHours(0, 0, 0, 0);
+  if (period === 'oggi') return d;
+  if (period === 'mese') return new Date(d.getFullYear(), d.getMonth(), 1);
+  if (period === 'anno') return new Date(d.getFullYear(), 0, 1);
+  return null;
+}
+
+async function loadPayments() {
+  const key = `${payState.period}|${payState.sid || ''}`;
+  if (!payCache || payCache.key !== key) {
+    $('#paytable tbody').innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--ink-3);padding:28px">Caricamento…</td></tr>';
+    try {
+      const supa = await getSupa();
+      if (!supa) throw new Error('Connessione Supabase non disponibile.');
+      const from = periodStart(payState.period);
+      const rows = await fetchAll(supa, 'pagamenti', 'id,importo,metodo,data,abbonamento:abbonamenti!inner(socio_id,piano:piani(nome))', (q) => {
+        if (from) q = q.gte('data', from.toISOString());
+        if (payState.sid) q = q.eq('abbonamenti.socio_id', payState.sid);
+        return q.order('data', { ascending: false });
+      });
+      if (key !== `${payState.period}|${payState.sid || ''}`) return;   // filtro cambiato nel frattempo
+      payCache = { key, rows };
+    } catch (err) {
+      console.error(err);
+      $('#paytable tbody').innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--bad);padding:28px">Errore caricamento pagamenti: ${esc(err.message || err)}</td></tr>`;
+      return;
+    }
+  }
+  renderPayments();
+}
+
+function renderPayments() {
+  const bySid = Object.fromEntries(DATA.members.map((m) => [m.sid, m]));
+  const q = normName(payState.query);
+  const list = (payCache?.rows || []).map((p) => {
+    const m = bySid[p.abbonamento?.socio_id];
+    return { ...p, m, nome: m ? m.nome : '—', tessera: m ? String(m.id) : '', piano: p.abbonamento?.piano?.nome || '—' };
+  }).filter((p) => !q || normName(`${p.nome} ${p.tessera} ${metodoLabel(p.metodo)}`).includes(q));
+
+  const tot = list.reduce((sum, p) => sum + Number(p.importo || 0), 0);
+  const perMetodo = {};
+  for (const p of list) perMetodo[p.metodo] = (perMetodo[p.metodo] || 0) + Number(p.importo || 0);
+  const eur2 = (n) => '€ ' + Number(n).toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  $('#paysum').innerHTML = `<div class="pbox"><span>Totale incassato</span><b>${eur2(tot)}</b></div><div class="pbox"><span>Pagamenti</span><b>${list.length}</b></div>`
+    + Object.entries(perMetodo).sort((a, b) => b[1] - a[1]).map(([k, v]) => `<div class="pbox"><span>${esc(metodoLabel(k))}</span><b>${eur2(v)}</b></div>`).join('');
+
+  const fmtDT = (d) => new Date(d).toLocaleString('it-IT', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  $('#paytable tbody').innerHTML = list.map((p) => `<tr><td class="mono">${fmtDT(p.data)}</td><td>${p.m ? `<a role="button" style="cursor:pointer;font-weight:600" data-member="${esc(p.m.sid)}">${esc(p.nome)}</a>` : '—'}</td><td class="mono">${esc(p.tessera)}</td><td><span class="plan-pill">${esc(p.piano)}</span></td><td>${esc(metodoLabel(p.metodo))}</td><td class="mono" style="text-align:right">${eur2(p.importo)}</td></tr>`).join('')
+    || '<tr><td colspan="6" style="text-align:center;color:var(--ink-3);padding:28px">Nessun pagamento nel periodo selezionato</td></tr>';
+  $('#paycount').textContent = `${list.length} ${list.length === 1 ? 'pagamento' : 'pagamenti'}`;
+
+  const m = payState.sid && bySid[payState.sid];
+  $('#payfor').hidden = !payState.sid;
+  $('#payfor').innerHTML = m ? `Socio: ${esc(m.nome)} ✕` : '';
+  document.querySelectorAll('#payfilters .chip').forEach((c) => c.classList.toggle('active', c.dataset.p === payState.period));
+}
+
+// "Visualizza pagamenti" dalla lista soci: apre la sezione filtrata su quel socio (tutto lo storico).
+function openPayments(sid) {
+  closeModal('modal-scheda');
+  payState.sid = sid; payState.period = 'tutti'; payState.query = '';
+  $('#paysearch').value = '';
+  go('pagamenti');
+}
+
 // ---------- navigazione ----------
 const titles = {
   dashboard: ['Dashboard', 'Panoramica attività'], anagrafiche: ['Anagrafiche soci', 'Gestione iscritti e tesseramenti'],
   abbonamenti: ['Abbonamenti', 'Listino piani e incasso ricorrente'], entrate: ['Entrate / Accessi', 'Controllo ingressi'],
   posta: ['Posta', 'Comunicazioni automatiche agli iscritti'],
+  pagamenti: ['Pagamenti', 'Riepilogo incassi'],
 };
 function go(view) {
   document.querySelectorAll('.view').forEach((v) => (v.hidden = true));
@@ -708,6 +812,7 @@ function go(view) {
   $('#pg-sub').textContent = titles[view][1];
   $('#sidebar').classList.remove('open'); $('#scrim').classList.remove('show');
   window.scrollTo(0, 0);
+  if (view === 'pagamenti') loadPayments();
 }
 
 // ---------- login ----------
@@ -797,6 +902,18 @@ function wireEvents() {
   $('#plan-reset').addEventListener('click', resetPlanForm);
   $('#r-piano').addEventListener('change', updateRinnovoPreview);
   $('#rinnovoform').addEventListener('submit', doRenew);
+  $('#quickform').addEventListener('submit', doQuickRenew);
+  $('#payfilters').addEventListener('click', (e) => {
+    const c = e.target.closest('[data-p]'); if (!c) return;
+    payState.period = c.dataset.p;
+    loadPayments();
+  });
+  $('#payfor').addEventListener('click', () => { payState.sid = null; loadPayments(); });
+  let payTimer;
+  $('#paysearch').addEventListener('input', (e) => {
+    clearTimeout(payTimer);
+    payTimer = setTimeout(() => { payState.query = e.target.value; renderPayments(); }, 150);
+  });
   $('#posta tbody').addEventListener('click', (e) => { const tr = e.target.closest('tr[data-i]'); if (tr) openMailPreview(+tr.dataset.i); });
   // delega globale: chiusura modali, rinnovo rapido, rinnovo con opzioni, apri scheda
   document.addEventListener('click', (e) => {
@@ -807,6 +924,7 @@ function wireEvents() {
     const rd = e.target.closest('[data-remind]'); if (rd) return sendReminderTo(rd.dataset.remind);
     const q = e.target.closest('[data-quickrenew]'); if (q) return quickRenew(q.dataset.quickrenew);
     const r = e.target.closest('[data-renew]'); if (r) return openRinnovoModal(r.dataset.renew);
+    const pay = e.target.closest('[data-payments]'); if (pay) return openPayments(pay.dataset.payments);
     const mm = e.target.closest('[data-member]'); if (mm) return openScheda(mm.dataset.member);
   });
   document.querySelectorAll('.overlay').forEach((o) => o.addEventListener('click', (e) => { if (e.target === o) closeModal(o.id); }));
