@@ -107,7 +107,9 @@ const actionIcons = (m) => `<button class="ibtn edit" data-edit="${m.sid}" data-
 const actionsCell = (m) => `<td><div class="actions-cell">${actionIcons(m)}</div></td>`;
 
 function renderDashboard() {
-  const { members, revenue, plans } = DATA;
+  const { revenue } = DATA;
+  const members = DATA.members.filter((m) => m.stato !== 'Senza abbonamento');
+  const plans = DATA.plans.filter((p) => p.attivo !== false);
   const attivi = members.filter((m) => m.stato === 'Attivo');
   const scad = members.filter((m) => m.stato === 'In scadenza');
   const scaduti = members.filter((m) => m.stato === 'Scaduto');
@@ -332,6 +334,7 @@ function openMailPreview(i) {
 async function sendReminderTo(sid) {
   const m = DATA.members.find((x) => x.sid === sid); if (!m) return;
   if (!m.email) { toast('Il socio non ha un indirizzo email', 'warn'); return; }
+  if (!confirm(`Inviare 1 mail di promemoria a ${m.nome} (${m.email})?`)) return;
   const { subject, html } = templates.rinnovo(m, Math.max(0, m.dleft));
   const mail = await sendMail({ tipo: 'rinnovo', tipoLabel: 'Rinnovo', member: m, subject, html });
   reminded.add(m.sid);
@@ -340,6 +343,7 @@ async function sendReminderTo(sid) {
 async function sendReminders() {
   const list = expiringList().filter((m) => m.email && !reminded.has(m.sid));
   if (!list.length) { toast('Nessun nuovo promemoria da inviare', 'warn'); return; }
+  if (!confirm(`Stai per inviare ${list.length} mail di promemoria. Confermi?`)) return;
   for (const m of list) {
     const { subject, html } = templates.rinnovo(m, Math.max(0, m.dleft));
     await sendMail({ tipo: 'rinnovo', tipoLabel: 'Rinnovo', member: m, subject, html });
