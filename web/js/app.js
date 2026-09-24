@@ -21,9 +21,13 @@ const memState = { filter: 'Attivo', query: '', page: 1, PER: 9, expWindow: 7 };
 let planFilter = 'attivo';
 let socioMode = 'new';
 let editSid = null;
-let expWindow = 7;   // finestra "in scadenza" della dashboard: 7 / 15 / 30 giorni
-// soci con abbonamento a tempo in scadenza entro expWindow giorni (esclude i carnet, che sono a consumo)
-const expiringList = () => DATA.members.filter((m) => m.end && !m.plan.entrate && m.dleft >= 0 && m.dleft <= expWindow).sort((a, b) => a.dleft - b.dleft);
+let expWindow = 7;   // fascia "in scadenza" della dashboard: 7 / 15 / 30
+// fasce giorni alla scadenza: 7 = 0–7, 15 = 8–15, 30 = 16–31
+const EXP_BANDS = { 7: [0, 7], 15: [8, 15], 30: [16, 31] };
+const inExpBand = (dleft, w) => { const [lo, hi] = EXP_BANDS[w]; return dleft >= lo && dleft <= hi; };
+const expBandLabel = (w) => { const [lo, hi] = EXP_BANDS[w]; return lo ? `tra ${lo} e ${hi} giorni` : `entro ${hi} giorni`; };
+// soci con abbonamento a tempo nella fascia expWindow (esclude i carnet, che sono a consumo)
+const expiringList = () => DATA.members.filter((m) => m.end && !m.plan.entrate && inExpBand(m.dleft, expWindow)).sort((a, b) => a.dleft - b.dleft);
 
 const ic = {
   euro: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 7a7 7 0 1 0 0 10M5 10h8M5 14h8"/></svg>',
@@ -37,7 +41,7 @@ const ic = {
 // ---------- helpers di stato ----------
 const addMonths = (d, m) => { const x = new Date(d); x.setMonth(x.getMonth() + m); return x; };
 const giorniTo = (d) => { const t = new Date(); t.setHours(0, 0, 0, 0); return Math.round((new Date(d) - t) / 86400000); };
-const statoDa = (dleft) => (dleft < 0 ? 'Scaduto' : dleft <= 30 ? 'In scadenza' : 'Attivo');
+const statoDa = (dleft) => (dleft < 0 ? 'Scaduto' : dleft <= 31 ? 'In scadenza' : 'Attivo');
 // stato che tiene conto dei carnet a consumo
 const computeStato = (m) => m.plan.entrate ? (m.entrateResidue <= 0 ? 'Scaduto' : m.entrateResidue <= 1 ? 'In scadenza' : 'Attivo') : statoDa(m.dleft);
 // testo colonna "Scadenza": data per gli abbonamenti a tempo, entrate residue per i carnet
@@ -133,7 +137,7 @@ function renderDashboard() {
   $('#kpis').innerHTML =
     kpi('Fatturato (mese)', ic.euro, 'var(--accent-soft)', 'var(--accent-ink)', euro(cur), `${growth >= 0 ? '↑' : '↓'} ${Math.abs(growth).toFixed(1)}% vs mese prec.`, growth >= 0 ? 'trend-up' : 'trend-dn', sparkline(rev.slice(6), 'var(--accent)')) +
     kpi('Contratti attivi', ic.users, 'var(--good-bg)', 'var(--good)', attivi.length, `${(attivi.length / members.length * 100).toFixed(0)}% dei soci`, 'trend-up', '') +
-    kpi('In scadenza (30gg)', ic.alert, 'var(--warn-bg)', 'var(--warn)', scad.length, 'Da contattare per rinnovo', '', '') +
+    kpi('In scadenza (31gg)', ic.alert, 'var(--warn-bg)', 'var(--warn)', scad.length, 'Da contattare per rinnovo', '', '') +
     kpi('Contratti scaduti', ic.door, 'var(--bad-bg)', 'var(--bad)', scaduti.length, 'Recuperabili con win-back', '', '');
 
   const pmax = Math.max(...plans.map((p) => p.count), 1);
@@ -150,16 +154,17 @@ function renderDashboard() {
 
   const expAll = expiringList();
   const exp = expAll.slice(0, 12);
-  $('#exp-title').textContent = `In scadenza nei prossimi ${expWindow} giorni`;
+  $('#exp-title').textContent = `In scadenza ${expBandLabel(expWindow)}`;
   $('#exp-sub').textContent = `${expAll.length} ${expAll.length === 1 ? 'socio' : 'soci'} · da contattare per il rinnovo`;
   document.querySelectorAll('#exp-filters .chip').forEach((c) => c.classList.toggle('active', +c.dataset.w === expWindow));
-  $('#expiring tbody').innerHTML = exp.map((m) => `<tr><td>${who(m)}</td><td><span class="plan-pill">${m.plan.name}</span></td><td class="mono">${fmtDate(m.end)} <span style="color:var(--warn);font-weight:600">· ${m.dleft}gg</span></td><td class="mono">${euro(m.plan.price)}</td>${actionsCell(m)}</tr>`).join('') || `<tr><td colspan="5" style="text-align:center;color:var(--ink-3);padding:20px">Nessun socio in scadenza nei prossimi ${expWindow} giorni</td></tr>`;
+  $('#expiring tbody').innerHTML = exp.map((m) => `<tr><td>${who(m)}</td><td><span class="plan-pill">${m.plan.name}</span></td><td class="mono">${fmtDate(m.end)} <span style="color:var(--warn);font-weight:600">· ${m.dleft}gg</span></td><td class="mono">${euro(m.plan.price)}</td>${actionsCell(m)}</tr>`).join('') || `<tr><td colspan="5" style="text-align:center;color:var(--ink-3);padding:20px">Nessun socio in scadenza ${expBandLabel(expWindow)}</td></tr>`;
 }
 
 function renderMembers() {
   const list = DATA.members.filter((m) => {
-    const mf = memState.filter === 'all' || (m.stato === memState.filter
-      && (memState.filter !== 'In scadenza' || m.plan.entrate || m.dleft <= memState.expWindow));
+    const mf = memState.filter === 'all' || (memState.filter === 'In scadenza' && m.end && !m.plan.entrate
+      ? inExpBand(m.dleft, memState.expWindow)
+      : m.stato === memState.filter);
     const q = (memState.query || '').toLowerCase();
     const nome = (m.nome || '').toLowerCase();
     const email = (m.email || '').toLowerCase();

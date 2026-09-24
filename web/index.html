@@ -320,9 +320,9 @@
           <div style="margin-top:16px"><div class="track" style="height:12px" id="contractbar"></div>
           <div class="legend"><span><i style="background:var(--good)"></i> Attivi</span><span><i style="background:var(--warn)"></i> In scadenza</span><span><i style="background:var(--bad)"></i> Scaduti</span></div></div></div>
       </div>
-      <div class="panel"><div class="phead" style="flex-wrap:wrap;gap:12px"><div><h3 id="exp-title">In scadenza nei prossimi 7 giorni</h3><div class="psub" id="exp-sub">Da contattare per il rinnovo</div></div>
+      <div class="panel"><div class="phead" style="flex-wrap:wrap;gap:12px"><div><h3 id="exp-title">In scadenza entro 7 giorni</h3><div class="psub" id="exp-sub">Da contattare per il rinnovo</div></div>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-          <div class="filters" id="exp-filters"><button class="chip active" data-w="7">7 giorni</button><button class="chip" data-w="15">15 giorni</button><button class="chip" data-w="30">30 giorni</button></div>
+          <div class="filters" id="exp-filters"><button class="chip active" data-w="7">≤ 7 giorni</button><button class="chip" data-w="15">8–15 giorni</button><button class="chip" data-w="30">16–31 giorni</button></div>
           <button class="btn-sm" id="btn-reminders"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg> Invia promemoria</button>
         </div></div>
         <div class="scroll"><table id="expiring"><thead><tr><th>Socio</th><th>Abbonamento</th><th>Scadenza</th><th>Quota</th><th>Azioni</th></tr></thead><tbody></tbody></table></div></div>
@@ -332,7 +332,7 @@
       <div class="toolbar">
         <div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg><input id="memsearch" placeholder="Cerca per nome, email o tessera…"></div>
         <div class="filters" id="memfilters"><button class="chip" data-f="all">Tutti</button><button class="chip active" data-f="Attivo">Attivi</button><button class="chip" data-f="In scadenza">In scadenza</button><button class="chip" data-f="Scaduto">Scaduti</button><button class="chip" data-f="Senza abbonamento">Senza abbonamento</button></div>
-        <div class="filters" id="mem-expfilters" hidden><button class="chip active" data-w="7">7 giorni</button><button class="chip" data-w="15">15 giorni</button><button class="chip" data-w="30">30 giorni</button></div>
+        <div class="filters" id="mem-expfilters" hidden><button class="chip active" data-w="7">≤ 7 giorni</button><button class="chip" data-w="15">8–15 giorni</button><button class="chip" data-w="30">16–31 giorni</button></div>
         <button class="btn-primary" id="btn-nuovo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg> Nuovo socio</button>
       </div>
       <div class="tablewrap"><div class="scroll"><table id="memtable"><thead><tr><th>Socio</th><th>Tessera</th><th>Abbonamento</th><th>Iscritto il</th><th>Scadenza</th><th>Stato</th><th>Azioni</th></tr></thead><tbody></tbody></table></div>
