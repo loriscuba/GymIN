@@ -9,4 +9,9 @@ window.GYMIN_CONFIG = {
   // e compaiono nella sua UI (http://localhost:8025).
   // Richiede Mailpit avviato con CORS abilitato (vedi docker-compose.yml).
   MAILPIT_URL: '',        // es. http://localhost:8025
+
+  // Opzionale: endpoint del mailer reale, usato solo quando clicchi "Invia mail reale".
+  // La richiesta va ad un backend Node che usa SMTP reale (es. http://localhost:3001/api/send).
+  MAILER_API_URL: '',
+  MAILER_API_KEY: '',     // opzionale; se impostato, il backend richiede X-Mailer-Key
 };

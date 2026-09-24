@@ -1,8 +1,10 @@
 import 'dotenv/config';
+import http from 'node:http';
 import cron from 'node-cron';
 import { runGiornaliero } from './reminders.js';
 import { inviaMail } from './emails.js';
 import { templates } from './templates.js';
+import { createManualSendHandler } from './manual.js';
 
 const mode = process.argv[2] || 'watch';
 
@@ -24,6 +26,16 @@ if (mode === 'test') {
   await inviaMail({ socio_id: null, destinatario: to, tipo: 'rinnovo', rif: 'test', ...rin });
   console.log(`\nFatto. Apri Mailpit su http://localhost:8025 per vedere le mail.`);
   process.exit(0);
+}
+
+if (mode === 'api' || mode === 'manual') {
+  const port = Number(process.env.MAILER_PORT || 3001);
+  const server = http.createServer(createManualSendHandler({ sendMail: inviaMail }));
+  server.listen(port, () => {
+    console.log(`Mailer API pronto su http://localhost:${port}/api/send`);
+    console.log('Invio reale manuale: POST con { to, subject, html }');
+  });
+  await new Promise(() => {});
 }
 
 // watch: pianifica il job giornaliero e resta in ascolto.
