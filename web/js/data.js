@@ -1,3 +1,5 @@
+import { privacyFromRow } from './privacy.js?v=__BUILD__';
+
 // Livello dati GymIN.
 // L'app usa sempre Supabase: se la config o la sessione non sono valide,
 // il codice deve bloccare il caricamento invece di generare dati demo.
@@ -78,7 +80,8 @@ async function loadSupabase(supa) {
 
   // Tutti i soci (anche quelli senza abbonamento) + tutti gli abbonamenti.
   const soci = await fetchAll(supa, 'soci',
-    'id,nome,cognome,email,telefono,data_nascita,sesso,codice_fiscale,indirizzo,citta,cap,note,consenso_mail,tessera,creato_il');
+    'id,nome,cognome,email,telefono,data_nascita,sesso,codice_fiscale,indirizzo,citta,cap,note,consenso_mail,tessera,creato_il,' +
+    'privacy_acknowledged,privacy_acknowledged_at,privacy_policy_version,marketing_email_consent,marketing_email_consent_at,marketing_email_revoked_at');
   const abb = await fetchAll(supa, 'abbonamenti',
     'id,socio_id,data_inizio,data_scadenza,entrate_residue,piano:piani(nome,prezzo,durata_mesi,entrate)');
   const planCatalog = await fetchAll(supa, 'piani', 'id,nome,prezzo,durata_mesi,entrate,descrizione,attivo');
@@ -96,7 +99,7 @@ async function loadSupabase(supa) {
       sid: s.id, id: s.tessera || s.id.slice(0, 8), nome, firstName: s.nome, lastName: s.cognome,
       email: s.email || '', telefono: s.telefono, dataNascita: s.data_nascita, sesso: s.sesso,
       cf: s.codice_fiscale, indirizzo: s.indirizzo, citta: s.citta, cap: s.cap,
-      note: s.note, consenso: s.consenso_mail, av: AV[i % AV.length],
+      note: s.note, consenso: s.consenso_mail, ...privacyFromRow(s), av: AV[i % AV.length],
     };
     const a = lastBySocio[s.id];
     if (!a) {

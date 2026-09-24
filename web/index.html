@@ -220,6 +220,23 @@
   .scheda-grid>div{background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
   .scheda-grid span{display:block;font-size:11.5px;color:var(--ink-3);margin-bottom:4px}
   .scheda-grid b{font-size:14px}
+  /* privacy socio */
+  .pv-sec{margin-top:14px;padding:14px;border:1px solid var(--line);border-radius:10px;background:var(--surface-2)}
+  .pv-h{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:12px;font-weight:700;color:var(--ink-2);letter-spacing:.04em;margin-bottom:8px}
+  .pv-row{display:flex;align-items:flex-start;gap:9px;font-size:13.5px;color:var(--ink)}
+  .pv-box{flex:none;width:18px;height:18px;border:1.5px solid var(--ink-3);border-radius:4px;display:grid;place-items:center;font-size:12px;font-weight:700}
+  .pv-box.on{background:var(--accent);border-color:var(--accent);color:#fff}
+  .pv-meta{font-size:12.5px;color:var(--ink-3);margin:6px 0 0 27px}
+  .pv-note{font-size:12px;color:var(--ink-3)}
+  .pv-sec .pv-note{margin:4px 0 0 27px}
+  .pv-warn{font-size:12.5px;color:var(--warn);margin:6px 0 0 27px}
+  .pv-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+  .pv-hist{margin-top:10px;font-size:12.5px;color:var(--ink-2)}.pv-hist summary{cursor:pointer;font-weight:600}.pv-hist ul{margin:8px 0 0 18px}
+  .pv-text{white-space:pre-wrap;font-size:13px;line-height:1.55;color:var(--ink-2);background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:14px;max-height:55vh;overflow:auto}
+  .pv-banner{background:var(--accent-soft);color:var(--accent-ink);border-radius:10px;padding:10px 12px;font-size:13px;margin-bottom:12px}
+  .pv-check{align-items:flex-start;margin-top:14px;font-size:14px;color:var(--ink)}.pv-check input{margin-top:3px;width:18px;height:18px}
+  .linkbtn{background:none;border:0;color:var(--accent);font-size:12.5px;font-weight:600;cursor:pointer;padding:0;letter-spacing:0}
+  .btn-xs{padding:5px 12px;font-size:12.5px}.btn-xs:disabled{opacity:.5;cursor:not-allowed}
   #mailframe{width:100%;height:58vh;border:0;background:#fff}
   .live-note{font-size:12px;color:var(--ink-3);background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:9px 12px;margin-bottom:16px;display:flex;gap:8px;align-items:center}
   .mobile-top{display:none}
@@ -350,7 +367,8 @@
       <div class="field"><label for="f-indirizzo">Indirizzo</label><input id="f-indirizzo" placeholder="Via, numero civico"></div>
       <div class="field row"><div><label for="f-citta">Città</label><input id="f-citta"></div><div style="max-width:130px"><label for="f-cap">CAP</label><input id="f-cap" maxlength="5" inputmode="numeric"></div></div>
       <div class="field"><label for="f-note">Note</label><textarea id="f-note" rows="2" placeholder="Note interne (es. obiettivi, patologie, preferenze)"></textarea></div>
-      <label class="check"><input type="checkbox" id="f-consenso" checked> Consenso all'invio di email</label>
+      <label class="check"><input type="checkbox" id="f-consenso" checked> Invia comunicazioni di servizio via email (scadenza abbonamento, ricevute)</label>
+      <div class="pv-note" style="margin-top:6px">Informativa privacy e consenso marketing si registrano dalla scheda socio, compilati dal socio stesso.</div>
       <div id="socio-abbsection" style="margin-top:16px;padding-top:16px;border-top:1px dashed var(--line)">
         <div style="font-size:12.5px;font-weight:700;color:var(--ink-2);margin-bottom:10px;letter-spacing:.02em">PRIMO ABBONAMENTO</div>
         <div class="field row" style="margin-bottom:0"><div><label for="f-piano">Abbonamento</label><select id="f-piano"></select></div><div><label for="f-inizio">Data inizio</label><input id="f-inizio" type="date"></div></div>
@@ -428,6 +446,24 @@
 
 <!-- Modale: scheda socio (contenuto generato da JS) -->
 <div class="overlay" id="modal-scheda" hidden><div class="modal wide"></div></div>
+
+<!-- Modale: informativa privacy (versioni) -->
+<div class="overlay" id="modal-informativa" hidden>
+  <div class="modal wide">
+    <div class="mhead"><div><h3>Informativa Privacy</h3><div class="msub">Art. 13 GDPR · versioni pubblicate</div></div><button type="button" class="xbtn" data-close="modal-informativa">×</button></div>
+    <div class="mbody" id="informativa-body"></div>
+    <div class="mfoot"><button type="button" class="btn-ghost" data-close="modal-informativa">Chiudi</button></div>
+  </div>
+</div>
+
+<!-- Modale: compilazione privacy a cura del socio -->
+<div class="overlay" id="modal-privacy-socio" hidden>
+  <form class="modal wide" id="privacyform">
+    <div class="mhead"><div><h3>Privacy e comunicazioni</h3><div class="msub">Compilazione a cura del socio</div></div><button type="button" class="xbtn" data-close="modal-privacy-socio">×</button></div>
+    <div class="mbody" id="privacy-socio-body"></div>
+    <div class="mfoot"><button type="button" class="btn-ghost" data-close="modal-privacy-socio">Annulla</button><button type="submit" class="btn-primary">Conferma</button></div>
+  </form>
+</div>
 
 <!-- Modale: record già presente (controllo duplicati anagrafica) -->
 <div class="overlay" id="modal-dup" hidden><div class="modal wide"></div></div>
