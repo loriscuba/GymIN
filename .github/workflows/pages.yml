@@ -39,6 +39,12 @@ jobs:
           else
             echo "Variabili Supabase assenti: build in modalità demo."
           fi
+      # Versione nei link a JS/config: dopo ogni deploy il browser scarica
+      # i file nuovi invece di usare quelli vecchi in cache.
+      - name: Versiona i file (cache busting)
+        run: |
+          V="${GITHUB_SHA::8}"
+          sed -i "s/__BUILD__/$V/g" web/index.html web/js/app.js
       - uses: actions/configure-pages@v5
         with:
           enablement: true
