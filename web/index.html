@@ -169,7 +169,19 @@
   .dupbox li{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:5px 0;border-top:1px solid color-mix(in srgb,currentColor 18%,transparent);color:var(--ink-2)}
   .dupbox li span small{color:var(--ink-3)}
   .dupbox li button{flex:none;padding:4px 10px;font-size:12px;border:1px solid var(--line);border-radius:7px;background:var(--surface);color:var(--ink-2);cursor:pointer}
-  .dupbox .check{color:inherit;font-weight:600}
+  .dupcard{border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:12px;background:var(--surface-2)}
+  .dupcard-head{display:flex;align-items:center;gap:12px}
+  .dupcard-head small{display:block;font-size:12px;color:var(--ink-3);margin-top:2px}
+  .dupcard .av{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;color:#fff;font-weight:700;font-size:13px;flex:none}
+  .dupmatch{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}
+  .dupdl{display:grid;grid-template-columns:120px 1fr;gap:6px 12px;margin:0;font-size:13px}
+  .dupdl dt{color:var(--ink-3)}.dupdl dd{margin:0;color:var(--ink);word-break:break-word}
+  .dupcard .hit{display:inline-block;background:var(--warn-bg);color:var(--warn);font-weight:700;border-radius:5px;padding:0 5px;margin-left:-5px}
+  .dupcard-foot{display:flex;justify-content:flex-end;margin-top:12px}
+  .dupcard-foot button{padding:8px 14px}
+  .duphint{font-size:13px;color:var(--ink-2);margin:4px 0 0}
+  .duphint.bad{color:var(--bad);margin-top:10px}
+  #modal-dup button:disabled{opacity:.55;cursor:wait}
   .btn-ghost{padding:10px 16px;background:var(--surface-2);color:var(--ink-2);border:1px solid var(--line);border-radius:10px;font-size:13.5px;font-weight:600;cursor:pointer}
   .btn-sm{padding:8px 13px;font-size:12.5px;background:var(--accent);color:#fff;border:0;border-radius:9px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}.btn-sm svg{width:14px;height:14px}
   .btn-row{padding:5px 12px;font-size:12.5px;font-weight:600;background:var(--accent-soft);color:var(--accent-ink);border:1px solid transparent;border-radius:8px;cursor:pointer;white-space:nowrap}
@@ -383,6 +395,9 @@
 
 <!-- Modale: scheda socio (contenuto generato da JS) -->
 <div class="overlay" id="modal-scheda" hidden><div class="modal wide"></div></div>
+
+<!-- Modale: record già presente (controllo duplicati anagrafica) -->
+<div class="overlay" id="modal-dup" hidden><div class="modal wide"></div></div>
 
 <!-- Modale: anteprima mail -->
 <div class="overlay" id="modal-mail" hidden>
