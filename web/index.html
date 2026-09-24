@@ -64,6 +64,15 @@
     .app.collapsed .sidebar:not(:hover) .sidebar-foot{justify-content:center}
     .app.collapsed .sidebar:not(:hover) .foot-txt{display:none}
   }
+  /* tablet touch (es. iPad orizzontale): niente espansione "hover" appiccicosa, resta a sole icone */
+  @media (min-width:921px) and (hover:none){
+    .app.collapsed .sidebar:hover{width:70px;padding-left:8px;padding-right:8px;box-shadow:none}
+    .app.collapsed .sidebar .brand{justify-content:center;padding:6px 0 18px}
+    .app.collapsed .sidebar .brand-txt,.app.collapsed .sidebar .nav-label,.app.collapsed .sidebar .nav .count,.app.collapsed .sidebar .foot-txt{display:none}
+    .app.collapsed .sidebar .navlabel{opacity:0;height:10px;padding:0;overflow:hidden}
+    .app.collapsed .sidebar .nav{justify-content:center;padding-left:0;padding-right:0;gap:0}
+    .app.collapsed .sidebar .sidebar-foot{justify-content:center}
+  }
   @media (max-width:920px){.desktop-only{display:none!important}}
   .main{min-width:0;display:flex;flex-direction:column}
   .topbar{display:flex;align-items:center;gap:16px;padding:18px 30px;border-bottom:1px solid var(--line);background:var(--surface);position:sticky;top:0;z-index:5}
@@ -77,7 +86,7 @@
   .kpi .kval{font-family:"Archivo";font-weight:800;font-size:30px;margin-top:10px;line-height:1}
   .kpi .ktrend{font-size:12.5px;margin-top:7px;color:var(--ink-3)}.trend-up{color:var(--good);font-weight:600}.trend-dn{color:var(--bad);font-weight:600}
   .kpi .spark{position:absolute;right:14px;bottom:12px;width:82px;height:34px;opacity:.9}
-  .grid-2{display:grid;grid-template-columns:1.55fr 1fr;gap:16px;margin-bottom:16px}
+  .grid-2{display:grid;grid-template-columns:1.55fr 1fr;gap:16px;margin-bottom:16px}.grid-2.even{grid-template-columns:1fr 1fr}.kpis.kpis-3{grid-template-columns:repeat(3,1fr)}
   .panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:18px 20px;box-shadow:var(--shadow)}
   .panel h3{font-size:15.5px;font-weight:700}.panel .phead{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:16px}.panel .phead .psub{font-size:12.5px;color:var(--ink-3)}
   .legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12.5px;color:var(--ink-2);margin-top:12px}.legend span{display:flex;align-items:center;gap:7px}.legend i{width:10px;height:10px;border-radius:3px}
@@ -138,6 +147,8 @@
   .toast.warn{border-left-color:var(--warn)}.toast.mail{border-left-color:var(--accent)}
   .toast .ti{width:18px;height:18px;flex:none;color:var(--good)}.toast.warn .ti{color:var(--warn)}.toast.mail .ti{color:var(--accent)}.toast .ti svg{width:18px;height:18px}
   .toast.out{opacity:0;transform:translateY(6px);transition:.3s}
+  .toast.ask{flex-wrap:wrap;border-left-color:var(--accent)}.toast.ask .ti{color:var(--accent)}.toast.ask>span:nth-child(2){flex:1;min-width:0}
+  .toast.ask .tact{display:flex;gap:8px;justify-content:flex-end;width:100%}.toast.ask .tact button{padding:8px 14px}
   @keyframes slidein{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
   /* overlay + modal */
   .overlay{position:fixed;inset:0;background:rgba(10,13,18,.55);z-index:70;display:grid;place-items:center;padding:20px}
@@ -244,9 +255,18 @@
   @media (max-width:920px){
     .app{grid-template-columns:1fr}
     .sidebar{position:fixed;left:0;top:0;bottom:0;width:248px;transform:translateX(-100%);transition:transform .2s;z-index:40}.sidebar.open{transform:none}
-    .mobile-top{display:flex}.kpis{grid-template-columns:repeat(2,1fr)}.grid-2{grid-template-columns:1fr}
+    .mobile-top{display:flex}.kpis{grid-template-columns:repeat(2,1fr)}.grid-2,.grid-2.even{grid-template-columns:1fr}
+    .topbar{padding:14px 20px;gap:12px}.view{padding:20px 20px 40px}
+    .topbar .mark.mobile-top{width:34px;height:34px;border-radius:9px}
+    .sidebar{height:auto;overflow-y:auto}
   }
-  @media (max-width:460px){.view{padding-left:16px;padding-right:16px}.topbar{padding-left:16px;padding-right:16px}.kpis{grid-template-columns:1fr}.split{grid-template-columns:1fr}}
+  @media (max-width:640px){
+    .topbar h2{font-size:17px}.topbar .sub{display:none}
+    .overlay{padding:10px}.modal{max-height:94vh}.field.row{flex-direction:column;gap:0}.field.row>div{max-width:none!important}
+    .scheda-grid{grid-template-columns:1fr}.kpis.kpis-3{grid-template-columns:1fr 1fr 1fr}
+    #toasts{left:12px;right:12px;bottom:12px}.toast{max-width:none}
+  }
+  @media (max-width:460px){.view{padding-left:16px;padding-right:16px}.topbar{padding-left:16px;padding-right:16px}.kpis,.kpis.kpis-3{grid-template-columns:1fr}.split{grid-template-columns:1fr}}
   @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
@@ -285,7 +305,8 @@
   <div class="main">
     <header class="topbar">
       <button class="iconbtn mobile-top" id="burger" aria-label="Menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>
-      <div><h2 id="pg-title">Dashboard</h2><div class="sub" id="pg-sub">Panoramica attività</div></div>
+      <div class="mark logo mobile-top"><img src="img/logo.png" alt="Kinesia" onerror="this.parentNode.classList.remove('logo')"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"><path d="M6.5 7v10M17.5 7v10M4 9.5v5M20 9.5v5M6.5 12h11"/></svg></div>
+      <div style="min-width:0"><h2 id="pg-title">Dashboard</h2><div class="sub" id="pg-sub">Panoramica attività</div></div>
       <div class="spacer"></div>
       <button class="iconbtn desktop-only" id="collapse" aria-label="Menu a scomparsa" data-tip="Menu a scomparsa on/off"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/></svg></button>
       <button class="iconbtn" id="theme" aria-label="Tema"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></button>
@@ -293,7 +314,7 @@
 
     <section class="view" id="view-dashboard">
       <div class="kpis" id="kpis"></div>
-      <div class="grid-2" style="grid-template-columns:1fr 1fr">
+      <div class="grid-2 even">
         <div class="panel"><div class="phead"><h3>Soci per abbonamento</h3></div><div class="dist" id="distchart"></div></div>
         <div class="panel"><div class="phead"><h3>Stato contratti</h3></div><div class="split" id="contractsplit"></div>
           <div style="margin-top:16px"><div class="track" style="height:12px" id="contractbar"></div>
@@ -342,7 +363,7 @@
     </section>
 
     <section class="view" id="view-entrate" hidden>
-      <div class="kpis" id="acckpis" style="grid-template-columns:repeat(3,1fr)"></div>
+      <div class="kpis kpis-3" id="acckpis"></div>
       <div class="tablewrap"><div class="phead" style="padding:16px 18px 0;align-items:center"><div><h3 style="font-size:15.5px">Accessi di oggi</h3><div class="psub">Validazione ingressi in tempo reale</div></div><button class="btn-sm" id="btn-accesso" style="margin:0 4px 8px 0"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"/></svg> Registra accesso</button></div>
         <div class="scroll"><table id="acctable"><thead><tr><th>Orario</th><th>Socio</th><th>Abbonamento</th><th>Ingresso</th><th>Esito</th></tr></thead><tbody></tbody></table></div></div>
     </section>
