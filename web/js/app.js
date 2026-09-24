@@ -17,7 +17,7 @@ const AV = ['#f4511e', '#2563eb', '#0d9488', '#7c3aed', '#db2777', '#0891b2', '#
 let DATA = null;
 const MAILBOX = [];
 const reminded = new Set();
-const memState = { filter: 'all', query: '', page: 1, PER: 9 };
+const memState = { filter: 'Attivo', query: '', page: 1, PER: 9, expWindow: 7 };
 let planFilter = 'attivo';
 let socioMode = 'new';
 let editSid = null;
@@ -145,7 +145,8 @@ function renderDashboard() {
 
 function renderMembers() {
   const list = DATA.members.filter((m) => {
-    const mf = memState.filter === 'all' || m.stato === memState.filter;
+    const mf = memState.filter === 'all' || (m.stato === memState.filter
+      && (memState.filter !== 'In scadenza' || m.plan.entrate || m.dleft <= memState.expWindow));
     const q = (memState.query || '').toLowerCase();
     const nome = (m.nome || '').toLowerCase();
     const email = (m.email || '').toLowerCase();
@@ -583,9 +584,10 @@ async function submitSocio(e) {
 }
 
 function resetMemberList() {
-  memState.filter = 'all'; memState.query = ''; memState.page = 1;
+  memState.filter = 'Attivo'; memState.query = ''; memState.page = 1;
   $('#memsearch').value = '';
-  document.querySelectorAll('#memfilters .chip').forEach((c) => c.classList.toggle('active', c.dataset.f === 'all'));
+  document.querySelectorAll('#memfilters .chip').forEach((c) => c.classList.toggle('active', c.dataset.f === 'Attivo'));
+  $('#mem-expfilters').hidden = true;
 }
 const formPlan = () => {
   const plan = DATA.plans.find((p) => p.name === $('#f-piano').value);
@@ -1006,7 +1008,14 @@ function wireEvents() {
   $('#memfilters').addEventListener('click', (e) => {
     const b = e.target.closest('.chip'); if (!b) return;
     document.querySelectorAll('#memfilters .chip').forEach((c) => c.classList.remove('active'));
-    b.classList.add('active'); memState.filter = b.dataset.f; memState.page = 1; renderMembers();
+    b.classList.add('active'); memState.filter = b.dataset.f; memState.page = 1;
+    $('#mem-expfilters').hidden = memState.filter !== 'In scadenza';
+    renderMembers();
+  });
+  $('#mem-expfilters').addEventListener('click', (e) => {
+    const b = e.target.closest('.chip'); if (!b) return;
+    document.querySelectorAll('#mem-expfilters .chip').forEach((c) => c.classList.toggle('active', c === b));
+    memState.expWindow = +b.dataset.w; memState.page = 1; renderMembers();
   });
   $('#planfilters').addEventListener('click', (e) => {
     const b = e.target.closest('.chip'); if (!b) return;

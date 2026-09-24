@@ -310,7 +310,8 @@
     <section class="view" id="view-anagrafiche" hidden>
       <div class="toolbar">
         <div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg><input id="memsearch" placeholder="Cerca per nome, email o tessera…"></div>
-        <div class="filters" id="memfilters"><button class="chip active" data-f="all">Tutti</button><button class="chip" data-f="Attivo">Attivi</button><button class="chip" data-f="In scadenza">In scadenza</button><button class="chip" data-f="Scaduto">Scaduti</button><button class="chip" data-f="Senza abbonamento">Senza abbonamento</button></div>
+        <div class="filters" id="memfilters"><button class="chip" data-f="all">Tutti</button><button class="chip active" data-f="Attivo">Attivi</button><button class="chip" data-f="In scadenza">In scadenza</button><button class="chip" data-f="Scaduto">Scaduti</button><button class="chip" data-f="Senza abbonamento">Senza abbonamento</button></div>
+        <div class="filters" id="mem-expfilters" hidden><button class="chip active" data-w="7">7 giorni</button><button class="chip" data-w="15">15 giorni</button><button class="chip" data-w="30">30 giorni</button></div>
         <button class="btn-primary" id="btn-nuovo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg> Nuovo socio</button>
       </div>
       <div class="tablewrap"><div class="scroll"><table id="memtable"><thead><tr><th>Socio</th><th>Tessera</th><th>Abbonamento</th><th>Iscritto il</th><th>Scadenza</th><th>Stato</th><th>Azioni</th></tr></thead><tbody></tbody></table></div>
