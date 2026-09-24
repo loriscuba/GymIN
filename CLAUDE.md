@@ -31,6 +31,12 @@
 - Quando si usano branch e PR, includere sempre un riassunto chiaro di cosa è stato cambiato e come è stato verificato.
 - Se esistono branch/PR aperti, preferire il lavoro su un branch isolato e aggiornato con `main`.
 
+## Preferenze dell'utente (valide per ogni sessione)
+
+- **Sempre partire da `main` aggiornato**: all'inizio di ogni sessione eseguire il workflow sopra, senza che venga richiesto.
+- **Risparmiare crediti**: risposte brevi, niente esplorazioni inutili del codice, leggere solo i file necessari, niente subagent se non richiesti, niente riepiloghi lunghi.
+- **PR in attesa di verifica**: ogni modifica va in una PR aperta come **draft** verso `main`. Non fare mai merge in autonomia: la PR resta in attesa di revisione e approvazione dell'utente.
+
 ## Obiettivo
 
 Mantenere il repo sempre sincronizzato con la versione più recente di `main` e usare PR come canale ufficiale per integrare le modifiche.
