@@ -5,7 +5,9 @@ import { transport, MAIL_FROM } from './transport.js';
 //  - servizio: legate al rapporto con il socio (scadenza, ricevute, benvenuto);
 //    NON richiedono il consenso marketing.
 //  - marketing: promozioni/offerte; solo con soci.marketing_email_consent = true.
-export const CATEGORIA = { benvenuto: 'servizio', ricevuta: 'servizio', rinnovo: 'servizio', scaduto: 'servizio',
+// `manuale` = invio reale dalla Posta (mailer/manual.js) di una mail di servizio già generata:
+// per contenuti promozionali usare un tipo marketing, che richiede il consenso.
+export const CATEGORIA = { benvenuto: 'servizio', ricevuta: 'servizio', rinnovo: 'servizio', scaduto: 'servizio', manuale: 'servizio',
   winback: 'marketing', compleanno: 'marketing', inattivita: 'marketing', promo: 'marketing' };
 
 // Nei log niente dati personali: solo id socio e indirizzi mascherati.
