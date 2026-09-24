@@ -63,6 +63,19 @@ function toast(msg, kind = 'ok') {
   setTimeout(() => { t.classList.add('out'); setTimeout(() => t.remove(), 300); }, 3200);
 }
 
+// conferma non bloccante in basso a destra (sostituisce window.confirm, che su iPad/PWA può non aprirsi)
+function askConfirm(msg, okLabel = 'Conferma', icon = ic.mail) {
+  return new Promise((resolve) => {
+    const t = document.createElement('div');
+    t.className = 'toast ask'; t.setAttribute('role', 'alertdialog');
+    t.innerHTML = `<span class="ti">${icon}</span><span>${msg}</span><div class="tact"><button type="button" class="btn-ghost" data-a="0">Annulla</button><button type="button" class="btn-sm" data-a="1">${okLabel}</button></div>`;
+    const done = (v) => { t.classList.add('out'); setTimeout(() => t.remove(), 300); resolve(v); };
+    t.addEventListener('click', (e) => { const b = e.target.closest('button[data-a]'); if (b) done(b.dataset.a === '1'); });
+    $('#toasts').appendChild(t);
+    t.querySelector('[data-a="1"]').focus();
+  });
+}
+
 // ---------- tooltip istantaneo (data-tip) ----------
 const tipEl = document.createElement('div');
 tipEl.className = 'tip'; tipEl.hidden = true;
@@ -335,7 +348,7 @@ function openMailPreview(i) {
 async function sendReminderTo(sid) {
   const m = DATA.members.find((x) => x.sid === sid); if (!m) return;
   if (!m.email) { toast('Il socio non ha un indirizzo email', 'warn'); return; }
-  if (!confirm(`Inviare 1 mail di promemoria a ${m.nome} (${m.email})?`)) return;
+  if (!(await askConfirm(`Inviare 1 mail di promemoria a <b>${m.nome}</b> (${m.email})?`, 'Invia'))) return;
   const { subject, html } = templates.rinnovo(m, Math.max(0, m.dleft));
   const mail = await sendMail({ tipo: 'rinnovo', tipoLabel: 'Rinnovo', member: m, subject, html });
   reminded.add(m.sid);
@@ -344,7 +357,7 @@ async function sendReminderTo(sid) {
 async function sendReminders() {
   const list = expiringList().filter((m) => m.email && !reminded.has(m.sid));
   if (!list.length) { toast('Nessun nuovo promemoria da inviare', 'warn'); return; }
-  if (!confirm(`Stai per inviare ${list.length} mail di promemoria. Confermi?`)) return;
+  if (!(await askConfirm(`Stai per inviare <b>${list.length}</b> mail di promemoria. Confermi?`, 'Invia'))) return;
   for (const m of list) {
     const { subject, html } = templates.rinnovo(m, Math.max(0, m.dleft));
     await sendMail({ tipo: 'rinnovo', tipoLabel: 'Rinnovo', member: m, subject, html });
@@ -881,7 +894,7 @@ async function submitPrivacySocio(e) {
 }
 async function revocaMarketing(sid) {
   const m = DATA.members.find((x) => x.sid === sid); if (!m || !m.marketing?.consent) return;
-  if (!confirm(`Registrare la revoca del consenso marketing email di ${m.nome}?`)) return;
+  if (!(await askConfirm(`Registrare la revoca del consenso marketing email di <b>${m.nome}</b>?`, 'Revoca', ic.alert))) return;
   try {
     const supa = await getSupa();
     await registraEventi(supa, sid, [eventoRevoca()]);
@@ -1252,7 +1265,7 @@ async function deletePlan(id) {
   }
   const plan = DATA.plans.find((p) => (p.id || p.name) === id) || DATA.plans.find((p) => p.name === id);
   if (!plan) return;
-  const ok = window.confirm(`Eliminare il piano "${plan.name}"?`);
+  const ok = await askConfirm(`Eliminare il piano <b>${plan.name}</b>?`, 'Elimina', ic.alert);
   if (!ok) return;
   try {
     await deletePlanFromSupabase(plan.id || plan.name);
