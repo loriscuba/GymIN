@@ -190,7 +190,7 @@ function renderAccessi() {
 
 function renderPosta() {
   $('#c-posta').textContent = MAILBOX.length || '';
-  $('#posta tbody').innerHTML = MAILBOX.map((m, i) => `<tr data-i="${i}" style="cursor:pointer"><td class="mono">${m.when.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}</td><td><span class="plan-pill">${m.tipoLabel}</span></td><td><b>${m.nome}</b><br><span style="color:var(--ink-3);font-size:12px">${m.destinatario}</span></td><td>${m.subject}</td><td>${m.channel === 'mailpit' ? '<span class="tag g">Mailpit</span>' : '<span class="tag w">Anteprima</span>'}</td></tr>`).join('') || '<tr><td colspan="5" style="text-align:center;color:var(--ink-3);padding:28px">Nessuna mail inviata. Aggiungi un socio o invia i promemoria di rinnovo.</td></tr>';
+  $('#posta tbody').innerHTML = MAILBOX.map((m, i) => `<tr data-i="${i}" style="cursor:pointer"><td class="mono">${m.when.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}</td><td><span class="plan-pill">${m.tipoLabel}</span></td><td><b>${m.nome}</b><br><span style="color:var(--ink-3);font-size:12px">${m.destinatario}</span></td><td>${m.subject}</td><td>${m.channel === 'real' ? '<span class="tag g">Reale</span>' : m.channel === 'mailpit' ? '<span class="tag g">Mailpit</span>' : '<span class="tag w">Anteprima</span>'}</td></tr>`).join('') || '<tr><td colspan="5" style="text-align:center;color:var(--ink-3);padding:28px">Nessuna mail inviata. Aggiungi un socio o invia i promemoria di rinnovo.</td></tr>';
 }
 
 async function canManagePlans() {
@@ -219,12 +219,39 @@ async function toMailpit(mail) {
     return r.ok;
   } catch { return false; }
 }
+let selectedMailIndex = 0;
+
 async function sendMail({ tipo, tipoLabel, member, subject, html }) {
   const mail = { tipo, tipoLabel, nome: member.nome, destinatario: member.email, subject, html, when: new Date(), channel: 'preview' };
   if (await toMailpit(mail)) mail.channel = 'mailpit';
   MAILBOX.unshift(mail);
+  selectedMailIndex = 0;
   renderPosta();
   return mail;
+}
+async function sendRealMail() {
+  const cfg = window.GYMIN_CONFIG || {};
+  const url = cfg.MAILER_API_URL;
+  const mail = MAILBOX[selectedMailIndex] || MAILBOX[0];
+  if (!url) { toast('Configura MAILER_API_URL in config.js per usare il canale reale.', 'warn'); return; }
+  if (!mail) { toast('Nessuna mail in coda da inviare.', 'warn'); return; }
+
+  try {
+    const headers = { 'Content-Type': 'application/json' };
+    if (cfg.MAILER_API_KEY) headers['X-Mailer-Key'] = cfg.MAILER_API_KEY;
+    const r = await fetch(url.replace(/\/$/, ''), {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ to: mail.destinatario, subject: mail.subject, html: mail.html, tipo: mail.tipo, rif: `${mail.tipo}:${Date.now()}` }),
+    });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(data.error || 'Invio reale non riuscito');
+    mail.channel = 'real';
+    renderPosta();
+    toast(`Email reale inviata a ${mail.destinatario}`, 'mail');
+  } catch (err) {
+    toast(err.message || 'Invio reale fallito', 'error');
+  }
 }
 function clearPosta() {
   if (!MAILBOX.length) { toast('La posta è già vuota', 'warn'); return; }
@@ -235,6 +262,7 @@ function clearPosta() {
 }
 function openMailPreview(i) {
   const m = MAILBOX[i]; if (!m) return;
+  selectedMailIndex = i;
   $('#mail-subject').textContent = m.subject;
   $('#mail-to').textContent = m.destinatario;
   $('#mailframe').srcdoc = m.html;
@@ -896,6 +924,7 @@ function wireEvents() {
   $('#accessoform').addEventListener('submit', submitAccesso);
   $('#btn-reminders').addEventListener('click', sendReminders);
   $('#exp-filters').addEventListener('click', (e) => { const b = e.target.closest('.chip'); if (!b) return; expWindow = +b.dataset.w; renderDashboard(); });
+  $('#btn-send-real-mail').addEventListener('click', sendRealMail);
   $('#btn-clear-posta').addEventListener('click', clearPosta);
   $('#btn-gestisci-piani').addEventListener('click', openPlanManager);
   $('#planform').addEventListener('submit', submitPlanForm);

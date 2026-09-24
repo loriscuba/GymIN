@@ -8,6 +8,7 @@
     "web": "npx --yes serve web -l 5173",
     "mail:dev": "node mailer/index.js watch",
     "mail:once": "node mailer/index.js once",
+    "mail:api": "node mailer/index.js api",
     "mail:test": "node mailer/index.js test",
     "mailpit:up": "docker compose up -d mailpit",
     "mailpit:down": "docker compose down",
