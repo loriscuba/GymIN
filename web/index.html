@@ -153,6 +153,35 @@
   .field input:focus,.field select:focus,.field textarea:focus{outline:2px solid var(--accent);outline-offset:-1px}
   .modal .mfoot{flex-wrap:wrap}
   .check{display:flex;align-items:center;gap:9px;font-size:13.5px;color:var(--ink-2)}.check input{width:auto}
+  .fhint{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12px;font-weight:600;margin:-6px 0 14px}
+  /* campi obbligatori: arancione = sempre; blu = almeno uno dei due */
+  .req{--rq:var(--accent)}.req-alt{--rq:var(--blue)}
+  .req label,.req-alt label{color:var(--rq)}
+  .req label i,.req-alt label i{font-style:normal}
+  .req input,.req-alt input{border-color:color-mix(in srgb,var(--rq) 55%,var(--line));border-left:3px solid var(--rq);background:color-mix(in srgb,var(--rq) 6%,var(--surface-2))}
+  .fhint .k{color:var(--rq)}
+  .ferr{background:var(--bad-bg);color:var(--bad);border-radius:9px;padding:10px 12px;font-size:13px;font-weight:600;margin-bottom:14px}
+  .field input.invalid{border-color:var(--bad);outline-color:var(--bad)}
+  .dupbox{background:var(--warn-bg);color:var(--warn);border-radius:9px;padding:10px 12px;font-size:13px;margin-bottom:14px}
+  .dupbox.block{background:var(--bad-bg);color:var(--bad)}
+  .dupbox b{display:block;margin-bottom:6px}
+  .dupbox ul{list-style:none;margin:0 0 8px;padding:0}
+  .dupbox li{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:5px 0;border-top:1px solid color-mix(in srgb,currentColor 18%,transparent);color:var(--ink-2)}
+  .dupbox li span small{color:var(--ink-3)}
+  .dupbox li button{flex:none;padding:4px 10px;font-size:12px;border:1px solid var(--line);border-radius:7px;background:var(--surface);color:var(--ink-2);cursor:pointer}
+  .dupcard{border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:12px;background:var(--surface-2)}
+  .dupcard-head{display:flex;align-items:center;gap:12px}
+  .dupcard-head small{display:block;font-size:12px;color:var(--ink-3);margin-top:2px}
+  .dupcard .av{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;color:#fff;font-weight:700;font-size:13px;flex:none}
+  .dupmatch{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}
+  .dupdl{display:grid;grid-template-columns:120px 1fr;gap:6px 12px;margin:0;font-size:13px}
+  .dupdl dt{color:var(--ink-3)}.dupdl dd{margin:0;color:var(--ink);word-break:break-word}
+  .dupcard .hit{display:inline-block;background:var(--warn-bg);color:var(--warn);font-weight:700;border-radius:5px;padding:0 5px;margin-left:-5px}
+  .dupcard-foot{display:flex;justify-content:flex-end;margin-top:12px}
+  .dupcard-foot button{padding:8px 14px}
+  .duphint{font-size:13px;color:var(--ink-2);margin:4px 0 0}
+  .duphint.bad{color:var(--bad);margin-top:10px}
+  #modal-dup button:disabled{opacity:.55;cursor:wait}
   .btn-ghost{padding:10px 16px;background:var(--surface-2);color:var(--ink-2);border:1px solid var(--line);border-radius:10px;font-size:13.5px;font-weight:600;cursor:pointer}
   .btn-sm{padding:8px 13px;font-size:12.5px;background:var(--accent);color:#fff;border:0;border-radius:9px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}.btn-sm svg{width:14px;height:14px}
   .btn-row{padding:5px 12px;font-size:12.5px;font-weight:600;background:var(--accent-soft);color:var(--accent-ink);border:1px solid transparent;border-radius:8px;cursor:pointer;white-space:nowrap}
@@ -291,13 +320,16 @@
 
 <!-- Modale: nuovo socio -->
 <div class="overlay" id="modal-socio" hidden>
-  <form class="modal wide" id="socioform">
+  <form class="modal wide" id="socioform" novalidate>
     <div class="mhead"><div><h3 id="socio-title">Nuovo socio</h3><div class="msub" id="socio-sub">Anagrafica + primo abbonamento</div></div><button type="button" class="xbtn" data-close="modal-socio">×</button></div>
     <div class="mbody">
-      <div class="field row"><div><label for="f-nome">Nome *</label><input id="f-nome" required></div><div><label for="f-cognome">Cognome *</label><input id="f-cognome" required></div></div>
+      <div class="field row"><div class="req"><label for="f-nome">Nome <i>*</i></label><input id="f-nome" required></div><div class="req"><label for="f-cognome">Cognome <i>*</i></label><input id="f-cognome" required></div></div>
       <div class="field row"><div><label for="f-sesso">Sesso</label><select id="f-sesso"><option value="">—</option><option>M</option><option>F</option><option>Altro</option></select></div><div><label for="f-nascita">Data di nascita</label><input id="f-nascita" type="date"></div></div>
-      <div class="field row"><div><label for="f-cf">Codice fiscale</label><input id="f-cf" maxlength="16" placeholder="RSSMRA90A01F205X" style="text-transform:uppercase"></div><div><label for="f-tel">Telefono</label><input id="f-tel" placeholder="+39 3xx xxxxxxx"></div></div>
-      <div class="field"><label for="f-email">Email</label><input id="f-email" type="email" placeholder="mario.rossi@email.it"></div>
+      <div class="field row"><div><label for="f-cf">Codice fiscale</label><input id="f-cf" maxlength="16" placeholder="RSSMRA90A01F205X" style="text-transform:uppercase"></div><div class="req-alt"><label for="f-tel">Telefono <i>**</i></label><input id="f-tel" type="tel" placeholder="+39 3xx xxxxxxx"></div></div>
+      <div class="field req-alt"><label for="f-email">Email <i>**</i></label><input id="f-email" type="email" placeholder="mario.rossi@email.it"></div>
+      <div class="fhint"><span class="k req">* obbligatorio</span><span class="k req-alt">** almeno uno tra telefono ed email</span></div>
+      <div class="ferr" id="socio-err" hidden></div>
+      <div class="dupbox" id="socio-dup" hidden></div>
       <div class="field"><label for="f-indirizzo">Indirizzo</label><input id="f-indirizzo" placeholder="Via, numero civico"></div>
       <div class="field row"><div><label for="f-citta">Città</label><input id="f-citta"></div><div style="max-width:130px"><label for="f-cap">CAP</label><input id="f-cap" maxlength="5" inputmode="numeric"></div></div>
       <div class="field"><label for="f-note">Note</label><textarea id="f-note" rows="2" placeholder="Note interne (es. obiettivi, patologie, preferenze)"></textarea></div>
@@ -363,6 +395,9 @@
 
 <!-- Modale: scheda socio (contenuto generato da JS) -->
 <div class="overlay" id="modal-scheda" hidden><div class="modal wide"></div></div>
+
+<!-- Modale: record già presente (controllo duplicati anagrafica) -->
+<div class="overlay" id="modal-dup" hidden><div class="modal wide"></div></div>
 
 <!-- Modale: anteprima mail -->
 <div class="overlay" id="modal-mail" hidden>
