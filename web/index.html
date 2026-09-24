@@ -374,6 +374,20 @@
 </div>
 
 <!-- Modale: rinnova abbonamento -->
+<div class="overlay" id="modal-quick" hidden>
+  <form class="modal" id="quickform">
+    <div class="mhead"><div><h3>Rinnovo rapido</h3><div class="msub" id="q-socio">—</div></div><button type="button" class="xbtn" data-close="modal-quick">×</button></div>
+    <div class="mbody">
+      <div class="renew-info">
+        <div><span>Abbonamento</span><b id="q-piano">—</b></div>
+        <div><span>Nuova scadenza</span><b id="q-new" style="color:var(--good)">—</b></div>
+      </div>
+      <div class="field" style="margin-top:14px"><label for="q-metodo">Tipo di pagamento</label><select id="q-metodo"><option value="contanti">Contanti</option><option value="bancomat">Bancomat</option><option value="carta">Carta di credito</option><option value="bonifico">Bonifico</option><option value="satispay">Satispay</option><option value="altro">Altro</option></select></div>
+    </div>
+    <div class="mfoot"><button type="button" class="btn-ghost" data-close="modal-quick">Annulla</button><button type="submit" class="btn-primary">Conferma rinnovo</button></div>
+  </form>
+</div>
+
 <div class="overlay" id="modal-rinnovo" hidden>
   <form class="modal" id="rinnovoform">
     <div class="mhead"><div><h3>Rinnova abbonamento</h3><div class="msub" id="r-socio">—</div></div><button type="button" class="xbtn" data-close="modal-rinnovo">×</button></div>

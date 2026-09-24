@@ -663,11 +663,28 @@ async function doRenew(e) {
   closeModal('modal-rinnovo');
   await applyRenewal(m, plan, ricevuta, $('#r-metodo').value);
 }
-async function quickRenew(sid) {
+// rinnovo rapido: stesso piano, con ricevuta; chiede solo il tipo di pagamento
+let quickSid = null, quickFromScheda = false;
+function quickRenew(sid) {
   const m = DATA.members.find((x) => x.sid === sid); if (!m) return;
   const plan = DATA.plans.find((p) => p.name === m.plan.name) || m.plan;
-  await applyRenewal(m, plan, true);            // rinnovo rapido: stesso piano, con ricevuta
-  if (!$('#modal-scheda').hidden) openScheda(sid); // aggiorna la scheda se aperta
+  if (!plan || plan.name === '—') { openRinnovoModal(sid); return; }   // senza piano: serve il rinnovo completo
+  quickSid = sid;
+  quickFromScheda = !$('#modal-scheda').hidden;
+  closeModal('modal-scheda');
+  $('#q-socio').textContent = `${m.nome} · ${m.id}`;
+  $('#q-piano').textContent = `${plan.name} — ${euro(plan.price)}`;
+  $('#q-new').textContent = fmtDate(addMonths(renewBase(m), plan.dur));
+  $('#q-metodo').value = 'contanti';
+  openModal('modal-quick');
+}
+async function doQuickRenew(e) {
+  e.preventDefault();
+  const m = DATA.members.find((x) => x.sid === quickSid); if (!m) return;
+  const plan = DATA.plans.find((p) => p.name === m.plan.name) || m.plan;
+  closeModal('modal-quick');
+  await applyRenewal(m, plan, true, $('#q-metodo').value);
+  if (quickFromScheda) openScheda(m.sid);        // torna alla scheda aggiornata
 }
 
 // ---------- scheda socio ----------
@@ -885,6 +902,7 @@ function wireEvents() {
   $('#plan-reset').addEventListener('click', resetPlanForm);
   $('#r-piano').addEventListener('change', updateRinnovoPreview);
   $('#rinnovoform').addEventListener('submit', doRenew);
+  $('#quickform').addEventListener('submit', doQuickRenew);
   $('#payfilters').addEventListener('click', (e) => {
     const c = e.target.closest('[data-p]'); if (!c) return;
     payState.period = c.dataset.p;
