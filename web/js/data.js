@@ -35,7 +35,7 @@ const MESI = ['Gen', 'Feb', 'Mar', 'Apr', 'Mag', 'Giu', 'Lug', 'Ago', 'Set', 'Ot
 const initials = (n) => n.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase();
 const giorni = (a, b) => Math.round((a - b) / 86400000);
 function statoDa(dleft) {
-  return dleft < 0 ? 'Scaduto' : dleft <= 30 ? 'In scadenza' : 'Attivo';
+  return dleft < 0 ? 'Scaduto' : dleft <= 31 ? 'In scadenza' : 'Attivo';
 }
 function planMeta(nome, prezzo, durata, entrate, extra = {}) {
   const dur = durata || 1;
