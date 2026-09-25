@@ -984,7 +984,7 @@ async function loadPayments() {
       payCache = { key, rows };
     } catch (err) {
       console.error(errMsg(err));
-      $('#paytable tbody').innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--bad);padding:28px">Errore caricamento pagamenti: ${escerrMsg(err)}</td></tr>`;
+      $('#paytable tbody').innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--bad);padding:28px">Errore caricamento pagamenti: ${esc(errMsg(err))}</td></tr>`;
       return;
     }
   }
@@ -1100,12 +1100,76 @@ async function submitPagamento(e) {
   toast(`Pagamento registrato · ${m ? m.nome : descrizione} · ${euro(importo)} · ${metodoLabel(metodo)}`);
 }
 
+// ---------- log attività (tabella audit_log, scritta dai trigger del database) ----------
+const LOG_TAB = { soci: 'Soci', abbonamenti: 'Abbonamenti', pagamenti: 'Pagamenti', piani: 'Piani', accessi: 'Accessi', mail_log: 'Posta', informative_privacy: 'Informative privacy', consensi_eventi: 'Privacy soci' };
+const LOG_OP = { INSERT: ['Nuovo', 'g'], UPDATE: ['Modifica', 'w'], DELETE: ['Eliminato', 'b'] };
+const LOG_MAX = 500;
+const logState = { period: '7', tab: '', query: '' };
+let logCache = null;   // { key, rows }
+const logMsg = (html, color = 'var(--ink-3)') => `<tr><td colspan="6" style="text-align:center;color:${color};padding:28px">${html}</td></tr>`;
+
+async function loadLog() {
+  const key = `${logState.period}|${logState.tab}`;
+  if (!logCache || logCache.key !== key) {
+    $('#logtable tbody').innerHTML = logMsg('Caricamento…');
+    try {
+      const supa = await getSupa();
+      if (!supa) throw new Error('Connessione Supabase non disponibile.');
+      const from = logState.period === 'tutti' ? null : logState.period === 'oggi' ? periodStart('oggi') : new Date(Date.now() - Number(logState.period) * 86400000);
+      let q = supa.from('audit_log').select('id,creato_il,utente,tabella,operazione,record_id,prima,dopo').order('creato_il', { ascending: false }).limit(LOG_MAX);
+      if (from) q = q.gte('creato_il', from.toISOString());
+      if (logState.tab) q = q.eq('tabella', logState.tab);
+      const { data, error } = await q;
+      if (error) throw error;
+      if (key !== `${logState.period}|${logState.tab}`) return;   // filtro cambiato nel frattempo
+      logCache = { key, rows: data || [] };
+    } catch (err) {
+      console.error(errMsg(err));
+      $('#logtable tbody').innerHTML = logMsg(`Errore caricamento log: ${esc(errMsg(err))}`, 'var(--bad)');
+      return;
+    }
+  }
+  renderLog();
+}
+
+// a chi/cosa si riferisce la riga: nome del socio quando si riesce a risalire, altrimenti nome/descrizione/id breve
+function logRef(r) {
+  const d = { ...(r.prima || {}), ...(r.dopo || {}) };
+  const sid = r.tabella === 'soci' ? r.record_id : d.socio_id;
+  const m = sid && DATA.members.find((x) => x.sid === sid);
+  if (m) return m.nome;
+  if (r.tabella === 'soci' && (d.nome || d.cognome)) return `${d.nome || ''} ${d.cognome || ''}`.trim();
+  return d.nome || d.descrizione || d.oggetto || d.versione || (r.record_id ? String(r.record_id).slice(0, 8) : '—');
+}
+const logVal = (v) => { const s = v === null || v === undefined || v === '' ? '—' : typeof v === 'object' ? JSON.stringify(v) : String(v); return s.length > 60 ? s.slice(0, 57) + '…' : s; };
+function logDetail(r) {
+  if (r.operazione === 'UPDATE') return Object.keys(r.dopo || {}).map((k) => `<div><b>${esc(k)}</b>: ${esc(logVal(r.prima?.[k]))} → ${esc(logVal(r.dopo[k]))}</div>`).join('');
+  return Object.entries(r.dopo || r.prima || {})
+    .filter(([k, v]) => k !== 'id' && k !== 'creato_il' && !k.endsWith('_id') && v !== null && v !== '')
+    .slice(0, 5).map(([k, v]) => `<b>${esc(k)}</b>: ${esc(logVal(v))}`).join(' · ');
+}
+
+function renderLog() {
+  const q = normName(logState.query);
+  const list = (logCache?.rows || []).map((r) => ({ ...r, ref: logRef(r) }))
+    .filter((r) => !q || normName(`${r.utente} ${r.ref} ${LOG_TAB[r.tabella] || r.tabella} ${JSON.stringify(r.prima)} ${JSON.stringify(r.dopo)}`).includes(q));
+  const fmtDT = (d) => new Date(d).toLocaleString('it-IT', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  $('#logtable tbody').innerHTML = list.map((r) => {
+    const [op, cls] = LOG_OP[r.operazione] || [r.operazione, 'n'];
+    const full = JSON.stringify({ prima: r.prima, dopo: r.dopo }, null, 1);
+    return `<tr><td class="mono">${fmtDT(r.creato_il)}</td><td>${esc(r.utente || '—')}</td><td>${esc(LOG_TAB[r.tabella] || r.tabella)}</td><td><span class="tag ${cls}">${op}</span></td><td>${esc(r.ref)}</td><td class="logdet" title="${esc(full)}">${logDetail(r) || '—'}</td></tr>`;
+  }).join('') || logMsg('Nessuna attività nel periodo selezionato');
+  const n = logCache?.rows.length || 0;
+  $('#logcount').textContent = `${list.length} ${list.length === 1 ? 'operazione' : 'operazioni'}${n >= LOG_MAX ? ` · mostrate le ultime ${LOG_MAX}: restringi periodo o sezione per vedere le precedenti` : ''}`;
+  document.querySelectorAll('#logfilters .chip').forEach((c) => c.classList.toggle('active', c.dataset.p === logState.period));
+}
+
 // ---------- navigazione ----------
 const titles = {
   dashboard: ['Dashboard', 'Panoramica attività'], anagrafiche: ['Anagrafiche soci', 'Gestione iscritti e tesseramenti'],
   abbonamenti: ['Abbonamenti', 'Listino piani e incasso ricorrente'], entrate: ['Entrate / Accessi', 'Controllo ingressi'],
   posta: ['Posta', 'Comunicazioni automatiche agli iscritti'],
-  pagamenti: ['Pagamenti', 'Riepilogo incassi'],
+  pagamenti: ['Pagamenti', 'Riepilogo incassi'], log: ['Log attività', 'Tutte le modifiche al database, con utente e dettagli'],
 };
 function go(view) {
   document.querySelectorAll('.view').forEach((v) => (v.hidden = true));
@@ -1116,6 +1180,7 @@ function go(view) {
   $('#sidebar').classList.remove('open'); $('#scrim').classList.remove('show');
   window.scrollTo(0, 0);
   if (view === 'pagamenti') loadPayments();
+  if (view === 'log') { logCache = null; loadLog(); }   // ogni apertura rilegge il log aggiornato
 }
 
 // ---------- login ----------
@@ -1229,6 +1294,11 @@ function wireEvents() {
   });
   $('#payfor').addEventListener('click', () => { payState.sid = null; loadPayments(); });
   $('#btn-pagamento').addEventListener('click', openPagamentoModal);
+  $('#logtab').innerHTML += Object.entries(LOG_TAB).map(([k, v]) => `<option value="${k}">${v}</option>`).join('');
+  $('#logfilters').addEventListener('click', (e) => { const c = e.target.closest('[data-p]'); if (!c) return; logState.period = c.dataset.p; loadLog(); });
+  $('#logtab').addEventListener('change', (e) => { logState.tab = e.target.value; loadLog(); });
+  let logTimer;
+  $('#logsearch').addEventListener('input', (e) => { clearTimeout(logTimer); logTimer = setTimeout(() => { logState.query = e.target.value; renderLog(); }, 150); });
   $('#pagamentoform').addEventListener('submit', submitPagamento);
   accPicker = socioPicker('a-socio');
   payPicker = socioPicker('p-socio', onPagamentoSocio);
