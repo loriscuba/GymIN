@@ -1,6 +1,10 @@
 name: Deploy web su GitHub Pages
 
-# Pubblica la cartella web/ (frontend statico, modalità demo) su GitHub Pages.
+# Pubblica su GitHub Pages:
+#   - branch main -> https://loriscuba.github.io/GymIN/        (produzione)
+#   - branch test -> https://loriscuba.github.io/GymIN/test/   (ambiente di test)
+# Gira sempre dal branch main (unico ammesso a pubblicare su Pages) e prende
+# entrambi i branch; un push su "test" lo avvia tramite test-deploy.yml.
 on:
   push:
     branches: [main]
@@ -23,33 +27,63 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
-      # Collega l'ambiente di test a Supabase generando web/config.js dalle
-      # Variables del repo. La chiave "anon" è pubblica per design (protetta da
-      # RLS): va bene esporla nel sito. Se le variabili non sono impostate, il
-      # sito parte in modalità demo (comportamento invariato).
-      - name: Genera web/config.js (se Supabase è configurato)
+        with:
+          ref: main
+          path: prod
+      # Collega il sito a Supabase generando web/config.js dalle Variables del repo.
+      # La chiave "anon" è pubblica per design (protetta da RLS): va bene esporla nel sito.
+      # Se le variabili non sono impostate resta il config.js presente nel repo.
+      - name: Config produzione
         env:
           SUPABASE_URL: ${{ vars.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ vars.SUPABASE_ANON_KEY }}
         run: |
           if [ -n "$SUPABASE_URL" ] && [ -n "$SUPABASE_ANON_KEY" ]; then
             printf "window.GYMIN_CONFIG = { SUPABASE_URL: '%s', SUPABASE_ANON_KEY: '%s', MAILPIT_URL: '' };\n" \
-              "$SUPABASE_URL" "$SUPABASE_ANON_KEY" > web/config.js
-            echo "config.js generato: ambiente di test collegato a Supabase."
+              "$SUPABASE_URL" "$SUPABASE_ANON_KEY" > prod/web/config.js
+            echo "Produzione collegata a Supabase dalle Variables."
           else
-            echo "Variabili Supabase assenti: build in modalità demo."
+            echo "Variabili Supabase assenti: uso il config.js del repo."
           fi
+
+      - name: Scarica il branch test (se esiste)
+        id: test
+        run: |
+          if git ls-remote --exit-code --heads "https://github.com/${GITHUB_REPOSITORY}.git" test >/dev/null; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Branch test assente: pubblico solo la produzione."
+          fi
+      - uses: actions/checkout@v4
+        if: steps.test.outputs.exists == 'true'
+        with:
+          ref: test
+          path: testsrc
+      # Il sito di test usa lo stesso progetto Supabase della produzione ma SOLO lo schema "test"
+      # (tabelle separate, create con scripts/test-schema.mjs) e non invia email reali.
+      - name: Config test
+        if: steps.test.outputs.exists == 'true'
+        run: |
+          cp prod/web/config.js testsrc/web/config.js
+          printf "window.GYMIN_CONFIG = Object.assign(window.GYMIN_CONFIG || {}, { DB_SCHEMA: 'test', ENV: 'test', MAILPIT_URL: '', MAILER_API_URL: '' });\n" >> testsrc/web/config.js
+          # etichetta ben visibile per non confondere test e produzione
+          sed -i 's#<title>#<title>[TEST] #' testsrc/web/index.html
+          sed -i 's#<body>#<body><div style="position:fixed;top:0;left:50%;transform:translateX(-50%);z-index:9999;background:\#d97706;color:\#fff;font:700 12px/1 system-ui,sans-serif;padding:5px 14px;border-radius:0 0 8px 8px;pointer-events:none">AMBIENTE DI TEST</div>#' testsrc/web/index.html
+          mkdir -p prod/web/test
+          cp -r testsrc/web/. prod/web/test/
+          echo "Sito di test pubblicato in /test/ (schema test)."
+
       # Versione nei link a JS/config: dopo ogni deploy il browser scarica
       # i file nuovi invece di usare quelli vecchi in cache.
       - name: Versiona i file (cache busting)
         run: |
-          V="${GITHUB_SHA::8}"
-          sed -i "s/__BUILD__/$V/g" web/index.html web/js/app.js web/js/data.js
+          V="${GITHUB_SHA::8}-$(date +%s)"
+          find prod/web -name index.html -o -name '*.js' | xargs sed -i "s/__BUILD__/$V/g"
       - uses: actions/configure-pages@v5
         with:
           enablement: true
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: web
+          path: prod/web
       - id: deployment
         uses: actions/deploy-pages@v4
