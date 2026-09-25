@@ -118,6 +118,7 @@ const zapSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strok
 const refreshSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v6h-6"/></svg>';
 const mailSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg>';
 const cardSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20M6 15h4"/></svg>';
+const trashSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>';
 const editSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>';
 // stessi pulsanti-icona usati sia in tabella sia nella scheda socio
 const actionIcons = (m) => `<button class="ibtn edit" data-edit="${m.sid}" data-tip="Modifica dati" aria-label="Modifica dati">${editSvg}</button><button class="ibtn remind" data-remind="${m.sid}" data-tip="Invia promemoria" aria-label="Invia promemoria">${mailSvg}</button><button class="ibtn quick" data-quickrenew="${m.sid}" data-tip="Rinnovo rapido · mantiene il piano" aria-label="Rinnovo rapido">${zapSvg}</button><button class="ibtn full" data-renew="${m.sid}" data-tip="Rinnova · scegli il piano" aria-label="Rinnova con opzioni">${refreshSvg}</button><button class="ibtn pay" data-payments="${m.sid}" data-tip="Visualizza pagamenti" aria-label="Visualizza pagamenti">${cardSvg}</button>`;
@@ -970,12 +971,12 @@ function periodStart(period) {
 async function loadPayments() {
   const key = `${payState.period}|${payState.sid || ''}`;
   if (!payCache || payCache.key !== key) {
-    $('#paytable tbody').innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--ink-3);padding:28px">Caricamento…</td></tr>';
+    $('#paytable tbody').innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--ink-3);padding:28px">Caricamento…</td></tr>';
     try {
       const supa = await getSupa();
       if (!supa) throw new Error('Connessione Supabase non disponibile.');
       const from = periodStart(payState.period);
-      const rows = await fetchAll(supa, 'pagamenti', 'id,importo,metodo,data,socio_id,descrizione,abbonamento:abbonamenti(socio_id,piano:piani(nome))', (q) => {
+      const rows = await fetchAll(supa, 'pagamenti', 'id,importo,metodo,data,socio_id,descrizione,abbonamento_id,abbonamento:abbonamenti(socio_id,data_scadenza,piano:piani(nome))', (q) => {
         if (from) q = q.gte('data', from.toISOString());
         if (payState.sid) q = q.eq('socio_id', payState.sid);
         return q.order('data', { ascending: false });
@@ -984,7 +985,7 @@ async function loadPayments() {
       payCache = { key, rows };
     } catch (err) {
       console.error(errMsg(err));
-      $('#paytable tbody').innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--bad);padding:28px">Errore caricamento pagamenti: ${escerrMsg(err)}</td></tr>`;
+      $('#paytable tbody').innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--bad);padding:28px">Errore caricamento pagamenti: ${esc(errMsg(err))}</td></tr>`;
       return;
     }
   }
@@ -1007,8 +1008,8 @@ function renderPayments() {
     + Object.entries(perMetodo).sort((a, b) => b[1] - a[1]).map(([k, v]) => `<div class="pbox"><span>${esc(metodoLabel(k))}</span><b>${eur2(v)}</b></div>`).join('');
 
   const fmtDT = (d) => new Date(d).toLocaleString('it-IT', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-  $('#paytable tbody').innerHTML = list.map((p) => `<tr><td class="mono">${fmtDT(p.data)}</td><td>${p.m ? `<a role="button" style="cursor:pointer;font-weight:600" data-member="${esc(p.m.sid)}">${esc(p.nome)}</a>` : '—'}</td><td class="mono">${esc(p.tessera)}</td><td><span class="plan-pill">${esc(p.piano)}</span></td><td>${esc(metodoLabel(p.metodo))}</td><td class="mono" style="text-align:right">${eur2(p.importo)}</td></tr>`).join('')
-    || '<tr><td colspan="6" style="text-align:center;color:var(--ink-3);padding:28px">Nessun pagamento nel periodo selezionato</td></tr>';
+  $('#paytable tbody').innerHTML = list.map((p) => `<tr><td class="mono">${fmtDT(p.data)}</td><td>${p.m ? `<a role="button" style="cursor:pointer;font-weight:600" data-member="${esc(p.m.sid)}">${esc(p.nome)}</a>` : '—'}</td><td class="mono">${esc(p.tessera)}</td><td><span class="plan-pill">${esc(p.piano)}</span></td><td>${esc(metodoLabel(p.metodo))}</td><td class="mono" style="text-align:right">${eur2(p.importo)}</td><td><div class="actions-cell"><button class="ibtn edit" data-payedit="${esc(p.id)}" data-tip="Modifica pagamento" aria-label="Modifica pagamento">${editSvg}</button><button class="ibtn del" data-paydel="${esc(p.id)}" data-tip="Annulla pagamento" aria-label="Annulla pagamento">${trashSvg}</button></div></td></tr>`).join('')
+    || '<tr><td colspan="7" style="text-align:center;color:var(--ink-3);padding:28px">Nessun pagamento nel periodo selezionato</td></tr>';
   $('#paycount').textContent = `${list.length} ${list.length === 1 ? 'pagamento' : 'pagamenti'}`;
 
   const m = payState.sid && bySid[payState.sid];
@@ -1023,6 +1024,74 @@ function openPayments(sid) {
   payState.sid = sid; payState.period = 'tutti'; payState.query = '';
   $('#paysearch').value = '';
   go('pagamenti');
+}
+
+// ---------- modifica / annulla pagamento ----------
+let payEditId = null;
+const payById = (id) => (payCache?.rows || []).find((p) => p.id === id);
+const payLabel = (p) => {
+  const m = DATA.members.find((x) => x.sid === (p.socio_id || p.abbonamento?.socio_id));
+  return `${m ? m.nome : 'Senza socio'} · ${p.descrizione || p.abbonamento?.piano?.nome || '—'}`;
+};
+// dopo una modifica: ricarica dati (incassi dashboard, scadenze) e lista pagamenti
+async function refreshAfterPayChange() {
+  payCache = null;
+  try { DATA = await loadData(); renderAll(); } catch (err) { console.error(errMsg(err)); }
+  loadPayments();
+}
+function openPayEdit(id) {
+  const p = payById(id); if (!p) return;
+  payEditId = id;
+  $('#pe-sub').textContent = payLabel(p);
+  $('#pe-importo').value = Number(p.importo || 0).toFixed(2);
+  $('#pe-metodo').value = METODI[p.metodo] ? p.metodo : 'altro';
+  $('#pe-data').value = new Date(p.data).toLocaleDateString('sv');
+  $('#pe-descr').value = p.descrizione || '';
+  openModal('modal-payedit');
+}
+async function submitPayEdit(e) {
+  e.preventDefault();
+  const p = payById(payEditId); if (!p) return;
+  const importo = Number(String($('#pe-importo').value).replace(',', '.'));
+  const giorno = $('#pe-data').value;
+  if (!(importo > 0)) { toast('Inserisci un importo valido', 'warn'); return; }
+  if (!giorno) { toast('Inserisci la data del pagamento', 'warn'); return; }
+  const patch = { importo, metodo: $('#pe-metodo').value, descrizione: $('#pe-descr').value.trim() || null };
+  // la data cambia solo se è stato scelto un altro giorno (così resta l'orario originale)
+  if (giorno !== new Date(p.data).toLocaleDateString('sv')) patch.data = new Date(giorno + 'T12:00:00').toISOString();
+  const supa = await getSupa();
+  if (!supa) { toast('Connessione Supabase non disponibile. Verifica la configurazione del database.', 'warn'); return; }
+  const { error } = await supa.from('pagamenti').update(patch).eq('id', p.id);
+  if (error) { console.error(errMsg(error)); toast('Errore modifica pagamento: ' + errMsg(error), 'warn'); return; }
+  closeModal('modal-payedit');
+  toast(`Pagamento modificato · ${euro(importo)} · ${metodoLabel(patch.metodo)}`);
+  await refreshAfterPayChange();
+}
+function openPayDel(id) {
+  const p = payById(id); if (!p) return;
+  payEditId = id;
+  const eur2 = (n) => '€ ' + Number(n).toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  $('#pd-info').innerHTML = `<div class="renew-info"><div><span>Pagamento</span><b>${esc(payLabel(p))}</b></div><div><span>Importo</span><b>${eur2(p.importo)} · ${esc(metodoLabel(p.metodo))}</b></div></div>`;
+  // pagamento di un rinnovo: si può annullare anche l'abbonamento creato (es. rinnovo fatto per errore)
+  $('#pd-abb-box').hidden = !p.abbonamento_id;
+  $('#pd-abb').checked = false;
+  if (p.abbonamento_id) $('#pd-abb-label').textContent = `Annulla anche l’abbonamento collegato (${p.abbonamento?.piano?.nome || 'piano'}${p.abbonamento?.data_scadenza ? ' · scad. ' + fmtDate(p.abbonamento.data_scadenza) : ''})`;
+  openModal('modal-paydel');
+}
+async function submitPayDel(e) {
+  e.preventDefault();
+  const p = payById(payEditId); if (!p) return;
+  const conAbb = !!p.abbonamento_id && $('#pd-abb').checked;
+  const supa = await getSupa();
+  if (!supa) { toast('Connessione Supabase non disponibile. Verifica la configurazione del database.', 'warn'); return; }
+  // eliminando l'abbonamento si eliminano anche i suoi pagamenti (on delete cascade)
+  const { error } = conAbb
+    ? await supa.from('abbonamenti').delete().eq('id', p.abbonamento_id)
+    : await supa.from('pagamenti').delete().eq('id', p.id);
+  if (error) { console.error(errMsg(error)); toast('Errore annullamento: ' + errMsg(error), 'warn'); return; }
+  closeModal('modal-paydel');
+  toast(conAbb ? 'Pagamento e abbonamento annullati' : 'Pagamento annullato', 'warn');
+  await refreshAfterPayChange();
 }
 
 // ---------- registra pagamento diretto ----------
@@ -1100,12 +1169,76 @@ async function submitPagamento(e) {
   toast(`Pagamento registrato · ${m ? m.nome : descrizione} · ${euro(importo)} · ${metodoLabel(metodo)}`);
 }
 
+// ---------- log attività (tabella audit_log, scritta dai trigger del database) ----------
+const LOG_TAB = { soci: 'Soci', abbonamenti: 'Abbonamenti', pagamenti: 'Pagamenti', piani: 'Piani', accessi: 'Accessi', mail_log: 'Posta', informative_privacy: 'Informative privacy', consensi_eventi: 'Privacy soci' };
+const LOG_OP = { INSERT: ['Nuovo', 'g'], UPDATE: ['Modifica', 'w'], DELETE: ['Eliminato', 'b'] };
+const LOG_MAX = 500;
+const logState = { period: '7', tab: '', query: '' };
+let logCache = null;   // { key, rows }
+const logMsg = (html, color = 'var(--ink-3)') => `<tr><td colspan="6" style="text-align:center;color:${color};padding:28px">${html}</td></tr>`;
+
+async function loadLog() {
+  const key = `${logState.period}|${logState.tab}`;
+  if (!logCache || logCache.key !== key) {
+    $('#logtable tbody').innerHTML = logMsg('Caricamento…');
+    try {
+      const supa = await getSupa();
+      if (!supa) throw new Error('Connessione Supabase non disponibile.');
+      const from = logState.period === 'tutti' ? null : logState.period === 'oggi' ? periodStart('oggi') : new Date(Date.now() - Number(logState.period) * 86400000);
+      let q = supa.from('audit_log').select('id,creato_il,utente,tabella,operazione,record_id,prima,dopo').order('creato_il', { ascending: false }).limit(LOG_MAX);
+      if (from) q = q.gte('creato_il', from.toISOString());
+      if (logState.tab) q = q.eq('tabella', logState.tab);
+      const { data, error } = await q;
+      if (error) throw error;
+      if (key !== `${logState.period}|${logState.tab}`) return;   // filtro cambiato nel frattempo
+      logCache = { key, rows: data || [] };
+    } catch (err) {
+      console.error(errMsg(err));
+      $('#logtable tbody').innerHTML = logMsg(`Errore caricamento log: ${esc(errMsg(err))}`, 'var(--bad)');
+      return;
+    }
+  }
+  renderLog();
+}
+
+// a chi/cosa si riferisce la riga: nome del socio quando si riesce a risalire, altrimenti nome/descrizione/id breve
+function logRef(r) {
+  const d = { ...(r.prima || {}), ...(r.dopo || {}) };
+  const sid = r.tabella === 'soci' ? r.record_id : d.socio_id;
+  const m = sid && DATA.members.find((x) => x.sid === sid);
+  if (m) return m.nome;
+  if (r.tabella === 'soci' && (d.nome || d.cognome)) return `${d.nome || ''} ${d.cognome || ''}`.trim();
+  return d.nome || d.descrizione || d.oggetto || d.versione || (r.record_id ? String(r.record_id).slice(0, 8) : '—');
+}
+const logVal = (v) => { const s = v === null || v === undefined || v === '' ? '—' : typeof v === 'object' ? JSON.stringify(v) : String(v); return s.length > 60 ? s.slice(0, 57) + '…' : s; };
+function logDetail(r) {
+  if (r.operazione === 'UPDATE') return Object.keys(r.dopo || {}).map((k) => `<div><b>${esc(k)}</b>: ${esc(logVal(r.prima?.[k]))} → ${esc(logVal(r.dopo[k]))}</div>`).join('');
+  return Object.entries(r.dopo || r.prima || {})
+    .filter(([k, v]) => k !== 'id' && k !== 'creato_il' && !k.endsWith('_id') && v !== null && v !== '')
+    .slice(0, 5).map(([k, v]) => `<b>${esc(k)}</b>: ${esc(logVal(v))}`).join(' · ');
+}
+
+function renderLog() {
+  const q = normName(logState.query);
+  const list = (logCache?.rows || []).map((r) => ({ ...r, ref: logRef(r) }))
+    .filter((r) => !q || normName(`${r.utente} ${r.ref} ${LOG_TAB[r.tabella] || r.tabella} ${JSON.stringify(r.prima)} ${JSON.stringify(r.dopo)}`).includes(q));
+  const fmtDT = (d) => new Date(d).toLocaleString('it-IT', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  $('#logtable tbody').innerHTML = list.map((r) => {
+    const [op, cls] = LOG_OP[r.operazione] || [r.operazione, 'n'];
+    const full = JSON.stringify({ prima: r.prima, dopo: r.dopo }, null, 1);
+    return `<tr><td class="mono">${fmtDT(r.creato_il)}</td><td>${esc(r.utente || '—')}</td><td>${esc(LOG_TAB[r.tabella] || r.tabella)}</td><td><span class="tag ${cls}">${op}</span></td><td>${esc(r.ref)}</td><td class="logdet" title="${esc(full)}">${logDetail(r) || '—'}</td></tr>`;
+  }).join('') || logMsg('Nessuna attività nel periodo selezionato');
+  const n = logCache?.rows.length || 0;
+  $('#logcount').textContent = `${list.length} ${list.length === 1 ? 'operazione' : 'operazioni'}${n >= LOG_MAX ? ` · mostrate le ultime ${LOG_MAX}: restringi periodo o sezione per vedere le precedenti` : ''}`;
+  document.querySelectorAll('#logfilters .chip').forEach((c) => c.classList.toggle('active', c.dataset.p === logState.period));
+}
+
 // ---------- navigazione ----------
 const titles = {
   dashboard: ['Dashboard', 'Panoramica attività'], anagrafiche: ['Anagrafiche soci', 'Gestione iscritti e tesseramenti'],
   abbonamenti: ['Abbonamenti', 'Listino piani e incasso ricorrente'], entrate: ['Entrate / Accessi', 'Controllo ingressi'],
   posta: ['Posta', 'Comunicazioni automatiche agli iscritti'],
-  pagamenti: ['Pagamenti', 'Riepilogo incassi'],
+  pagamenti: ['Pagamenti', 'Riepilogo incassi'], log: ['Log attività', 'Tutte le modifiche al database, con utente e dettagli'],
 };
 function go(view) {
   document.querySelectorAll('.view').forEach((v) => (v.hidden = true));
@@ -1116,6 +1249,7 @@ function go(view) {
   $('#sidebar').classList.remove('open'); $('#scrim').classList.remove('show');
   window.scrollTo(0, 0);
   if (view === 'pagamenti') loadPayments();
+  if (view === 'log') { logCache = null; loadLog(); }   // ogni apertura rilegge il log aggiornato
 }
 
 // ---------- login ----------
@@ -1229,6 +1363,13 @@ function wireEvents() {
   });
   $('#payfor').addEventListener('click', () => { payState.sid = null; loadPayments(); });
   $('#btn-pagamento').addEventListener('click', openPagamentoModal);
+  $('#payeditform').addEventListener('submit', submitPayEdit);
+  $('#paydelform').addEventListener('submit', submitPayDel);
+  $('#logtab').innerHTML += Object.entries(LOG_TAB).map(([k, v]) => `<option value="${k}">${v}</option>`).join('');
+  $('#logfilters').addEventListener('click', (e) => { const c = e.target.closest('[data-p]'); if (!c) return; logState.period = c.dataset.p; loadLog(); });
+  $('#logtab').addEventListener('change', (e) => { logState.tab = e.target.value; loadLog(); });
+  let logTimer;
+  $('#logsearch').addEventListener('input', (e) => { clearTimeout(logTimer); logTimer = setTimeout(() => { logState.query = e.target.value; renderLog(); }, 150); });
   $('#pagamentoform').addEventListener('submit', submitPagamento);
   accPicker = socioPicker('a-socio');
   payPicker = socioPicker('p-socio', onPagamentoSocio);
@@ -1251,6 +1392,8 @@ function wireEvents() {
     const q = e.target.closest('[data-quickrenew]'); if (q) return quickRenew(q.dataset.quickrenew);
     const r = e.target.closest('[data-renew]'); if (r) return openRinnovoModal(r.dataset.renew);
     const pay = e.target.closest('[data-payments]'); if (pay) return openPayments(pay.dataset.payments);
+    const pe = e.target.closest('[data-payedit]'); if (pe) return openPayEdit(pe.dataset.payedit);
+    const pd = e.target.closest('[data-paydel]'); if (pd) return openPayDel(pd.dataset.paydel);
     if (e.target.closest('[data-informativa]')) return openInformativa();
     const ps = e.target.closest('[data-privacy-socio]'); if (ps) return openPrivacySocio(ps.dataset.privacySocio);
     const rv = e.target.closest('[data-revoca]'); if (rv) return revocaMarketing(rv.dataset.revoca);

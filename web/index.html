@@ -189,6 +189,8 @@
   .socio-res button{display:flex;justify-content:space-between;align-items:center;gap:10px;text-align:left;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);font:inherit;font-size:13.5px;cursor:pointer}
   .socio-res button.on,.socio-res button:hover{border-color:var(--accent);background:var(--accent-soft)}
   .socio-res span{color:var(--ink-3);font-size:12px;white-space:nowrap}.socio-res .none{font-size:13px;color:var(--ink-3);padding:4px 2px}
+  .logtab{padding:8px 12px;border:1px solid var(--line);border-radius:9px;background:var(--surface);color:var(--ink);font:inherit;font-size:13px}
+  #logtable .logdet{font-size:12.5px;color:var(--ink-2);max-width:420px;white-space:normal}#logtable .logdet b{color:var(--ink);font-weight:600}
   .chip.payfor{background:var(--accent-soft);color:var(--accent-ink);border-color:var(--accent)}
   .dupcard{border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:12px;background:var(--surface-2)}
   .dupcard-head{display:flex;align-items:center;gap:12px}
@@ -219,6 +221,7 @@
   .ibtn.full{color:var(--accent-ink);background:var(--accent-soft)}
   .ibtn.pay{color:var(--teal);background:color-mix(in srgb,var(--teal) 12%,transparent)}
   .ibtn.remind{color:var(--blue);background:color-mix(in srgb,var(--blue) 15%,transparent)}
+  .ibtn.del{color:var(--bad);background:var(--bad-bg)}
   .ibtn.edit{color:var(--ink-2);background:var(--surface-2);border-color:var(--line)}
   .ibtn:hover{filter:brightness(.96);border-color:currentColor}
   /* tooltip istantaneo */
@@ -303,6 +306,7 @@
     <button class="nav" data-view="pagamenti" data-tip="Pagamenti"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20M6 15h4"/></svg> <span class="nav-label">Pagamenti</span></button>
     <button class="nav" data-view="entrate" data-tip="Entrate / Accessi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"/></svg> <span class="nav-label">Entrate / Accessi</span> <span class="count" id="c-acc"></span></button>
     <button class="nav" data-view="posta" data-tip="Posta"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg> <span class="nav-label">Posta</span> <span class="count" id="c-posta"></span></button>
+    <button class="nav" data-view="log" data-tip="Log attività"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/></svg> <span class="nav-label">Log attività</span></button>
     <button class="nav" id="btn-settings" data-tip="Impostazioni"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.86l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06A1.7 1.7 0 0 0 15.8 19.4a1.7 1.7 0 0 0-1 .97 1.7 1.7 0 0 0-.2 1.06V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-.2-1.06 1.7 1.7 0 0 0-1-.97 1.7 1.7 0 0 0-1.86.34l-.06.06A2 2 0 1 1 4.7 17.7l.06-.06A1.7 1.7 0 0 0 4.6 15.8a1.7 1.7 0 0 0-1.06-.2H3.4a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.06-.2 1.7 1.7 0 0 0 .97-1 1.7 1.7 0 0 0-.34-1.86l-.06-.06A2 2 0 1 1 8.3 4.7l.06.06A1.7 1.7 0 0 0 8.2 4.6a1.7 1.7 0 0 0 .97-1 .97.97 0 0 0-.2-1.06V2.4a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 .2 1.06 1.7 1.7 0 0 0 .97 1 1.7 1.7 0 0 0 1.86-.34l.06-.06A2 2 0 1 1 19.3 8.3l-.06.06A1.7 1.7 0 0 0 19.4 8.2a1.7 1.7 0 0 0 1.06.2h.1a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.06.2 1.7 1.7 0 0 0-.97 1Z"/></svg> <span class="nav-label">Impostazioni</span></button>
     <div class="sidebar-foot"><div class="avatar">TV</div><div class="foot-txt"><b>Tommaso V.</b><span>Direttore</span></div></div>
   </aside>
@@ -364,8 +368,18 @@
         <button class="btn-sm" id="btn-pagamento"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg> Registra pagamento</button>
       </div>
       <div class="paysum" id="paysum"></div>
-      <div class="tablewrap"><div class="scroll"><table id="paytable"><thead><tr><th>Data</th><th>Socio</th><th>Tessera</th><th>Abbonamento</th><th>Metodo</th><th style="text-align:right">Importo</th></tr></thead><tbody></tbody></table></div>
+      <div class="tablewrap"><div class="scroll"><table id="paytable"><thead><tr><th>Data</th><th>Socio</th><th>Tessera</th><th>Abbonamento</th><th>Metodo</th><th style="text-align:right">Importo</th><th>Azioni</th></tr></thead><tbody></tbody></table></div>
         <div class="tfoot"><span id="paycount"></span></div></div>
+    </section>
+
+    <section class="view" id="view-log" hidden>
+      <div class="toolbar">
+        <div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg><input id="logsearch" placeholder="Cerca per utente, socio o valore…"></div>
+        <div class="filters" id="logfilters"><button class="chip" data-p="oggi">Oggi</button><button class="chip active" data-p="7">7 giorni</button><button class="chip" data-p="30">30 giorni</button><button class="chip" data-p="tutti">Tutti</button></div>
+        <select id="logtab" class="logtab" aria-label="Sezione"><option value="">Tutte le sezioni</option></select>
+      </div>
+      <div class="tablewrap"><div class="scroll"><table id="logtable"><thead><tr><th>Data</th><th>Utente</th><th>Sezione</th><th>Operazione</th><th>Riferimento</th><th>Dettaglio</th></tr></thead><tbody></tbody></table></div>
+        <div class="tfoot"><span id="logcount"></span></div></div>
     </section>
 
     <section class="view" id="view-entrate" hidden>
@@ -456,6 +470,32 @@
       <div class="msub" id="p-hint" style="margin-top:6px"></div>
     </div>
     <div class="mfoot"><button type="button" class="btn-ghost" data-close="modal-pagamento">Annulla</button><button type="submit" class="btn-primary">Registra pagamento</button></div>
+  </form>
+</div>
+
+<!-- Modale: modifica pagamento -->
+<div class="overlay" id="modal-payedit" hidden>
+  <form class="modal" id="payeditform" novalidate>
+    <div class="mhead"><div><h3>Modifica pagamento</h3><div class="msub" id="pe-sub">—</div></div><button type="button" class="xbtn" data-close="modal-payedit">×</button></div>
+    <div class="mbody">
+      <div class="field"><label for="pe-importo">Importo (€)</label><input id="pe-importo" type="number" min="0.01" step="0.01" inputmode="decimal" required></div>
+      <div class="field"><label for="pe-metodo">Tipo di pagamento</label><select id="pe-metodo"><option value="contanti">Contanti</option><option value="bancomat">Bancomat</option><option value="carta">Carta di credito</option><option value="bonifico">Bonifico</option><option value="satispay">Satispay</option><option value="altro">Altro</option></select></div>
+      <div class="field"><label for="pe-data">Data pagamento</label><input id="pe-data" type="date" required></div>
+      <div class="field"><label for="pe-descr">Descrizione</label><input id="pe-descr" maxlength="80" placeholder="Facoltativa (per i rinnovi resta il nome del piano)"></div>
+    </div>
+    <div class="mfoot"><button type="button" class="btn-ghost" data-close="modal-payedit">Annulla</button><button type="submit" class="btn-primary">Salva modifiche</button></div>
+  </form>
+</div>
+
+<!-- Modale: annulla pagamento -->
+<div class="overlay" id="modal-paydel" hidden>
+  <form class="modal" id="paydelform">
+    <div class="mhead"><div><h3>Annulla pagamento</h3><div class="msub">Il pagamento viene eliminato e tolto dagli incassi</div></div><button type="button" class="xbtn" data-close="modal-paydel">×</button></div>
+    <div class="mbody">
+      <div id="pd-info"></div>
+      <label class="check" id="pd-abb-box" style="margin-top:14px"><input type="checkbox" id="pd-abb"> <span id="pd-abb-label">Annulla anche l’abbonamento collegato</span></label>
+    </div>
+    <div class="mfoot"><button type="button" class="btn-ghost" data-close="modal-paydel">Indietro</button><button type="submit" class="btn-primary" style="background:var(--bad)">Annulla pagamento</button></div>
   </form>
 </div>
 
