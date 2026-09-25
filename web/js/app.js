@@ -243,7 +243,8 @@ function renderAll() {
 }
 
 // ---------- CONFIG RUNTIME / SETTINGS ----------
-const SETTINGS_STORAGE_KEY = 'gymin-settings';
+// ambiente di test (stesso dominio della produzione): impostazioni salvate a parte, mai mescolate
+const SETTINGS_STORAGE_KEY = window.GYMIN_CONFIG?.ENV === 'test' ? 'gymin-settings-test' : 'gymin-settings';
 
 function loadSettingsFromStorage() {
   try {
