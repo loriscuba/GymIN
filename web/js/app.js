@@ -1176,7 +1176,8 @@ const LOG_OP = { INSERT: ['Nuovo', 'g'], UPDATE: ['Modifica', 'w'], DELETE: ['El
 const LOG_MAX = 500;
 const logState = { period: '7', tab: '', query: '' };
 let logCache = null;   // { key, rows }
-const logMsg = (html, color = 'var(--ink-3)') => `<tr><td colspan="6" style="text-align:center;color:${color};padding:28px">${html}</td></tr>`;
+const LOG_COLS = 'id,creato_il,utente,tabella,operazione,record_id,prima,dopo';
+const logMsg = (html, color = 'var(--ink-3)') => `<tr><td colspan="5" style="text-align:center;color:${color};padding:28px">${html}</td></tr>`;
 
 async function loadLog() {
   const key = `${logState.period}|${logState.tab}`;
@@ -1186,10 +1187,15 @@ async function loadLog() {
       const supa = await getSupa();
       if (!supa) throw new Error('Connessione Supabase non disponibile.');
       const from = logState.period === 'tutti' ? null : logState.period === 'oggi' ? periodStart('oggi') : new Date(Date.now() - Number(logState.period) * 86400000);
-      let q = supa.from('audit_log').select('id,creato_il,utente,tabella,operazione,record_id,prima,dopo').order('creato_il', { ascending: false }).limit(LOG_MAX);
-      if (from) q = q.gte('creato_il', from.toISOString());
-      if (logState.tab) q = q.eq('tabella', logState.tab);
-      const { data, error } = await q;
+      const query = (cols) => {
+        let q = supa.from('audit_log').select(cols).order('creato_il', { ascending: false }).limit(LOG_MAX);
+        if (from) q = q.gte('creato_il', from.toISOString());
+        if (logState.tab) q = q.eq('tabella', logState.tab);
+        return q;
+      };
+      let { data, error } = await query(LOG_COLS + ',azione,sql,origine,transazione');
+      // colonne di dettaglio non ancora create (SQL "audit_log_dettagli" non eseguito): usa quelle base
+      if (error && /azione|sql|origine|transazione/.test(errMsg(error))) ({ data, error } = await query(LOG_COLS));
       if (error) throw error;
       if (key !== `${logState.period}|${logState.tab}`) return;   // filtro cambiato nel frattempo
       logCache = { key, rows: data || [] };
@@ -1219,19 +1225,50 @@ function logDetail(r) {
     .slice(0, 5).map(([k, v]) => `<b>${esc(k)}</b>: ${esc(logVal(v))}`).join(' · ');
 }
 
+const logTabName = (t) => LOG_TAB[t] || t;
+const logFmtDT = (d) => new Date(d).toLocaleString('it-IT', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' });
+// tabelle toccate nella stessa transazione (es. annullo abbonamento → eliminati anche i pagamenti)
+function logTabelle(r) {
+  if (r.transazione == null) return [r.tabella];
+  return [...new Set((logCache?.rows || []).filter((x) => x.transazione === r.transazione).map((x) => x.tabella))];
+}
+const logAzione = (r) => r.azione || `${LOG_OP[r.operazione]?.[0] || r.operazione} · ${logTabName(r.tabella)} · ${r.ref || logRef(r)}`;
+
 function renderLog() {
   const q = normName(logState.query);
   const list = (logCache?.rows || []).map((r) => ({ ...r, ref: logRef(r) }))
-    .filter((r) => !q || normName(`${r.utente} ${r.ref} ${LOG_TAB[r.tabella] || r.tabella} ${JSON.stringify(r.prima)} ${JSON.stringify(r.dopo)}`).includes(q));
-  const fmtDT = (d) => new Date(d).toLocaleString('it-IT', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    .filter((r) => !q || normName(`${r.utente} ${r.ref} ${r.azione || ''} ${logTabName(r.tabella)} ${r.sql || ''} ${JSON.stringify(r.prima)} ${JSON.stringify(r.dopo)}`).includes(q));
   $('#logtable tbody').innerHTML = list.map((r) => {
     const [op, cls] = LOG_OP[r.operazione] || [r.operazione, 'n'];
-    const full = JSON.stringify({ prima: r.prima, dopo: r.dopo }, null, 1);
-    return `<tr><td class="mono">${fmtDT(r.creato_il)}</td><td>${esc(r.utente || '—')}</td><td>${esc(LOG_TAB[r.tabella] || r.tabella)}</td><td><span class="tag ${cls}">${op}</span></td><td>${esc(r.ref)}</td><td class="logdet" title="${esc(full)}">${logDetail(r) || '—'}</td></tr>`;
+    const tabs = logTabelle(r);
+    return `<tr data-log="${r.id}" title="Clicca per il dettaglio completo (SQL e dati)"><td class="mono">${logFmtDT(r.creato_il)}</td><td>${esc(r.utente || '—')}</td><td><span class="tag ${cls}">${op}</span><span class="logsub">${esc(logTabName(r.tabella))}</span></td><td>${esc(logAzione(r))}${tabs.length > 1 ? `<span class="logsub">Tabelle coinvolte: ${esc(tabs.map(logTabName).join(', '))}</span>` : ''}</td><td class="logdet">${logDetail(r) || '—'}</td></tr>`;
   }).join('') || logMsg('Nessuna attività nel periodo selezionato');
   const n = logCache?.rows.length || 0;
   $('#logcount').textContent = `${list.length} ${list.length === 1 ? 'operazione' : 'operazioni'}${n >= LOG_MAX ? ` · mostrate le ultime ${LOG_MAX}: restringi periodo o sezione per vedere le precedenti` : ''}`;
   document.querySelectorAll('#logfilters .chip').forEach((c) => c.classList.toggle('active', c.dataset.p === logState.period));
+}
+
+function openLogDetail(id) {
+  const r = (logCache?.rows || []).find((x) => String(x.id) === String(id)); if (!r) return;
+  const json = (v) => (v ? JSON.stringify(v, null, 2) : '—');
+  const riga = (label, val) => `<div><span>${label}</span><b>${esc(val || '—')}</b></div>`;
+  const tabs = logTabelle(r);
+  $('#ld-sub').textContent = `${logFmtDT(r.creato_il)} · ${r.utente || '—'}`;
+  $('#ld-body').innerHTML = `
+    <div class="scheda-grid" style="margin-bottom:14px">
+      ${riga('Cosa è stato fatto', logAzione(r))}
+      ${riga('Operazione', `${LOG_OP[r.operazione]?.[0] || r.operazione} (${r.operazione}) su ${r.tabella}`)}
+      ${riga('Tabelle coinvolte', tabs.join(', '))}
+      ${riga('Origine', r.origine)}
+      ${riga('Utente', r.utente)}
+      ${riga('Id record', r.record_id)}
+    </div>
+    <div class="loghead">Istruzione SQL eseguita</div>
+    <pre class="logpre">${esc(r.sql || 'Non disponibile (operazione registrata prima dell’aggiornamento del log)')}</pre>
+    ${r.origine?.startsWith('App') ? '<div class="msub" style="margin:-8px 0 12px">Dall’app la query è generata dall’API di Supabase: i valori inviati sono qui sotto in “Dati”.</div>' : ''}
+    <div class="loghead">Dati prima</div><pre class="logpre">${esc(json(r.prima))}</pre>
+    <div class="loghead">Dati dopo</div><pre class="logpre">${esc(json(r.dopo))}</pre>`;
+  openModal('modal-logdet');
 }
 
 // ---------- navigazione ----------
@@ -1368,6 +1405,7 @@ function wireEvents() {
   $('#paydelform').addEventListener('submit', submitPayDel);
   $('#logtab').innerHTML += Object.entries(LOG_TAB).map(([k, v]) => `<option value="${k}">${v}</option>`).join('');
   $('#logfilters').addEventListener('click', (e) => { const c = e.target.closest('[data-p]'); if (!c) return; logState.period = c.dataset.p; loadLog(); });
+  $('#logtable tbody').addEventListener('click', (e) => { const tr = e.target.closest('tr[data-log]'); if (tr) openLogDetail(tr.dataset.log); });
   $('#logtab').addEventListener('change', (e) => { logState.tab = e.target.value; loadLog(); });
   let logTimer;
   $('#logsearch').addEventListener('input', (e) => { clearTimeout(logTimer); logTimer = setTimeout(() => { logState.query = e.target.value; renderLog(); }, 150); });

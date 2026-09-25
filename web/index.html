@@ -190,6 +190,10 @@
   .socio-res button.on,.socio-res button:hover{border-color:var(--accent);background:var(--accent-soft)}
   .socio-res span{color:var(--ink-3);font-size:12px;white-space:nowrap}.socio-res .none{font-size:13px;color:var(--ink-3);padding:4px 2px}
   .logtab{padding:8px 12px;border:1px solid var(--line);border-radius:9px;background:var(--surface);color:var(--ink);font:inherit;font-size:13px}
+  #logtable tbody tr[data-log]{cursor:pointer}#logtable tbody tr[data-log]:hover{background:var(--surface-2)}
+  #logtable .logsub{display:block;font-size:11.5px;color:var(--ink-3);margin-top:3px}
+  .logpre{background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:10px 12px;font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre-wrap;word-break:break-word;max-height:260px;overflow:auto;margin:6px 0 14px}
+  .loghead{font-size:12px;font-weight:700;color:var(--ink-2);text-transform:uppercase;letter-spacing:.03em}
   #logtable .logdet{font-size:12.5px;color:var(--ink-2);max-width:420px;white-space:normal}#logtable .logdet b{color:var(--ink);font-weight:600}
   .chip.payfor{background:var(--accent-soft);color:var(--accent-ink);border-color:var(--accent)}
   .dupcard{border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:12px;background:var(--surface-2)}
@@ -378,7 +382,7 @@
         <div class="filters" id="logfilters"><button class="chip" data-p="oggi">Oggi</button><button class="chip active" data-p="7">7 giorni</button><button class="chip" data-p="30">30 giorni</button><button class="chip" data-p="tutti">Tutti</button></div>
         <select id="logtab" class="logtab" aria-label="Sezione"><option value="">Tutte le sezioni</option></select>
       </div>
-      <div class="tablewrap"><div class="scroll"><table id="logtable"><thead><tr><th>Data</th><th>Utente</th><th>Sezione</th><th>Operazione</th><th>Riferimento</th><th>Dettaglio</th></tr></thead><tbody></tbody></table></div>
+      <div class="tablewrap"><div class="scroll"><table id="logtable"><thead><tr><th>Data</th><th>Utente</th><th>Operazione</th><th>Cosa è stato fatto</th><th>Dettaglio</th></tr></thead><tbody></tbody></table></div>
         <div class="tfoot"><span id="logcount"></span></div></div>
     </section>
 
@@ -472,6 +476,13 @@
     <div class="mfoot"><button type="button" class="btn-ghost" data-close="modal-pagamento">Annulla</button><button type="submit" class="btn-primary">Registra pagamento</button></div>
   </form>
 </div>
+
+<!-- Modale: dettaglio operazione del log -->
+<div class="overlay" id="modal-logdet" hidden><div class="modal wide">
+  <div class="mhead"><div><h3>Dettaglio operazione</h3><div class="msub" id="ld-sub">—</div></div><button type="button" class="xbtn" data-close="modal-logdet">×</button></div>
+  <div class="mbody" id="ld-body"></div>
+  <div class="mfoot"><button type="button" class="btn-ghost" data-close="modal-logdet">Chiudi</button></div>
+</div></div>
 
 <!-- Modale: modifica pagamento -->
 <div class="overlay" id="modal-payedit" hidden>
