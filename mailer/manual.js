@@ -38,7 +38,7 @@ export function validateManualMail(payload = {}) {
 export function createManualSendHandler({ sendMail } = {}) {
   const sender = sendMail ?? (async (payload) => {
     const { inviaMail } = await import('./emails.js');
-    return inviaMail(payload);
+    return inviaMail({ ...payload, rethrow: true });
   });
 
   return async function manualSendHandler(req, res) {
