@@ -185,6 +185,10 @@
   .paysum .pbox{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 14px;min-width:120px}
   .paysum .pbox span{display:block;font-size:12px;color:var(--ink-3)}.paysum .pbox b{font-size:17px}
   th.sortable{cursor:pointer;user-select:none}th.sortable:hover{color:var(--accent)}th.sortable span{opacity:.7}
+  .socio-res{display:flex;flex-direction:column;gap:4px;margin-top:6px;max-height:240px;overflow:auto}.socio-res:empty{display:none}
+  .socio-res button{display:flex;justify-content:space-between;align-items:center;gap:10px;text-align:left;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);font:inherit;font-size:13.5px;cursor:pointer}
+  .socio-res button.on,.socio-res button:hover{border-color:var(--accent);background:var(--accent-soft)}
+  .socio-res span{color:var(--ink-3);font-size:12px;white-space:nowrap}.socio-res .none{font-size:13px;color:var(--ink-3);padding:4px 2px}
   .chip.payfor{background:var(--accent-soft);color:var(--accent-ink);border-color:var(--accent)}
   .dupcard{border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:12px;background:var(--surface-2)}
   .dupcard-head{display:flex;align-items:center;gap:12px}
@@ -427,7 +431,7 @@
   <form class="modal" id="accessoform">
     <div class="mhead"><div><h3>Registra accesso</h3><div class="msub">L'esito dipende dallo stato dell'abbonamento</div></div><button type="button" class="xbtn" data-close="modal-accesso">×</button></div>
     <div class="mbody">
-      <div class="field"><label for="a-socio">Socio</label><select id="a-socio"></select></div>
+      <div class="field"><label for="a-socio-q">Socio</label><input type="hidden" id="a-socio"><input id="a-socio-q" placeholder="Cerca per nome, tessera, email o telefono…" autocomplete="off"><div class="socio-res" id="a-socio-res"></div></div>
       <div class="field"><label for="a-ingresso">Ingresso</label><select id="a-ingresso"><option>Tornello A</option><option>Tornello B</option><option>Reception</option></select></div>
     </div>
     <div class="mfoot"><button type="button" class="btn-ghost" data-close="modal-accesso">Annulla</button><button type="submit" class="btn-primary">Registra</button></div>
@@ -439,7 +443,7 @@
   <form class="modal" id="pagamentoform" novalidate>
     <div class="mhead"><div><h3>Registra pagamento</h3><div class="msub">Saldo di un abbonamento o entrata a prezzo libero</div></div><button type="button" class="xbtn" data-close="modal-pagamento">×</button></div>
     <div class="mbody">
-      <div class="field"><label for="p-socio">Socio</label><select id="p-socio"></select></div>
+      <div class="field"><label for="p-socio-q">Socio</label><input type="hidden" id="p-socio"><input id="p-socio-q" placeholder="Cerca per nome, tessera, email o telefono · vuoto = entrata libera" autocomplete="off"><div class="socio-res" id="p-socio-res"></div></div>
       <div class="field"><label for="p-tipo">Tipo</label><select id="p-tipo"><option value="abbonamento">Abbonamento</option><option value="libero">Prezzo libero</option></select></div>
       <div id="p-abb-box">
         <div class="field"><label for="p-piano">Abbonamento</label><select id="p-piano"></select></div>

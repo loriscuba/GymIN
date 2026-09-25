@@ -694,16 +694,41 @@ async function useExistingSocio(sid) {
   openScheda(m.sid);
 }
 
+// ---------- ricerca socio: campo di testo libero con i risultati sotto (al posto del menu a tendina) ----------
+function socioPicker(key, onPick = () => {}) {
+  const hid = $(`#${key}`), q = $(`#${key}-q`), res = $(`#${key}-res`);
+  let hits = [], cur = 0;
+  const draw = () => {
+    res.innerHTML = hits.map((m, i) => `<button type="button" class="${i === cur ? 'on' : ''}" data-i="${i}"><b>${esc(m.nome)}</b><span>${esc(m.id)} · ${esc(m.stato)}</span></button>`).join('')
+      || (q.value.trim() && !hid.value ? '<div class="none">Nessun socio trovato</div>' : '');
+  };
+  const pick = (m) => { hid.value = m ? m.sid : ''; q.value = m ? `${m.nome} — ${m.id}` : ''; hits = []; draw(); onPick(m); };
+  q.addEventListener('input', () => {
+    const had = hid.value; hid.value = '';
+    const t = normName(q.value), d = q.value.replace(/\D/g, '');
+    hits = !t ? [] : DATA.members.filter((m) => normName(`${m.nome} ${m.id} ${m.email || ''}`).includes(t)
+      || (d.length >= 3 && normTel(m.telefono).includes(d))).slice(0, 8);
+    cur = 0; draw();
+    if (had) onPick(null);
+  });
+  q.addEventListener('keydown', (e) => {
+    if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && hits.length) { e.preventDefault(); cur = (cur + (e.key === 'ArrowDown' ? 1 : hits.length - 1)) % hits.length; draw(); }
+    else if (e.key === 'Enter' && hits.length) { e.preventDefault(); pick(hits[cur]); }
+  });
+  res.addEventListener('mousedown', (e) => { const b = e.target.closest('[data-i]'); if (b) { e.preventDefault(); pick(hits[+b.dataset.i]); } });
+  return { set: (sid) => pick(DATA.members.find((m) => m.sid === sid) || null), focus: () => q.focus() };
+}
+let accPicker, payPicker;
+
 function openAccessoModal() {
-  const opts = [...DATA.members].sort((a, b) => a.nome.localeCompare(b.nome))
-    .map((m) => `<option value="${m.sid}">${m.nome} — ${m.id} (${m.stato})</option>`).join('');
-  $('#a-socio').innerHTML = opts;
+  accPicker.set(null);
   openModal('modal-accesso');
+  accPicker.focus();
 }
 function submitAccesso(e) {
   e.preventDefault();
   const m = DATA.members.find((x) => x.sid === $('#a-socio').value);
-  if (!m) return;
+  if (!m) { toast('Cerca e seleziona un socio', 'warn'); accPicker.focus(); return; }
   const isCarnet = !!m.plan.entrate;
   let ok, extra = '', motivo = 'abbonamento scaduto';
   if (isCarnet) {
@@ -992,19 +1017,15 @@ function openPayments(sid) {
 // Abbonamento: se "Già utilizzato" registra solo l'incasso (socio che si era dimenticato di pagare),
 // altrimenti attiva/rinnova l'abbonamento come il rinnovo. Prezzo libero: solo incasso (es. entrata libera).
 function openPagamentoModal() {
-  $('#p-socio').innerHTML = '<option value="">— Nessun socio (entrata libera) —</option>'
-    + [...DATA.members].sort((a, b) => a.nome.localeCompare(b.nome))
-      .map((m) => `<option value="${esc(m.sid)}">${esc(m.nome)} — ${esc(m.id)} (${esc(m.stato)})</option>`).join('');
-  $('#p-socio').value = payState.sid || '';
   $('#p-piano').innerHTML = DATA.plans.map((p) => `<option value="${esc(p.name)}">${esc(p.name)} — ${euro(p.price)}</option>`).join('');
   $('#p-tipo').value = 'abbonamento';
   $('#p-usato').checked = true;
   $('#p-descr').value = 'Entrata libera';
   $('#p-metodo').value = 'contanti';
   $('#p-data').value = new Date().toLocaleDateString('sv');
-  onPagamentoSocio();
-  updatePagamentoForm();
+  payPicker.set(payState.sid);                 // richiama onPagamentoSocio
   openModal('modal-pagamento');
+  if (!payState.sid) payPicker.focus();
 }
 // socio scelto: preseleziona il suo piano attuale
 function onPagamentoSocio() {
@@ -1037,6 +1058,7 @@ async function submitPagamento(e) {
   const plan = abb ? DATA.plans.find((p) => p.name === $('#p-piano').value) : null;
   const importo = Number(String($('#p-importo').value).replace(',', '.'));
   const metodo = $('#p-metodo').value;
+  if (!m && $('#p-socio-q').value.trim()) { toast('Seleziona il socio dalla ricerca, oppure svuota il campo per un’entrata libera', 'warn'); return; }
   if (!(importo > 0)) { toast('Inserisci un importo valido', 'warn'); return; }
   if (abb && !plan) { toast('Seleziona un abbonamento', 'warn'); return; }
 
@@ -1196,7 +1218,8 @@ function wireEvents() {
   $('#payfor').addEventListener('click', () => { payState.sid = null; loadPayments(); });
   $('#btn-pagamento').addEventListener('click', openPagamentoModal);
   $('#pagamentoform').addEventListener('submit', submitPagamento);
-  $('#p-socio').addEventListener('change', onPagamentoSocio);
+  accPicker = socioPicker('a-socio');
+  payPicker = socioPicker('p-socio', onPagamentoSocio);
   $('#p-piano').addEventListener('change', onPagamentoPiano);
   $('#p-tipo').addEventListener('change', onPagamentoPiano);
   $('#p-usato').addEventListener('change', updatePagamentoForm);
