@@ -221,6 +221,7 @@
   .ibtn.full{color:var(--accent-ink);background:var(--accent-soft)}
   .ibtn.pay{color:var(--teal);background:color-mix(in srgb,var(--teal) 12%,transparent)}
   .ibtn.remind{color:var(--blue);background:color-mix(in srgb,var(--blue) 15%,transparent)}
+  .ibtn.del{color:var(--bad);background:var(--bad-bg)}
   .ibtn.edit{color:var(--ink-2);background:var(--surface-2);border-color:var(--line)}
   .ibtn:hover{filter:brightness(.96);border-color:currentColor}
   /* tooltip istantaneo */
@@ -367,7 +368,7 @@
         <button class="btn-sm" id="btn-pagamento"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg> Registra pagamento</button>
       </div>
       <div class="paysum" id="paysum"></div>
-      <div class="tablewrap"><div class="scroll"><table id="paytable"><thead><tr><th>Data</th><th>Socio</th><th>Tessera</th><th>Abbonamento</th><th>Metodo</th><th style="text-align:right">Importo</th></tr></thead><tbody></tbody></table></div>
+      <div class="tablewrap"><div class="scroll"><table id="paytable"><thead><tr><th>Data</th><th>Socio</th><th>Tessera</th><th>Abbonamento</th><th>Metodo</th><th style="text-align:right">Importo</th><th>Azioni</th></tr></thead><tbody></tbody></table></div>
         <div class="tfoot"><span id="paycount"></span></div></div>
     </section>
 
@@ -469,6 +470,32 @@
       <div class="msub" id="p-hint" style="margin-top:6px"></div>
     </div>
     <div class="mfoot"><button type="button" class="btn-ghost" data-close="modal-pagamento">Annulla</button><button type="submit" class="btn-primary">Registra pagamento</button></div>
+  </form>
+</div>
+
+<!-- Modale: modifica pagamento -->
+<div class="overlay" id="modal-payedit" hidden>
+  <form class="modal" id="payeditform" novalidate>
+    <div class="mhead"><div><h3>Modifica pagamento</h3><div class="msub" id="pe-sub">—</div></div><button type="button" class="xbtn" data-close="modal-payedit">×</button></div>
+    <div class="mbody">
+      <div class="field"><label for="pe-importo">Importo (€)</label><input id="pe-importo" type="number" min="0.01" step="0.01" inputmode="decimal" required></div>
+      <div class="field"><label for="pe-metodo">Tipo di pagamento</label><select id="pe-metodo"><option value="contanti">Contanti</option><option value="bancomat">Bancomat</option><option value="carta">Carta di credito</option><option value="bonifico">Bonifico</option><option value="satispay">Satispay</option><option value="altro">Altro</option></select></div>
+      <div class="field"><label for="pe-data">Data pagamento</label><input id="pe-data" type="date" required></div>
+      <div class="field"><label for="pe-descr">Descrizione</label><input id="pe-descr" maxlength="80" placeholder="Facoltativa (per i rinnovi resta il nome del piano)"></div>
+    </div>
+    <div class="mfoot"><button type="button" class="btn-ghost" data-close="modal-payedit">Annulla</button><button type="submit" class="btn-primary">Salva modifiche</button></div>
+  </form>
+</div>
+
+<!-- Modale: annulla pagamento -->
+<div class="overlay" id="modal-paydel" hidden>
+  <form class="modal" id="paydelform">
+    <div class="mhead"><div><h3>Annulla pagamento</h3><div class="msub">Il pagamento viene eliminato e tolto dagli incassi</div></div><button type="button" class="xbtn" data-close="modal-paydel">×</button></div>
+    <div class="mbody">
+      <div id="pd-info"></div>
+      <label class="check" id="pd-abb-box" style="margin-top:14px"><input type="checkbox" id="pd-abb"> <span id="pd-abb-label">Annulla anche l’abbonamento collegato</span></label>
+    </div>
+    <div class="mfoot"><button type="button" class="btn-ghost" data-close="modal-paydel">Indietro</button><button type="submit" class="btn-primary" style="background:var(--bad)">Annulla pagamento</button></div>
   </form>
 </div>
 
