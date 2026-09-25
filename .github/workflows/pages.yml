@@ -59,27 +59,19 @@ jobs:
         with:
           ref: test
           path: testsrc
-      # Il sito di test usa SOLO il suo database (SUPABASE_URL_TEST / SUPABASE_ANON_KEY_TEST)
-      # e non invia email reali. Senza queste variabili il sito di test non viene pubblicato,
-      # così le prove non finiscono mai nei dati di produzione.
+      # Il sito di test usa lo stesso progetto Supabase della produzione ma SOLO lo schema "test"
+      # (tabelle separate, create con scripts/test-schema.mjs) e non invia email reali.
       - name: Config test
         if: steps.test.outputs.exists == 'true'
-        env:
-          SUPABASE_URL: ${{ vars.SUPABASE_URL_TEST }}
-          SUPABASE_ANON_KEY: ${{ vars.SUPABASE_ANON_KEY_TEST }}
         run: |
-          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_ANON_KEY" ]; then
-            echo "::warning::SUPABASE_URL_TEST / SUPABASE_ANON_KEY_TEST non impostate: sito di test non pubblicato."
-            exit 0
-          fi
-          printf "window.GYMIN_CONFIG = { SUPABASE_URL: '%s', SUPABASE_ANON_KEY: '%s', MAILPIT_URL: '', MAILER_API_URL: '', ENV: 'test' };\n" \
-            "$SUPABASE_URL" "$SUPABASE_ANON_KEY" > testsrc/web/config.js
+          cp prod/web/config.js testsrc/web/config.js
+          printf "window.GYMIN_CONFIG = Object.assign(window.GYMIN_CONFIG || {}, { DB_SCHEMA: 'test', ENV: 'test', MAILPIT_URL: '', MAILER_API_URL: '' });\n" >> testsrc/web/config.js
           # etichetta ben visibile per non confondere test e produzione
           sed -i 's#<title>#<title>[TEST] #' testsrc/web/index.html
           sed -i 's#<body>#<body><div style="position:fixed;top:0;left:50%;transform:translateX(-50%);z-index:9999;background:\#d97706;color:\#fff;font:700 12px/1 system-ui,sans-serif;padding:5px 14px;border-radius:0 0 8px 8px;pointer-events:none">AMBIENTE DI TEST</div>#' testsrc/web/index.html
           mkdir -p prod/web/test
           cp -r testsrc/web/. prod/web/test/
-          echo "Sito di test pubblicato in /test/."
+          echo "Sito di test pubblicato in /test/ (schema test)."
 
       # Versione nei link a JS/config: dopo ogni deploy il browser scarica
       # i file nuovi invece di usare quelli vecchi in cache.

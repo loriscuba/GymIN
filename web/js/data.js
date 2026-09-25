@@ -17,7 +17,8 @@ export async function getSupa() {
 
   try {
     const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
-    _supa = createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+    // DB_SCHEMA: 'test' nell'ambiente di test (stesso progetto Supabase, tabelle nello schema test)
+    _supa = createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY, cfg.DB_SCHEMA ? { db: { schema: cfg.DB_SCHEMA } } : undefined);
   } catch (e) {
     console.error('Supabase non caricato:', e);
     _supa = null;
