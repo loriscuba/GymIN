@@ -465,7 +465,7 @@ async function updateSocio(supa, sid, f) {
 }
 
 // Nuovo abbonamento (+ pagamento) per un socio già salvato.
-async function insertAbbonamento(supa, socioId, plan, start, end, metodo = 'contanti') {
+async function insertAbbonamento(supa, socioId, plan, start, end, metodo = 'contanti', importo = plan.price) {
   const planLookup = plan.id ? { key: 'id', value: plan.id } : { key: 'nome', value: plan.name };
   const { data: planRow, error: planErr } = await supa.from('piani').select('id').eq(planLookup.key, planLookup.value).maybeSingle();
   if (planErr) throw planErr;
@@ -483,7 +483,8 @@ async function insertAbbonamento(supa, socioId, plan, start, end, metodo = 'cont
 
   const { error: payErr } = await supa.from('pagamenti').insert({
     abbonamento_id: ab.id,
-    importo: Number(plan.price || 0),
+    socio_id: socioId,
+    importo: Number(importo || 0),
     metodo: metodo || 'contanti',
     data: new Date().toISOString(),
   });
@@ -741,12 +742,12 @@ function updateRinnovoPreview() {
   const plan = DATA.plans.find((p) => p.name === $('#r-piano').value);
   $('#r-new').textContent = fmtDate(addMonths(renewBase(m), plan.dur));
 }
-async function applyRenewal(m, plan, sendRicevuta, metodo = 'contanti') {
+async function applyRenewal(m, plan, sendRicevuta, metodo = 'contanti', importo = plan.price) {
   const newEnd = addMonths(renewBase(m), plan.dur);
   const supa = await getSupa();
   if (!supa) { toast('Connessione Supabase non disponibile. Verifica la configurazione del database.', 'warn'); return false; }
   try {
-    await insertAbbonamento(supa, m.sid, plan, renewBase(m), newEnd, metodo);
+    await insertAbbonamento(supa, m.sid, plan, renewBase(m), newEnd, metodo, importo);
   } catch (err) {
     console.error(errMsg(err));
     toast('Errore rinnovo: ' + errMsg(err), 'warn');
@@ -758,7 +759,7 @@ async function applyRenewal(m, plan, sendRicevuta, metodo = 'contanti') {
   m.entrateResidue = plan.entrate ? plan.entrate : undefined;  // il carnet riparte pieno
   m.stato = computeStato(m);
   reminded.delete(m.sid);                       // riabilita eventuali futuri promemoria
-  DATA.revenue.at(-1).value += plan.price;      // incassa la quota nel mese corrente
+  DATA.revenue.at(-1).value += Number(importo || 0);   // incassa la quota nel mese corrente
   recomputePlans();
   renderAll();
   toast(`Abbonamento rinnovato · ${m.nome} → scad. ${fmtDate(newEnd)} · ${metodoLabel(metodo)}`);
@@ -931,9 +932,9 @@ async function loadPayments() {
       const supa = await getSupa();
       if (!supa) throw new Error('Connessione Supabase non disponibile.');
       const from = periodStart(payState.period);
-      const rows = await fetchAll(supa, 'pagamenti', 'id,importo,metodo,data,abbonamento:abbonamenti!inner(socio_id,piano:piani(nome))', (q) => {
+      const rows = await fetchAll(supa, 'pagamenti', 'id,importo,metodo,data,socio_id,descrizione,abbonamento:abbonamenti(socio_id,piano:piani(nome))', (q) => {
         if (from) q = q.gte('data', from.toISOString());
-        if (payState.sid) q = q.eq('abbonamenti.socio_id', payState.sid);
+        if (payState.sid) q = q.eq('socio_id', payState.sid);
         return q.order('data', { ascending: false });
       });
       if (key !== `${payState.period}|${payState.sid || ''}`) return;   // filtro cambiato nel frattempo
@@ -951,9 +952,9 @@ function renderPayments() {
   const bySid = Object.fromEntries(DATA.members.map((m) => [m.sid, m]));
   const q = normName(payState.query);
   const list = (payCache?.rows || []).map((p) => {
-    const m = bySid[p.abbonamento?.socio_id];
-    return { ...p, m, nome: m ? m.nome : '—', tessera: m ? String(m.id) : '', piano: p.abbonamento?.piano?.nome || '—' };
-  }).filter((p) => !q || normName(`${p.nome} ${p.tessera} ${metodoLabel(p.metodo)}`).includes(q));
+    const m = bySid[p.socio_id || p.abbonamento?.socio_id];
+    return { ...p, m, nome: m ? m.nome : '—', tessera: m ? String(m.id) : '', piano: p.descrizione || p.abbonamento?.piano?.nome || '—' };
+  }).filter((p) => !q || normName(`${p.nome} ${p.tessera} ${p.piano} ${metodoLabel(p.metodo)}`).includes(q));
 
   const tot = list.reduce((sum, p) => sum + Number(p.importo || 0), 0);
   const perMetodo = {};
@@ -979,6 +980,84 @@ function openPayments(sid) {
   payState.sid = sid; payState.period = 'tutti'; payState.query = '';
   $('#paysearch').value = '';
   go('pagamenti');
+}
+
+// ---------- registra pagamento diretto ----------
+// Abbonamento: se "Già utilizzato" registra solo l'incasso (socio che si era dimenticato di pagare),
+// altrimenti attiva/rinnova l'abbonamento come il rinnovo. Prezzo libero: solo incasso (es. entrata libera).
+function openPagamentoModal() {
+  $('#p-socio').innerHTML = '<option value="">— Nessun socio (entrata libera) —</option>'
+    + [...DATA.members].sort((a, b) => a.nome.localeCompare(b.nome))
+      .map((m) => `<option value="${esc(m.sid)}">${esc(m.nome)} — ${esc(m.id)} (${esc(m.stato)})</option>`).join('');
+  $('#p-socio').value = payState.sid || '';
+  $('#p-piano').innerHTML = DATA.plans.map((p) => `<option value="${esc(p.name)}">${esc(p.name)} — ${euro(p.price)}</option>`).join('');
+  $('#p-tipo').value = 'abbonamento';
+  $('#p-usato').checked = true;
+  $('#p-descr').value = 'Entrata libera';
+  $('#p-metodo').value = 'contanti';
+  $('#p-data').value = new Date().toLocaleDateString('sv');
+  onPagamentoSocio();
+  updatePagamentoForm();
+  openModal('modal-pagamento');
+}
+// socio scelto: preseleziona il suo piano attuale
+function onPagamentoSocio() {
+  const m = DATA.members.find((x) => x.sid === $('#p-socio').value);
+  if (m && DATA.plans.some((p) => p.name === m.plan.name)) $('#p-piano').value = m.plan.name;
+  onPagamentoPiano();
+}
+function onPagamentoPiano() {
+  const plan = DATA.plans.find((p) => p.name === $('#p-piano').value);
+  if (plan && $('#p-tipo').value === 'abbonamento') $('#p-importo').value = Number(plan.price || 0).toFixed(2);
+  updatePagamentoForm();
+}
+function updatePagamentoForm() {
+  const abb = $('#p-tipo').value === 'abbonamento';
+  const attiva = abb && !$('#p-usato').checked;
+  $('#p-abb-box').hidden = !abb;
+  $('#p-libero-box').hidden = abb;
+  $('#p-data-box').hidden = attiva;             // il rinnovo incassa sempre alla data odierna
+  const m = DATA.members.find((x) => x.sid === $('#p-socio').value);
+  const plan = DATA.plans.find((p) => p.name === $('#p-piano').value);
+  $('#p-hint').innerHTML = !abb ? 'Registra solo l’incasso, senza abbonamento.'
+    : !attiva ? 'Registra solo l’incasso: <b>nessun abbonamento viene attivato</b>.'
+      : m && plan ? `Attiva l’abbonamento: nuova scadenza <b>${fmtDate(addMonths(renewBase(m), plan.dur))}</b>.`
+        : 'Per attivare un abbonamento seleziona un socio.';
+}
+async function submitPagamento(e) {
+  e.preventDefault();
+  const abb = $('#p-tipo').value === 'abbonamento';
+  const m = DATA.members.find((x) => x.sid === $('#p-socio').value) || null;
+  const plan = abb ? DATA.plans.find((p) => p.name === $('#p-piano').value) : null;
+  const importo = Number(String($('#p-importo').value).replace(',', '.'));
+  const metodo = $('#p-metodo').value;
+  if (!(importo > 0)) { toast('Inserisci un importo valido', 'warn'); return; }
+  if (abb && !plan) { toast('Seleziona un abbonamento', 'warn'); return; }
+
+  if (abb && !$('#p-usato').checked) {
+    if (!m) { toast('Seleziona il socio a cui attivare l’abbonamento', 'warn'); return; }
+    closeModal('modal-pagamento');
+    await applyRenewal(m, plan, false, metodo, importo);
+    loadPayments();
+    return;
+  }
+
+  const supa = await getSupa();
+  if (!supa) { toast('Connessione Supabase non disponibile. Verifica la configurazione del database.', 'warn'); return; }
+  const giorno = $('#p-data').value;
+  const today = new Date().toLocaleDateString('sv');
+  const data = !giorno || giorno === today ? new Date() : new Date(giorno + 'T12:00:00');
+  const descrizione = abb ? `${plan.name} · già utilizzato` : ($('#p-descr').value.trim() || 'Entrata libera');
+  const { error } = await supa.from('pagamenti').insert({
+    abbonamento_id: null, socio_id: m ? m.sid : null, importo, metodo, descrizione, data: data.toISOString(),
+  });
+  if (error) { console.error(errMsg(error)); toast('Errore registrazione pagamento: ' + errMsg(error), 'warn'); return; }
+  closeModal('modal-pagamento');
+  const now = new Date();
+  if (data.getFullYear() === now.getFullYear() && data.getMonth() === now.getMonth()) { DATA.revenue.at(-1).value += importo; renderAll(); }
+  payCache = null;
+  loadPayments();
+  toast(`Pagamento registrato · ${m ? m.nome : descrizione} · ${euro(importo)} · ${metodoLabel(metodo)}`);
 }
 
 // ---------- navigazione ----------
@@ -1105,6 +1184,12 @@ function wireEvents() {
     loadPayments();
   });
   $('#payfor').addEventListener('click', () => { payState.sid = null; loadPayments(); });
+  $('#btn-pagamento').addEventListener('click', openPagamentoModal);
+  $('#pagamentoform').addEventListener('submit', submitPagamento);
+  $('#p-socio').addEventListener('change', onPagamentoSocio);
+  $('#p-piano').addEventListener('change', onPagamentoPiano);
+  $('#p-tipo').addEventListener('change', onPagamentoPiano);
+  $('#p-usato').addEventListener('change', updatePagamentoForm);
   let payTimer;
   $('#paysearch').addEventListener('input', (e) => {
     clearTimeout(payTimer);
