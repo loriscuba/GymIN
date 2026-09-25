@@ -184,6 +184,7 @@
   .paysum{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px}
   .paysum .pbox{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 14px;min-width:120px}
   .paysum .pbox span{display:block;font-size:12px;color:var(--ink-3)}.paysum .pbox b{font-size:17px}
+  th.sortable{cursor:pointer;user-select:none}th.sortable:hover{color:var(--accent)}th.sortable span{opacity:.7}
   .chip.payfor{background:var(--accent-soft);color:var(--accent-ink);border-color:var(--accent)}
   .dupcard{border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:12px;background:var(--surface-2)}
   .dupcard-head{display:flex;align-items:center;gap:12px}
@@ -335,7 +336,7 @@
         <div class="filters" id="mem-expfilters" hidden><button class="chip active" data-w="7">≤ 7 giorni</button><button class="chip" data-w="15">8–15 giorni</button><button class="chip" data-w="30">16–31 giorni</button></div>
         <button class="btn-primary" id="btn-nuovo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg> Nuovo socio</button>
       </div>
-      <div class="tablewrap"><div class="scroll"><table id="memtable"><thead><tr><th>Socio</th><th>Tessera</th><th>Abbonamento</th><th>Iscritto il</th><th>Scadenza</th><th>Stato</th><th>Azioni</th></tr></thead><tbody></tbody></table></div>
+      <div class="tablewrap"><div class="scroll"><table id="memtable"><thead><tr><th>Socio</th><th>Tessera</th><th>Abbonamento</th><th>Iscritto il</th><th id="th-scad" class="sortable" title="Ordina per scadenza">Scadenza<span id="sort-scad"> ⇅</span></th><th>Stato</th><th>Azioni</th></tr></thead><tbody></tbody></table></div>
         <div class="tfoot"><span id="memcount"></span><div class="pager" id="mempager"></div></div></div>
     </section>
 

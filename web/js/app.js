@@ -17,7 +17,7 @@ const AV = ['#f4511e', '#2563eb', '#0d9488', '#7c3aed', '#db2777', '#0891b2', '#
 let DATA = null;
 const MAILBOX = [];
 const reminded = new Set();
-const memState = { filter: 'Attivo', query: '', page: 1, PER: 9, expWindow: 7 };
+const memState = { filter: 'Attivo', query: '', page: 1, PER: 9, expWindow: 7, sort: null };   // sort: null | 'asc' | 'desc' (scadenza)
 let planFilter = 'attivo';
 let socioMode = 'new';
 let editSid = null;
@@ -172,6 +172,12 @@ function renderMembers() {
     const mailQuery = !q || nome.includes(q) || email.includes(q) || id.includes(q);
     return mf && mailQuery;
   });
+  if (memState.sort) {                         // ordina per scadenza; soci senza scadenza sempre in fondo
+    const dir = memState.sort === 'asc' ? 1 : -1;
+    const t = (m) => (m.stato !== 'Senza abbonamento' && m.end ? new Date(m.end).getTime() : null);
+    list.sort((a, b) => { const x = t(a), y = t(b); return x === null ? (y === null ? 0 : 1) : y === null ? -1 : (x - y) * dir; });
+  }
+  $('#sort-scad').textContent = memState.sort === 'asc' ? ' ▲' : memState.sort === 'desc' ? ' ▼' : ' ⇅';
   const pages = Math.max(1, Math.ceil(list.length / memState.PER));
   if (memState.page > pages) memState.page = pages;
   const slice = list.slice((memState.page - 1) * memState.PER, memState.page * memState.PER);
@@ -1101,6 +1107,10 @@ async function ensureAuth() {
 
 function wireEvents() {
   document.querySelectorAll('.nav').forEach((n) => n.addEventListener('click', () => go(n.dataset.view)));
+  $('#th-scad').addEventListener('click', () => {
+    memState.sort = memState.sort === null ? 'asc' : memState.sort === 'asc' ? 'desc' : null;
+    memState.page = 1; renderMembers();
+  });
   $('#memsearch').addEventListener('input', (e) => { memState.query = e.target.value; memState.page = 1; renderMembers(); });
   $('#memfilters').addEventListener('click', (e) => {
     const b = e.target.closest('.chip'); if (!b) return;
