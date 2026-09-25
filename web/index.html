@@ -356,6 +356,7 @@
         <div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg><input id="paysearch" placeholder="Cerca per nome, tessera o metodo…"></div>
         <div class="filters" id="payfilters"><button class="chip" data-p="oggi">Oggi</button><button class="chip active" data-p="mese">Mese</button><button class="chip" data-p="anno">Anno</button><button class="chip" data-p="tutti">Tutti</button></div>
         <button class="chip payfor" id="payfor" hidden></button>
+        <button class="btn-sm" id="btn-pagamento"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg> Registra pagamento</button>
       </div>
       <div class="paysum" id="paysum"></div>
       <div class="tablewrap"><div class="scroll"><table id="paytable"><thead><tr><th>Data</th><th>Socio</th><th>Tessera</th><th>Abbonamento</th><th>Metodo</th><th style="text-align:right">Importo</th></tr></thead><tbody></tbody></table></div>
@@ -429,6 +430,27 @@
       <div class="field"><label for="a-ingresso">Ingresso</label><select id="a-ingresso"><option>Tornello A</option><option>Tornello B</option><option>Reception</option></select></div>
     </div>
     <div class="mfoot"><button type="button" class="btn-ghost" data-close="modal-accesso">Annulla</button><button type="submit" class="btn-primary">Registra</button></div>
+  </form>
+</div>
+
+<!-- Modale: registra pagamento diretto (saldo abbonamento o prezzo libero) -->
+<div class="overlay" id="modal-pagamento" hidden>
+  <form class="modal" id="pagamentoform" novalidate>
+    <div class="mhead"><div><h3>Registra pagamento</h3><div class="msub">Saldo di un abbonamento o entrata a prezzo libero</div></div><button type="button" class="xbtn" data-close="modal-pagamento">×</button></div>
+    <div class="mbody">
+      <div class="field"><label for="p-socio">Socio</label><select id="p-socio"></select></div>
+      <div class="field"><label for="p-tipo">Tipo</label><select id="p-tipo"><option value="abbonamento">Abbonamento</option><option value="libero">Prezzo libero</option></select></div>
+      <div id="p-abb-box">
+        <div class="field"><label for="p-piano">Abbonamento</label><select id="p-piano"></select></div>
+        <label class="check" style="margin-bottom:12px"><input type="checkbox" id="p-usato" checked> Già utilizzato · registra solo il pagamento</label>
+      </div>
+      <div class="field" id="p-libero-box"><label for="p-descr">Descrizione</label><input id="p-descr" maxlength="80" placeholder="Entrata libera"></div>
+      <div class="field"><label for="p-importo">Importo (€)</label><input id="p-importo" type="number" min="0.01" step="0.01" inputmode="decimal" required></div>
+      <div class="field"><label for="p-metodo">Tipo di pagamento</label><select id="p-metodo"><option value="contanti">Contanti</option><option value="bancomat">Bancomat</option><option value="carta">Carta di credito</option><option value="bonifico">Bonifico</option><option value="satispay">Satispay</option><option value="altro">Altro</option></select></div>
+      <div class="field" id="p-data-box"><label for="p-data">Data pagamento</label><input id="p-data" type="date"></div>
+      <div class="msub" id="p-hint" style="margin-top:6px"></div>
+    </div>
+    <div class="mfoot"><button type="button" class="btn-ghost" data-close="modal-pagamento">Annulla</button><button type="submit" class="btn-primary">Registra pagamento</button></div>
   </form>
 </div>
 
