@@ -22,7 +22,8 @@ async function consensoMarketing(socio_id) {
 
 // Invia una mail e registra sempre l'esito in mail_log.
 // `rif` è la chiave anti-doppione (es. "<abb_id>:7").
-export async function inviaMail({ socio_id, destinatario, tipo, rif, subject, html }) {
+// Con `rethrow: true` l'errore SMTP viene rilanciato (usato dall'invio manuale per mostrarlo in admin).
+export async function inviaMail({ socio_id, destinatario, tipo, rif, subject, html, rethrow = false }) {
   if (CATEGORIA[tipo] !== 'servizio' && !(await consensoMarketing(socio_id))) {
     console.log(`  · ${tipo} → ${chi(socio_id)}: saltata (nessun consenso marketing)`);
     return false;
@@ -41,9 +42,12 @@ export async function inviaMail({ socio_id, destinatario, tipo, rif, subject, ht
     console.log(`  ✓ ${tipo} → ${chi(socio_id)}`);
     return true;
   } catch (err) {
-    const errore = String(err?.message || err).slice(0, 500);
+    // Dettaglio SMTP: codice, comando e risposta del server (es. "550 sender not verified").
+    const dettagli = [err?.code, err?.command, err?.responseCode, err?.response].filter(Boolean).join(' | ');
+    const errore = `${String(err?.message || err)}${dettagli ? ` [${dettagli}]` : ''} (from: ${MAIL_FROM})`.slice(0, 500);
     await supa.from('mail_log').insert({ socio_id, tipo, rif, destinatario, stato: 'errore', errore });
     console.error(`  ✖ ${tipo} → ${chi(socio_id)}: ${redact(errore)}`);
+    if (rethrow) throw new Error(`Errore SMTP: ${errore}`);
     return false;
   }
 }

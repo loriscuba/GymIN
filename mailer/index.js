@@ -5,6 +5,7 @@ import { runGiornaliero } from './reminders.js';
 import { inviaMail } from './emails.js';
 import { templates } from './templates.js';
 import { createManualSendHandler } from './manual.js';
+import { MAIL_FROM } from './transport.js';
 
 const mode = process.argv[2] || 'watch';
 
@@ -30,10 +31,11 @@ if (mode === 'test') {
 
 if (mode === 'api' || mode === 'manual') {
   const port = Number(process.env.MAILER_PORT || 3001);
-  const server = http.createServer(createManualSendHandler({ sendMail: inviaMail }));
+  const server = http.createServer(createManualSendHandler({ sendMail: (m) => inviaMail({ ...m, rethrow: true }) }));
   server.listen(port, () => {
     console.log(`Mailer API pronto su http://localhost:${port}/api/send`);
     console.log('Invio reale manuale: POST con { to, subject, html }');
+    console.log(`SMTP: ${process.env.SMTP_HOST || 'localhost'}:${process.env.SMTP_PORT || 1025} · from: ${MAIL_FROM}`);
   });
   await new Promise(() => {});
 }
