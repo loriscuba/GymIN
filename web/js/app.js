@@ -756,6 +756,13 @@ function submitAccesso(e) {
 
 // ---------- rinnovo abbonamento ----------
 let renewSid = null;
+const ymd = (d) => new Date(d).toLocaleDateString('sv');   // YYYY-MM-DD in ora locale
+// scadenza scelta a mano nel rinnovo (letta come le date del DB, così resta lo stesso giorno); null se non valida o passata
+function forcedEnd(sel) {
+  const v = $(sel).value; if (!v) return null;
+  const d = new Date(v), t = new Date(); t.setHours(0, 0, 0, 0);
+  return isNaN(d) || d < t ? null : d;
+}
 function renewBase(m) { const t = new Date(); t.setHours(0, 0, 0, 0); return new Date(m.end) >= t ? new Date(m.end) : t; }
 function openRinnovoModal(sid) {
   const m = DATA.members.find((x) => x.sid === sid); if (!m) return;
@@ -771,14 +778,15 @@ function openRinnovoModal(sid) {
 function updateRinnovoPreview() {
   const m = DATA.members.find((x) => x.sid === renewSid); if (!m) return;
   const plan = DATA.plans.find((p) => p.name === $('#r-piano').value);
-  $('#r-new').textContent = fmtDate(addMonths(renewBase(m), plan.dur));
+  $('#r-new').value = ymd(addMonths(renewBase(m), plan.dur));
 }
-async function applyRenewal(m, plan, sendRicevuta, metodo = 'contanti', importo = plan.price) {
-  const newEnd = addMonths(renewBase(m), plan.dur);
+async function applyRenewal(m, plan, sendRicevuta, metodo = 'contanti', importo = plan.price, end = null) {
+  const newEnd = end || addMonths(renewBase(m), plan.dur);
+  const start = renewBase(m) > newEnd ? new Date() : renewBase(m);   // scadenza forzata prima della vecchia: parte da oggi
   const supa = await getSupa();
   if (!supa) { toast('Connessione Supabase non disponibile. Verifica la configurazione del database.', 'warn'); return false; }
   try {
-    await insertAbbonamento(supa, m.sid, plan, renewBase(m), newEnd, metodo, importo);
+    await insertAbbonamento(supa, m.sid, plan, start, newEnd, metodo, importo);
   } catch (err) {
     console.error(errMsg(err));
     toast('Errore rinnovo: ' + errMsg(err), 'warn');
@@ -805,8 +813,10 @@ async function doRenew(e) {
   const m = DATA.members.find((x) => x.sid === renewSid); if (!m) return;
   const plan = DATA.plans.find((p) => p.name === $('#r-piano').value);
   const ricevuta = $('#r-ricevuta').checked;
+  const end = forcedEnd('#r-new');
+  if (!end) { toast('Scegli una data di scadenza valida (da oggi in poi)', 'warn'); return; }
   closeModal('modal-rinnovo');
-  await applyRenewal(m, plan, ricevuta, $('#r-metodo').value);
+  await applyRenewal(m, plan, ricevuta, $('#r-metodo').value, plan.price, end);
 }
 // rinnovo rapido: stesso piano, con ricevuta; chiede solo il tipo di pagamento
 let quickSid = null, quickFromScheda = false;
@@ -819,7 +829,7 @@ function quickRenew(sid) {
   closeModal('modal-scheda');
   $('#q-socio').textContent = `${m.nome} · ${m.id}`;
   $('#q-piano').textContent = `${plan.name} — ${euro(plan.price)}`;
-  $('#q-new').textContent = fmtDate(addMonths(renewBase(m), plan.dur));
+  $('#q-new').value = ymd(addMonths(renewBase(m), plan.dur));
   $('#q-metodo').value = 'contanti';
   openModal('modal-quick');
 }
@@ -827,8 +837,10 @@ async function doQuickRenew(e) {
   e.preventDefault();
   const m = DATA.members.find((x) => x.sid === quickSid); if (!m) return;
   const plan = DATA.plans.find((p) => p.name === m.plan.name) || m.plan;
+  const end = forcedEnd('#q-new');
+  if (!end) { toast('Scegli una data di scadenza valida (da oggi in poi)', 'warn'); return; }
   closeModal('modal-quick');
-  await applyRenewal(m, plan, true, $('#q-metodo').value);
+  await applyRenewal(m, plan, true, $('#q-metodo').value, plan.price, end);
   if (quickFromScheda) openScheda(m.sid);        // torna alla scheda aggiornata
 }
 
