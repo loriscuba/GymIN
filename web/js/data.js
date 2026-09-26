@@ -84,12 +84,13 @@ async function loadSupabase(supa) {
     'id,nome,cognome,email,telefono,data_nascita,sesso,codice_fiscale,indirizzo,citta,cap,note,consenso_mail,tessera,creato_il,' +
     'privacy_acknowledged,privacy_acknowledged_at,privacy_policy_version,marketing_email_consent,marketing_email_consent_at,marketing_email_revoked_at');
   const abb = await fetchAll(supa, 'abbonamenti',
-    'id,socio_id,data_inizio,data_scadenza,entrate_residue,piano:piani(nome,prezzo,durata_mesi,entrate)');
+    'id,socio_id,data_inizio,data_scadenza,entrate_residue,stato,piano:piani(nome,prezzo,durata_mesi,entrate)');
   const planCatalog = await fetchAll(supa, 'piani', 'id,nome,prezzo,durata_mesi,entrate,descrizione,attivo');
 
-  // Ultimo abbonamento per socio (data_scadenza massima).
+  // Ultimo abbonamento per socio (data_scadenza massima). Gli archiviati (soci inattivi) sono ignorati.
   const lastBySocio = {};
   for (const a of abb) {
+    if (a.stato === 'archiviato') continue;
     const cur = lastBySocio[a.socio_id];
     if (!cur || new Date(a.data_scadenza) > new Date(cur.data_scadenza)) lastBySocio[a.socio_id] = a;
   }
