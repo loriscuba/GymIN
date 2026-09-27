@@ -28,6 +28,14 @@ jobs:
           DB_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
           test -n "$DB_URL" || { echo "Secret SUPABASE_DB_URL mancante"; exit 1; }
+          # toglie spazi/a capo e virgolette incollati per errore insieme alla stringa
+          DB_URL=$(printf '%s' "$DB_URL" | tr -d '\r\n' | sed -E "s/^[[:space:]\"']+//; s/[[:space:]\"']+$//")
+          case "$DB_URL" in
+            postgres://*|postgresql://*) ;;
+            *) echo "SUPABASE_DB_URL non valido: deve iniziare con postgresql:// (es. postgresql://postgres.<ref>:<password>@aws-0-eu-west-1.pooler.supabase.com:5432/postgres)"; exit 1 ;;
+          esac
+          case "$DB_URL" in *'[YOUR-PASSWORD]'*|*'<password>'*|*'<PASSWORD>'*) echo "SUPABASE_DB_URL contiene ancora il segnaposto della password"; exit 1 ;; esac
+          export DB_URL
           echo "FILE=gymin_$(date -u +%F).dump" >> "$GITHUB_ENV"
           docker run --rm -e DB_URL -v "$PWD:/out" postgres:17 \
             sh -c 'pg_dump "$DB_URL" -Fc --no-owner --no-privileges --schema=public --schema=auth -f /out/backup.dump'
