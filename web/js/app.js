@@ -1625,9 +1625,23 @@ async function deletePlan(id) {
   }
 }
 
+// il Log attività è visibile solo all'amministratore (la stessa regola è applicata dal database)
+const LOG_ADMIN = 'loriscuba@gmail.com';
+async function setupUser() {
+  const supa = await getSupa();
+  const { data: { user } } = await supa.auth.getUser();
+  const email = (user?.email || '').toLowerCase();
+  const admin = email === LOG_ADMIN;
+  $('.nav[data-view="log"]').hidden = !admin;
+  $('#u-name').textContent = admin ? 'Admin' : (email.split('@')[0] || 'Utente');
+  $('#u-role').textContent = admin ? 'Amministratore' : 'Staff';
+  $('#u-avatar').textContent = admin ? 'AD' : (email.slice(0, 2).toUpperCase() || '—');
+}
+
 async function boot() {
   const ok = await ensureAuth();
   if (!ok) return;
+  try { await setupUser(); } catch (err) { console.error(errMsg(err)); }
 
   try {
     DATA = await loadData();
