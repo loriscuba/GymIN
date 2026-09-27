@@ -1,0 +1,49 @@
+name: Backup notturno database
+
+# Ogni notte esegue un dump completo del database Supabase (schema + dati),
+# lo cifra con una passphrase e lo salva come artifact del workflow (conservato 30 giorni).
+# Il file è cifrato perché contiene dati personali dei soci.
+#
+# Secret richiesti (Settings → Secrets and variables → Actions):
+#   SUPABASE_DB_URL     stringa di connessione Postgres (Supabase → Connect → "Session pooler")
+#   BACKUP_PASSPHRASE   passphrase per cifrare/decifrare il backup
+#
+# Ripristino:
+#   gpg -d gymin_AAAA-MM-GG.dump.gpg > gymin.dump
+#   pg_restore --clean --if-exists --no-owner -d "<stringa di connessione>" gymin.dump
+on:
+  schedule:
+    - cron: '17 2 * * *'   # 02:17 UTC ogni giorno
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dump del database
+        env:
+          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          test -n "$DB_URL" || { echo "Secret SUPABASE_DB_URL mancante"; exit 1; }
+          echo "FILE=gymin_$(date -u +%F).dump" >> "$GITHUB_ENV"
+          docker run --rm -e DB_URL -v "$PWD:/out" postgres:17 \
+            sh -c 'pg_dump "$DB_URL" -Fc --no-owner --no-privileges --schema=public --schema=auth -f /out/backup.dump'
+          ls -lh backup.dump
+
+      - name: Cifra il backup
+        env:
+          PASS: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          test -n "$PASS" || { echo "Secret BACKUP_PASSPHRASE mancante"; exit 1; }
+          gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 --symmetric --cipher-algo AES256 \
+            -o "$FILE.gpg" backup.dump <<< "$PASS"
+          rm backup.dump
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.FILE }}
+          path: ${{ env.FILE }}.gpg
+          retention-days: 30
