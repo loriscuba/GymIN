@@ -381,6 +381,8 @@
         <div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg><input id="logsearch" placeholder="Cerca per utente, socio o valore…"></div>
         <div class="filters" id="logfilters"><button class="chip" data-p="oggi">Oggi</button><button class="chip active" data-p="7">7 giorni</button><button class="chip" data-p="30">30 giorni</button><button class="chip" data-p="tutti">Tutti</button></div>
         <select id="logtab" class="logtab" aria-label="Sezione"><option value="">Tutte le sezioni</option></select>
+        <div class="filters" id="logarch"><button class="chip active" data-a="0">Attivi</button><button class="chip" data-a="1">Archivio</button></div>
+        <button class="btn-ghost" id="btn-log-arch" style="padding:8px 13px;font-size:12.5px">Archivia visibili</button>
       </div>
       <div class="tablewrap"><div class="scroll"><table id="logtable"><thead><tr><th>Data</th><th>Utente</th><th>Operazione</th><th>Cosa è stato fatto</th><th>Dettaglio</th></tr></thead><tbody></tbody></table></div>
         <div class="tfoot"><span id="logcount"></span></div></div>

@@ -1174,13 +1174,15 @@ async function submitPagamento(e) {
 const LOG_TAB = { soci: 'Soci', abbonamenti: 'Abbonamenti', pagamenti: 'Pagamenti', piani: 'Piani', accessi: 'Accessi', mail_log: 'Posta', informative_privacy: 'Informative privacy', consensi_eventi: 'Privacy soci' };
 const LOG_OP = { INSERT: ['Nuovo', 'g'], UPDATE: ['Modifica', 'w'], DELETE: ['Eliminato', 'b'] };
 const LOG_MAX = 500;
-const logState = { period: '7', tab: '', query: '' };
+const logState = { period: '7', tab: '', query: '', arch: false };   // arch: true = sezione Archivio
 let logCache = null;   // { key, rows }
+let logArchOk = true;  // false se manca la colonna archiviato_il
 const LOG_COLS = 'id,creato_il,utente,tabella,operazione,record_id,prima,dopo';
 const logMsg = (html, color = 'var(--ink-3)') => `<tr><td colspan="5" style="text-align:center;color:${color};padding:28px">${html}</td></tr>`;
 
 async function loadLog() {
-  const key = `${logState.period}|${logState.tab}`;
+  if (logState.arch && !logArchOk) { $('#logtable tbody').innerHTML = logMsg('Archivio non disponibile: esegui la migration "audit_log_archivio".'); return; }
+  const key = `${logState.period}|${logState.tab}|${logState.arch}`;
   if (!logCache || logCache.key !== key) {
     $('#logtable tbody').innerHTML = logMsg('Caricamento…');
     try {
@@ -1191,13 +1193,16 @@ async function loadLog() {
         let q = supa.from('audit_log').select(cols).order('creato_il', { ascending: false }).limit(LOG_MAX);
         if (from) q = q.gte('creato_il', from.toISOString());
         if (logState.tab) q = q.eq('tabella', logState.tab);
+        if (logArchOk) q = logState.arch ? q.not('archiviato_il', 'is', null) : q.is('archiviato_il', null);
         return q;
       };
       let { data, error } = await query(LOG_COLS + ',azione,sql,origine,transazione');
       // colonne di dettaglio non ancora create (SQL "audit_log_dettagli" non eseguito): usa quelle base
+      // colonna archiviato_il non ancora creata (SQL "audit_log_archivio" non eseguito): niente archivio
+      if (error && /archiviato_il/.test(errMsg(error))) { logArchOk = false; ({ data, error } = await query(LOG_COLS + ',azione,sql,origine,transazione')); }
       if (error && /azione|sql|origine|transazione/.test(errMsg(error))) ({ data, error } = await query(LOG_COLS));
       if (error) throw error;
-      if (key !== `${logState.period}|${logState.tab}`) return;   // filtro cambiato nel frattempo
+      if (key !== `${logState.period}|${logState.tab}|${logState.arch}`) return;   // filtro cambiato nel frattempo
       logCache = { key, rows: data || [] };
     } catch (err) {
       console.error(errMsg(err));
@@ -1246,6 +1251,30 @@ function renderLog() {
   const n = logCache?.rows.length || 0;
   $('#logcount').textContent = `${list.length} ${list.length === 1 ? 'operazione' : 'operazioni'}${n >= LOG_MAX ? ` · mostrate le ultime ${LOG_MAX}: restringi periodo o sezione per vedere le precedenti` : ''}`;
   document.querySelectorAll('#logfilters .chip').forEach((c) => c.classList.toggle('active', c.dataset.p === logState.period));
+  document.querySelectorAll('#logarch .chip').forEach((c) => c.classList.toggle('active', (c.dataset.a === '1') === logState.arch));
+  const b = $('#btn-log-arch');
+  b.textContent = logState.arch ? 'Ripristina visibili' : 'Archivia visibili';
+  b.disabled = !logArchOk || !list.length;
+  logVisibleIds = list.map((r) => r.id);
+}
+
+// sposta le righe visibili (filtri + ricerca) nell'archivio, o le ripristina se si è nella sezione Archivio
+let logVisibleIds = [];
+async function toggleLogArchive() {
+  const ids = logVisibleIds; if (!ids.length) return;
+  const arch = logState.arch;
+  const msg = arch ? `Ripristinare <b>${ids.length}</b> ${ids.length === 1 ? 'operazione' : 'operazioni'} nel log principale?`
+    : `Spostare <b>${ids.length}</b> ${ids.length === 1 ? 'operazione' : 'operazioni'} nell'archivio?`;
+  if (!(await askConfirm(msg, arch ? 'Ripristina' : 'Archivia', ic.alert))) return;
+  try {
+    const supa = await getSupa();
+    const { data, error } = await supa.rpc(arch ? 'ripristina_log' : 'archivia_log', { p_ids: ids });
+    if (error) throw error;
+    toast(`${data ?? ids.length} ${arch ? 'operazioni ripristinate' : 'operazioni archiviate'}`);
+  } catch (err) {
+    toast(`Errore: ${errMsg(err)}`, 'warn');
+  }
+  logCache = null; loadLog();
 }
 
 function openLogDetail(id) {
@@ -1407,6 +1436,8 @@ function wireEvents() {
   $('#logfilters').addEventListener('click', (e) => { const c = e.target.closest('[data-p]'); if (!c) return; logState.period = c.dataset.p; loadLog(); });
   $('#logtable tbody').addEventListener('click', (e) => { const tr = e.target.closest('tr[data-log]'); if (tr) openLogDetail(tr.dataset.log); });
   $('#logtab').addEventListener('change', (e) => { logState.tab = e.target.value; loadLog(); });
+  $('#logarch').addEventListener('click', (e) => { const c = e.target.closest('[data-a]'); if (!c) return; logState.arch = c.dataset.a === '1'; document.querySelectorAll('#logarch .chip').forEach((x) => x.classList.toggle('active', x === c)); loadLog(); });
+  $('#btn-log-arch').addEventListener('click', toggleLogArchive);
   let logTimer;
   $('#logsearch').addEventListener('input', (e) => { clearTimeout(logTimer); logTimer = setTimeout(() => { logState.query = e.target.value; renderLog(); }, 150); });
   $('#pagamentoform').addEventListener('submit', submitPagamento);
