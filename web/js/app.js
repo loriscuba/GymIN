@@ -805,7 +805,7 @@ async function applyRenewal(m, plan, sendRicevuta, metodo = 'contanti', importo 
   renderAll();
   toast(`Abbonamento rinnovato · ${m.nome} → scad. ${fmtDate(newEnd)} · ${metodoLabel(metodo)}`);
   if (sendRicevuta && m.email) {
-    const { subject, html } = templates.ricevuta(m);
+    const { subject, html } = templates.ricevuta(m, { importo });
     const mail = await sendMail({ tipo: 'ricevuta', tipoLabel: 'Ricevuta', member: m, subject, html });
     toast(mail.channel === 'mailpit' ? `Ricevuta inviata a Mailpit · ${m.email}` : `Ricevuta generata (anteprima) · apri Posta`, 'mail');
   }
@@ -1105,6 +1105,7 @@ function openPagamentoModal() {
   $('#p-descr').value = 'Entrata libera';
   $('#p-metodo').value = 'contanti';
   $('#p-data').value = new Date().toLocaleDateString('sv');
+  $('#p-ricevuta').checked = true;
   payPicker.set(payState.sid);                 // richiama onPagamentoSocio
   openModal('modal-pagamento');
   if (!payState.sid) payPicker.focus();
@@ -1127,6 +1128,7 @@ function updatePagamentoForm() {
   $('#p-libero-box').hidden = abb;
   $('#p-data-box').hidden = attiva;             // il rinnovo incassa sempre alla data odierna
   const m = DATA.members.find((x) => x.sid === $('#p-socio').value);
+  $('#p-ricevuta-box').hidden = !m?.email;      // ricevuta solo a un socio con email
   const plan = DATA.plans.find((p) => p.name === $('#p-piano').value);
   $('#p-hint').innerHTML = !abb ? 'Registra solo l’incasso, senza abbonamento.'
     : !attiva ? 'Registra solo l’incasso: <b>nessun abbonamento viene attivato</b>.'
@@ -1140,6 +1142,7 @@ async function submitPagamento(e) {
   const plan = abb ? DATA.plans.find((p) => p.name === $('#p-piano').value) : null;
   const importo = Number(String($('#p-importo').value).replace(',', '.'));
   const metodo = $('#p-metodo').value;
+  const ricevuta = !!m?.email && $('#p-ricevuta').checked;
   if (!m && $('#p-socio-q').value.trim()) { toast('Seleziona il socio dalla ricerca, oppure svuota il campo per un’entrata libera', 'warn'); return; }
   if (!(importo > 0)) { toast('Inserisci un importo valido', 'warn'); return; }
   if (abb && !plan) { toast('Seleziona un abbonamento', 'warn'); return; }
@@ -1147,7 +1150,7 @@ async function submitPagamento(e) {
   if (abb && !$('#p-usato').checked) {
     if (!m) { toast('Seleziona il socio a cui attivare l’abbonamento', 'warn'); return; }
     closeModal('modal-pagamento');
-    await applyRenewal(m, plan, false, metodo, importo);
+    await applyRenewal(m, plan, ricevuta, metodo, importo);
     loadPayments();
     return;
   }
@@ -1168,6 +1171,11 @@ async function submitPagamento(e) {
   payCache = null;
   loadPayments();
   toast(`Pagamento registrato · ${m ? m.nome : descrizione} · ${euro(importo)} · ${metodoLabel(metodo)}`);
+  if (ricevuta) {
+    const { subject, html } = templates.ricevuta(m, { voce: descrizione, importo, scadenza: null });
+    const mail = await sendMail({ tipo: 'ricevuta', tipoLabel: 'Ricevuta', member: m, subject, html });
+    toast(mail.channel === 'mailpit' ? `Ricevuta inviata a Mailpit · ${m.email}` : `Ricevuta generata (anteprima) · apri Posta`, 'mail');
+  }
 }
 
 // ---------- log attività (tabella audit_log, scritta dai trigger del database) ----------

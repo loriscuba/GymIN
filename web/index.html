@@ -474,6 +474,7 @@
       <div class="field"><label for="p-importo">Importo (€)</label><input id="p-importo" type="number" min="0.01" step="0.01" inputmode="decimal" required></div>
       <div class="field"><label for="p-metodo">Tipo di pagamento</label><select id="p-metodo"><option value="contanti">Contanti</option><option value="bancomat">Bancomat</option><option value="carta">Carta di credito</option><option value="bonifico">Bonifico</option><option value="satispay">Satispay</option><option value="altro">Altro</option></select></div>
       <div class="field" id="p-data-box"><label for="p-data">Data pagamento</label><input id="p-data" type="date"></div>
+      <label class="check" id="p-ricevuta-box" style="margin-top:6px"><input type="checkbox" id="p-ricevuta" checked> Invia ricevuta di pagamento via email</label>
       <div class="msub" id="p-hint" style="margin-top:6px"></div>
     </div>
     <div class="mfoot"><button type="button" class="btn-ghost" data-close="modal-pagamento">Annulla</button><button type="submit" class="btn-primary">Registra pagamento</button></div>
