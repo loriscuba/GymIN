@@ -35,15 +35,16 @@ export const templates = {
       corpo: `Il tuo abbonamento <b>${m.plan.name}</b> scade il <b>${dataIt(m.end)}</b>.<br><br>Per rinnovare <b>passa in palestra alla reception</b>: ti aspettiamo per continuare ad allenarti senza interruzioni!`,
     }),
   }),
-  ricevuta: (m) => ({
+  // p (opzionale): { voce, importo, scadenza } — scadenza null = pagamento senza abbonamento attivato
+  ricevuta: (m, { voce = m.plan.name, importo = m.plan.price, scadenza = m.end } = {}) => ({
     subject: 'GymIN · ricevuta di pagamento',
     html: layout({
       titolo: 'Grazie, pagamento registrato',
-      corpo: `Abbiamo registrato il pagamento del tuo abbonamento.<br><br>
+      corpo: `Abbiamo registrato il tuo pagamento.<br><br>
         <table cellpadding="0" cellspacing="0" style="font-size:15px">
-        <tr><td style="padding:3px 18px 3px 0;color:${MUTED}">Piano</td><td><b>${m.plan.name}</b></td></tr>
-        <tr><td style="padding:3px 18px 3px 0;color:${MUTED}">Importo</td><td><b>${euro(m.plan.price)}</b></td></tr>
-        <tr><td style="padding:3px 18px 3px 0;color:${MUTED}">Valido fino al</td><td><b>${dataIt(m.end)}</b></td></tr></table>`,
+        <tr><td style="padding:3px 18px 3px 0;color:${MUTED}">Voce</td><td><b>${voce}</b></td></tr>
+        <tr><td style="padding:3px 18px 3px 0;color:${MUTED}">Importo</td><td><b>${euro(importo)}</b></td></tr>
+        ${scadenza ? `<tr><td style="padding:3px 18px 3px 0;color:${MUTED}">Valido fino al</td><td><b>${dataIt(scadenza)}</b></td></tr>` : ''}</table>`,
     }),
   }),
 };
