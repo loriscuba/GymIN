@@ -1179,8 +1179,8 @@ async function submitPagamento(e) {
 }
 
 // ---------- log attività (tabella audit_log, scritta dai trigger del database) ----------
-const LOG_TAB = { soci: 'Soci', abbonamenti: 'Abbonamenti', pagamenti: 'Pagamenti', piani: 'Piani', accessi: 'Accessi', mail_log: 'Posta', informative_privacy: 'Informative privacy', consensi_eventi: 'Privacy soci' };
-const LOG_OP = { INSERT: ['Nuovo', 'g'], UPDATE: ['Modifica', 'w'], DELETE: ['Eliminato', 'b'] };
+const LOG_TAB = { soci: 'Soci', abbonamenti: 'Abbonamenti', pagamenti: 'Pagamenti', piani: 'Piani', accessi: 'Accessi', mail_log: 'Posta', informative_privacy: 'Informative privacy', consensi_eventi: 'Privacy soci', login: 'Accessi al gestionale' };
+const LOG_OP = { INSERT: ['Nuovo', 'g'], UPDATE: ['Modifica', 'w'], DELETE: ['Eliminato', 'b'], LOGIN: ['Accesso', 'g'] };
 const LOG_MAX = 500;
 const logState = { period: '7', tab: '', query: '', arch: false };   // arch: true = sezione Archivio
 let logCache = null;   // { key, rows }
