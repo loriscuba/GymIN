@@ -1483,6 +1483,12 @@ function wireEvents() {
     if (e.key === 'Enter') { const mm = e.target.closest && e.target.closest('[data-member]'); if (mm) { e.preventDefault(); openScheda(mm.dataset.member); } }
   });
 
+  $('#btn-logout').addEventListener('click', async () => {
+    if (!confirm('Vuoi disconnetterti dal gestionale?')) return;
+    const supa = await getSupa();
+    if (supa) await supa.auth.signOut();
+    location.reload();                           // riparte dalla schermata di login
+  });
   $('#loginform')?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const supa = await getSupa();
