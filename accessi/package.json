@@ -12,6 +12,7 @@
     "seed:dev": "node scripts/seed-dev.mjs"
   },
   "devDependencies": {
+    "fake-indexeddb": "^6.2.5",
     "pg": "^8.23.1"
   }
 }

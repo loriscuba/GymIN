@@ -389,15 +389,32 @@ async function schedaVerificare(el) {
 // ---------------------------------------------------------------------------
 // scheda TERMINALI
 // ---------------------------------------------------------------------------
+const MIN_CONTATTO_ONLINE = 3;   // minuti: oltre, il terminale è considerato non raggiungibile
+function rigaTerminale(t) {
+  const st = t.stato || {};
+  const minuti = t.ultimo_contatto ? (Date.now() - Date.parse(t.ultimo_contatto)) / 60000 : Infinity;
+  const statoPill = !t.attivo ? '<span class="pill neutro">Revocato</span>'
+    : minuti <= MIN_CONTATTO_ONLINE ? '<span class="pill ok">Online</span>'
+      : `<span class="pill warn">Non raggiungibile${Number.isFinite(minuti) ? ` da ${minuti < 120 ? `${Math.round(minuti)} min` : `${Math.round(minuti / 60)} h`}` : ''}</span>`;
+  const coda = st.in_coda == null ? '—'
+    : st.in_coda ? `<span class="pill warn">${st.in_coda}</span>${st.eventi_con_errori ? ` <span class="pill negato" title="Eventi rifiutati dal server: verranno ritentati">${st.eventi_con_errori} con errori</span>` : ''}` : '0';
+  const cache = st.cache_ore == null ? '—' : `${st.cache_vecchia ? '<span class="pill warn">' : ''}aggiornati ${st.cache_ore < 1 ? 'ora' : `${Math.round(st.cache_ore)} h fa`}${st.cache_vecchia ? '</span>' : ''}`;
+  const orologio = st.sfasamento_ms == null ? '—'
+    : st.orologio_sfasato ? `<span class="pill negato">sfasato di ${Math.round(Math.abs(st.sfasamento_ms) / 60000)} min</span>` : 'ok';
+  return `<tr><td>${esc(t.nome)}${st.versione_app ? `<div class="vuoto" style="padding:0;font-size:12px">v. ${esc(st.versione_app)}</div>` : ''}</td><td>${statoPill}</td>
+    <td>${fmtDataOra(t.ultimo_contatto) || '—'}</td><td>${fmtDataOra(t.ultima_sync) || '—'}</td><td>${coda}</td><td>${cache}</td><td>${orologio}</td>
+    <td><div class="riga">${t.attivo ? `<button class="btn piccolo" type="button" data-sync="${t.id}" ${t.sync_richiesta_il ? 'disabled title="Richiesta già inviata"' : ''}>Sincronizza ora</button>
+      <button class="btn piccolo pericolo" type="button" data-revoca="${t.id}">Revoca</button>` : ''}</div></td></tr>`;
+}
+
 async function schedaTerminali(el, nuovo = null) {
   const righe = await dl.terminali();
   const urlIngresso = new URL('../ingresso/', location.href).href;
   el.innerHTML = `<div class="griglia">
-    <section class="card"><h2>Terminali</h2>
-      ${righe.length ? `<div class="tabella-wrap"><table><thead><tr><th>Nome</th><th>Stato</th><th>Ultimo contatto</th><th>Ultima sincronizzazione</th><th></th></tr></thead><tbody>
-        ${righe.map((t) => `<tr><td>${esc(t.nome)}</td><td>${t.attivo ? '<span class="pill ok">Attivo</span>' : '<span class="pill neutro">Revocato</span>'}</td>
-          <td>${fmtDataOra(t.ultimo_contatto) || '—'}</td><td>${fmtDataOra(t.ultima_sync) || '—'}</td>
-          <td>${t.attivo ? `<button class="btn piccolo pericolo" type="button" data-revoca="${t.id}">Revoca</button>` : ''}</td></tr>`).join('')}
+    <section class="card" style="grid-column:1/-1"><h2>Terminali</h2>
+      <p>Stato comunicato da ciascun terminale a ogni sincronizzazione (circa ogni minuto quando è online). La coda contiene gli accessi registrati offline non ancora inviati al server.</p>
+      ${righe.length ? `<div class="tabella-wrap"><table><thead><tr><th>Nome</th><th>Stato</th><th>Ultimo contatto</th><th>Ultima sincronizzazione</th><th>Accessi in coda</th><th>Dati locali</th><th>Orologio</th><th></th></tr></thead><tbody>
+        ${righe.map(rigaTerminale).join('')}
       </tbody></table></div>` : '<div class="vuoto">Nessun terminale.</div>'}
     </section>
     <section class="card"><h2>Nuovo terminale</h2>
@@ -414,6 +431,9 @@ async function schedaTerminali(el, nuovo = null) {
     if (r) schedaTerminali(el, r);
   });
   $('[data-copia]', el)?.addEventListener('click', () => navigator.clipboard?.writeText(nuovo.token).then(() => toast('Token copiato')));
+  $$('[data-sync]', el).forEach((b) => b.addEventListener('click', async () => {
+    if (await azione(() => dl.richiediSync(b.dataset.sync), 'Richiesta inviata: il terminale sincronizza entro un minuto (se è online)')) setTimeout(() => schedaTerminali(el), 1500);
+  }));
   $$('[data-revoca]', el).forEach((b) => b.addEventListener('click', async () => {
     if (!confirm('Revocare questo terminale? Smetterà subito di funzionare finché non viene configurato con un nuovo token.')) return;
     if (await azione(() => dl.revocaTerminale(b.dataset.revoca), 'Terminale revocato')) schedaTerminali(el);

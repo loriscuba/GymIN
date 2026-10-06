@@ -1,20 +1,27 @@
-// Schermata kiosk /ingresso
+// Schermata kiosk /ingresso — online-first con fallback locale (fase 2)
 import { avviso, creaFiltroDoppie, fmtDataCompleta, TZ } from './esito.js';
 import { agganciaLettore } from './lettore.js';
 import { sbloccaAudio, suona } from './suoni.js';
-import { creaDataLayerTerminale, remotoConfigurato, ErroreAutorizzazione } from './dataLayer.js';
+import { creaDataLayerTerminale, remotoConfigurato, ErroreAutorizzazione, ErroreNonSincronizzato } from './dataLayer.js';
+import { apriArchivio } from './archivio.js';
+import { creaSincronizzatore, SOGLIA_OROLOGIO_MS } from './sync.js';
 import { TESSERE_TEST, ALTRI_CASI } from './demo.js';
 
 const CFG = window.ACCESSI_CONFIG || {};
 const DURATA_ESITO = CFG.DURATA_ESITO_MS || 3000;
 const RITARDO_SUONI = CFG.RITARDO_SUONI_MS ?? 150;
-const SOGLIA_OROLOGIO_MS = 3 * 60 * 1000;   // avvisa se il PC e il server differiscono di più di 3 minuti
-const CHIAVE_TOKEN = 'gymin.accessi.token';
+const VERSIONE_APP = '__BUILD__';
 
 const $ = (s) => document.querySelector(s);
 const params = new URLSearchParams(location.search);
 const DEMO = params.get('demo') === '1';                 // simulazione con dati in memoria, mai il database
 const SIM = params.get('sim') === '1' || DEMO;
+
+// Produzione e test stanno sullo stesso dominio: token e cache separati per schema
+const SPAZIO = DEMO ? 'demo' : (CFG.DB_SCHEMA || 'public');
+const CHIAVE_TOKEN = `gymin.accessi.token${SPAZIO === 'public' ? '' : `.${SPAZIO}`}`;
+const NOME_DB = `gymin-accessi-${SPAZIO}`;
+const CHIAVE_NOME = `gymin.accessi.nome.${SPAZIO}`;
 
 const store = {
   get: (k) => { try { return localStorage.getItem(k); } catch { return null; } },
@@ -28,15 +35,34 @@ if (params.get('token')) {
   history.replaceState(null, '', location.pathname + (params.size ? `?${params}` : ''));
 }
 
-let data = null;          // sorgente dati (dataLayer)
-let nomeTerminale = '';
-let online = null;        // ultimo stato noto della connessione col server
-let sfasamentoMs = 0;     // ora del PC - ora del server
+let data = null;          // terminale (dataLayer: remoto + locale)
+let sync = null;          // sincronizzatore
+let archivio = null;
+let nomeTerminale = store.get(CHIAVE_NOME) || '';   // ricordato per i riavvii offline
+let vista = 'attesa';
 let timerEsito = null;
+let ricaricaQuandoLibero = false;
 const filtroDoppie = creaFiltroDoppie();
 
 // ---------------------------------------------------------------------------
-// orologio e barra di stato
+// PWA: service worker + storage persistente
+// ---------------------------------------------------------------------------
+if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+  const avevaController = !!navigator.serviceWorker.controller;
+  navigator.serviceWorker.register('../sw.js', { scope: '../' })
+    .then((reg) => setInterval(() => reg.update().catch(() => {}), 60 * 60 * 1000))   // il kiosk non naviga mai: controlla gli aggiornamenti ogni ora
+    .catch((e) => console.warn('Service worker non registrato:', e));
+  // nuova versione pubblicata: ricarica appena la schermata è in attesa
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!avevaController) return;
+    ricaricaQuandoLibero = true;
+    if (vista === 'attesa' || vista === 'nonsync') location.reload();
+  });
+}
+navigator.storage?.persist?.().then((ok) => { if (!ok) console.warn('Storage persistente non concesso dal browser'); }).catch(() => {});
+
+// ---------------------------------------------------------------------------
+// orologio, bande e barra di stato
 // ---------------------------------------------------------------------------
 const fmtOra = new Intl.DateTimeFormat('it-IT', { timeZone: TZ, hour: '2-digit', minute: '2-digit' });
 const fmtGiorno = new Intl.DateTimeFormat('it-IT', { timeZone: TZ, weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
@@ -48,7 +74,21 @@ function tick() {
 setInterval(tick, 1000);
 tick();
 
-function aggiornaBarra() {
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const offline = () => !!data && data.online === false;
+const inCoda = () => sync?.stato.inCoda || 0;
+const accessiDaSync = (n) => `${n} ${n === 1 ? 'accesso' : 'accessi'} da sincronizzare`;
+
+function aggiornaStato() {
+  const cache = sync?.stato.cache;
+  // banda OFFLINE solo in attesa; sull'esito c'è il badge
+  const bandaOff = $('#banda-offline');
+  bandaOff.hidden = !(offline() && vista === 'attesa');
+  bandaOff.textContent = `OFFLINE – ${accessiDaSync(inCoda())}`;
+  const bandaCache = $('#banda-cache');
+  bandaCache.hidden = !(cache?.vecchia && vista !== 'setup');
+  if (cache?.vecchia) bandaCache.textContent = `Dati non aggiornati da ${Math.floor(cache.ore)} ore`;
+
   const sx = [];
   if (data?.tipo === 'demo') sx.push('<span class="badge">SIMULAZIONE · dati demo</span>');
   else if (nomeTerminale) sx.push(esc(nomeTerminale));
@@ -56,19 +96,20 @@ function aggiornaBarra() {
   $('#b-sx').innerHTML = sx.join(' ');
 
   const dx = [];
-  if (Math.abs(sfasamentoMs) > SOGLIA_OROLOGIO_MS) {
-    dx.push(`<span class="giallo">Orologio del PC sfasato di ${Math.round(Math.abs(sfasamentoMs) / 60000)} min</span>`);
-  }
-  if (data?.tipo === 'remoto' && online !== null) {
-    dx.push(`<span class="punto${online ? '' : ' off'}"></span>${online ? 'Online' : 'Server non raggiungibile'}`);
+  const sfas = sync?.stato.sfasamentoMs || 0;
+  if (Math.abs(sfas) > SOGLIA_OROLOGIO_MS) dx.push(`<span class="giallo">Orologio del PC sfasato di ${Math.round(Math.abs(sfas) / 60000)} min</span>`);
+  if (data && data.online !== null) {
+    const n = inCoda();
+    dx.push(`<span class="punto${data.online ? '' : ' off'}"></span>${data.online ? (n ? `Online · invio ${accessiDaSync(n)}` : 'Online') : 'Offline'}`);
   }
   $('#b-dx').innerHTML = dx.join(' &nbsp; ');
-}
 
-function registraOraServer(oraServer) {
-  if (!oraServer) return;
-  sfasamentoMs = Date.now() - Date.parse(oraServer);
-  if (Math.abs(sfasamentoMs) > SOGLIA_OROLOGIO_MS) console.warn(`Orologio del PC sfasato di ${Math.round(sfasamentoMs / 1000)} s rispetto al server`);
+  // mai sincronizzato e senza rete: schermata dedicata al posto dell'attesa
+  if ((vista === 'attesa' || vista === 'nonsync') && data && archivio) {
+    const serveNonSync = !cache && data.online === false;
+    if (serveNonSync !== (vista === 'nonsync')) mostra(serveNonSync ? 'nonsync' : 'attesa');
+  }
+  aggiornaPannelloSim();
 }
 
 // ---------------------------------------------------------------------------
@@ -80,13 +121,15 @@ const ICONE = {
   errore: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 7v6M12 17h.01"/><circle cx="12" cy="12" r="9.5"/></svg>',
   avviso: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l10 18H2L12 3z"/><path d="M12 10v5M12 18h.01"/></svg>',
 };
-const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const iniziali = (s) => `${s?.nome?.[0] || ''}${s?.cognome?.[0] || ''}`.toUpperCase();
 
-function mostra(vista) {
-  for (const v of ['attesa', 'esito', 'setup']) $(`#v-${v}`).hidden = v !== vista;
-  document.body.classList.toggle('setup-attivo', vista === 'setup');
-  $('#barra').hidden = vista === 'setup';
+function mostra(v) {
+  vista = v;
+  for (const x of ['attesa', 'esito', 'setup', 'nonsync']) $(`#v-${x}`).hidden = x !== v;
+  document.body.classList.toggle('setup-attivo', v === 'setup');
+  $('#barra').hidden = v === 'setup';
+  aggiornaStato();
+  if ((v === 'attesa' || v === 'nonsync') && ricaricaQuandoLibero) location.reload();
 }
 
 function tornaInAttesa() {
@@ -131,6 +174,10 @@ function mostraEsito(r) {
   $('#e-avviso').hidden = !a;
   if (a) $('#e-avviso').innerHTML = `${ICONE.avviso}${esc(a)}`;
 
+  // colori e suoni identici offline: solo un piccolo badge
+  $('#e-badge').hidden = !r.offline;
+  $('#e-badge').textContent = `OFFLINE · ${inCoda()} da sincronizzare`;
+
   mostra('esito');
   clearTimeout(timerEsito);
   timerEsito = setTimeout(tornaInAttesa, DURATA_ESITO);
@@ -157,25 +204,28 @@ async function onCodice(codice) {
   if (filtroDoppie.controlla(codice)) {
     notifica('Tessera già letta');
     suona('lieve', RITARDO_SUONI);
-    data.registraLettura({ codice, evento_id: crypto.randomUUID(), ts, doppia: true }).catch(() => {});
+    data.registraLettura({ codice, evento_id: crypto.randomUUID(), ts, doppia: true }).catch(() => {}).finally(() => sync?.aggiornaContatori());
     return;
   }
 
-  const evento_id = crypto.randomUUID();
   try {
-    const r = await data.registraLettura({ codice, evento_id, ts });
-    online = true;
-    registraOraServer(r.ora_server);
+    // online entro ~2 s, altrimenti decisione locale con lo STESSO evento_id
+    const r = await data.registraLettura({ codice, evento_id: crypto.randomUUID(), ts });
+    if (!r.offline && r.ora_server && sync) sync.stato.sfasamentoMs = Date.now() - Date.parse(r.ora_server);
+    await sync?.aggiornaContatori();
     suona(r.esito === 'ok' ? 'ok' : 'negato', RITARDO_SUONI);
     mostraEsito(r);
   } catch (e) {
     if (e instanceof ErroreAutorizzazione) { apriSetup('Terminale non autorizzato: il token è stato revocato o non è valido.'); return; }
-    online = false;
-    // fase 1 (solo online): nessun fallback locale ancora
     suona('negato', RITARDO_SUONI);
-    mostraEsito({ esito: 'errore', motivo: 'Server non raggiungibile. Riprova o rivolgiti alla reception.' });
-  } finally {
-    aggiornaBarra();
+    if (e instanceof ErroreNonSincronizzato) {
+      mostra('nonsync');
+      clearTimeout(timerEsito);
+      timerEsito = setTimeout(tornaInAttesa, DURATA_ESITO);
+      return;
+    }
+    console.error(e);
+    mostraEsito({ esito: 'errore', motivo: 'Errore del terminale. Rivolgiti alla reception.' });
   }
 }
 
@@ -184,7 +234,9 @@ async function onCodice(codice) {
 // ---------------------------------------------------------------------------
 function apriSetup(errore = '') {
   store.set(CHIAVE_TOKEN, null);
+  sync?.ferma();
   data = null;
+  sync = null;
   $('#s-errore').hidden = !errore;
   $('#s-errore').textContent = errore;
   mostra('setup');
@@ -199,52 +251,67 @@ $('#f-setup').addEventListener('submit', async (e) => {
     const p = await tentativo.ping();
     store.set(CHIAVE_TOKEN, token);
     $('#s-token').value = '';
-    avvia(p);
+    nomeTerminale = p.nome;
+    store.set(CHIAVE_NOME, p.nome);
+    avvia();
   } catch (err) {
     $('#s-errore').hidden = false;
     $('#s-errore').textContent = err instanceof ErroreAutorizzazione ? 'Token non valido o revocato.' : `Impossibile contattare il server: ${err.message}`;
   }
 });
 
-function avvia(ping = null) {
-  data = creaDataLayerTerminale({ config: CFG, token: store.get(CHIAVE_TOKEN), sim: SIM, demo: DEMO });
-  if (!data) {
-    if (remotoConfigurato(CFG)) return apriSetup();
-    document.body.innerHTML = '<div class="vista"><div class="setup"><h1>Configurazione mancante</h1><p>Imposta SUPABASE_URL e SUPABASE_ANON_KEY (vedi accessi/README.md) oppure apri la pagina con <b>?sim=1</b> per la simulazione con dati demo.</p></div></div>';
-    return;
+async function apriArchivioLocale() {
+  try {
+    if (DEMO) await new Promise((ok) => { const r = indexedDB.deleteDatabase(NOME_DB); r.onsuccess = r.onerror = r.onblocked = () => ok(); });
+    return await apriArchivio({ nome: NOME_DB });
+  } catch (e) {
+    console.error('IndexedDB non disponibile: il terminale funziona solo online', e);
+    return null;
   }
-  if (ping) { nomeTerminale = ping.nome; online = true; registraOraServer(ping.ora_server); }
-  tornaInAttesa();
-  aggiornaBarra();
-  if (!ping) verificaConnessione();
 }
 
-// controllo periodico della connessione (e dell'orologio)
-async function verificaConnessione() {
-  if (!data) return;
-  try {
-    const p = await data.ping();
-    nomeTerminale = p.nome;
-    online = true;
-    registraOraServer(p.ora_server);
-  } catch (e) {
-    if (e instanceof ErroreAutorizzazione) return apriSetup('Terminale non autorizzato: il token è stato revocato o non è valido.');
-    online = false;
+async function avvia() {
+  archivio ??= await apriArchivioLocale();
+  data = creaDataLayerTerminale({ config: CFG, token: store.get(CHIAVE_TOKEN), sim: SIM, demo: DEMO, archivio });
+  if (!data) {
+    if (remotoConfigurato(CFG)) return apriSetup();
+    document.body.innerHTML = '<div class="vista"><div class="setup"><h1>Configurazione mancante</h1><p>Imposta SUPABASE_URL e SUPABASE_ANON_KEY (vedi accessi/README.md) oppure apri la pagina con <b>?demo=1</b> per la simulazione con dati demo.</p></div></div>';
+    return;
   }
-  aggiornaBarra();
+  sync = creaSincronizzatore({
+    terminale: data,
+    archivio,
+    intervalloMs: CFG.SYNC_INTERVALLO_MS || 60000,
+    versioneApp: VERSIONE_APP,
+    onCambio: aggiornaStato,
+    onNonAutorizzato: () => apriSetup('Terminale non autorizzato: il token è stato revocato o non è valido.'),
+  });
+  tornaInAttesa();
+  await sync.aggiornaContatori();
+  sync.avvia().then(() => {
+    // nome del terminale per la barra di stato
+    if (data && !data.forzaOffline) data.ping().then((p) => { nomeTerminale = p.nome; store.set(CHIAVE_NOME, p.nome); aggiornaStato(); }).catch(() => {});
+  });
 }
-setInterval(verificaConnessione, 60_000);
-window.addEventListener('online', verificaConnessione);
-window.addEventListener('offline', () => { online = false; aggiornaBarra(); });
+window.addEventListener('offline', () => { data?.segnaOffline(); aggiornaStato(); });
 
 // ---------------------------------------------------------------------------
 // lettore + simulazione
 // ---------------------------------------------------------------------------
-agganciaLettore(onCodice, { attivo: () => !!data && $('#v-setup').hidden });
+agganciaLettore(onCodice, { attivo: () => !!data && vista !== 'setup' });
 window.addEventListener('pointerdown', sbloccaAudio);
 window.addEventListener('dblclick', () => {
   if (!document.fullscreenElement) document.documentElement.requestFullscreen?.().catch(() => {});
 });
+
+let pannelloSim = null;
+function aggiornaPannelloSim() {
+  if (!pannelloSim) return;
+  const s = sync?.stato;
+  const ultima = s?.ultimaSync ? fmtOra.format(new Date(s.ultimaSync)) : 'mai';
+  pannelloSim.querySelector('#sim-stato').textContent =
+    `${data?.online === false ? 'Offline' : 'Online'} · in coda: ${s?.inCoda ?? 0} · ultima sincronizzazione: ${ultima}${s?.ultimoErrore ? ` · errore: ${s.ultimoErrore}` : ''}`;
+}
 
 if (SIM) {
   document.body.classList.add('sim');
@@ -253,6 +320,7 @@ if (SIM) {
   btn.textContent = 'SIM';
   btn.title = 'Pannello simulazione';
   const p = document.createElement('div');
+  pannelloSim = p;
   p.className = 'sim-pannello';
   p.hidden = true;
   p.dataset.noLettore = '';
@@ -262,9 +330,12 @@ if (SIM) {
     ${TESSERE_TEST.map((t) => `<button class="btn" data-codice="${t.codice}">${t.etichetta} <span>· ${t.descr}</span></button>`).join('')}
     <div class="nota">Altri casi</div>
     <div class="chips">${ALTRI_CASI.map((t) => `<button class="btn piccolo" data-codice="${t.codice}" title="${t.codice}">${t.descr}</button>`).join('')}</div>
+    <label class="interruttore"><input type="checkbox" id="sim-offline"> Simula offline</label>
+    <div class="riga"><button class="btn piccolo" id="sim-sync">Sincronizza ora</button></div>
+    <div class="nota" id="sim-stato"></div>
     <div class="nota">Le tessere di test esistono nei dati demo (in memoria, senza database) e nel seed di sviluppo (sql/seed-dev.sql).</div>`;
   document.body.append(btn, p);
-  btn.addEventListener('click', () => { p.hidden = !p.hidden; });
+  btn.addEventListener('click', () => { p.hidden = !p.hidden; aggiornaPannelloSim(); });
   p.addEventListener('click', (e) => { const b = e.target.closest('[data-codice]'); if (b) onCodice(b.dataset.codice); });
   p.querySelector('#sim-form').addEventListener('submit', (e) => {
     e.preventDefault();
@@ -272,6 +343,14 @@ if (SIM) {
     onCodice(c.value.replace(/\s+/g, '').toUpperCase());
     c.value = '';
   });
+  p.querySelector('#sim-offline').addEventListener('change', (e) => {
+    if (!data) return;
+    data.forzaOffline = e.target.checked;
+    if (e.target.checked) data.segnaOffline();
+    else sync?.sincronizza();
+    aggiornaStato();
+  });
+  p.querySelector('#sim-sync').addEventListener('click', () => sync?.sincronizza());
 }
 
 avvia();
