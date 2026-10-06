@@ -108,6 +108,21 @@ npm run import:all         # importa TUTTO lo storico abbonamenti
 npm run import:replace     # rimuove gli abbonamenti esistenti dei soci e reimporta
 ```
 
+## Reimport degli abbonamenti dall'app (cruscotto admin)
+
+Per riallineare **solo gli abbonamenti** senza toccare le anagrafiche:
+
+1. `npm run convert` sul PC con il backup → `data/out/abbonamenti.csv`
+2. In GymIN (utente admin) → menu **Import abbonamenti** → *Carica abbonamenti.csv*
+3. Il file viene confrontato col DB (sola lettura) e ogni riga è classificata:
+   **Nuovo**, **Diverso** (scadenza/entrate/stato cambiati, mostra prima → dopo),
+   **Già presente**, **Socio mancante**, **Piano mancante**.
+4. Si importa riga per riga (*Importa* / *Aggiorna*) o in blocco (*Importa selezionati*), sempre con conferma.
+
+Regole: scrive solo su `abbonamenti` (mai `soci`, `piani`, `pagamenti`); stesso socio + piano +
+`data_inizio` = stesso abbonamento, quindi rilanciarlo non crea doppioni; gli abbonamenti
+`archiviato` non cambiano stato. Ogni scrittura finisce nel Log attività.
+
 ## Idempotenza
 
 - **piani**: inseriti solo se il `nome` non esiste già.
