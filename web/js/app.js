@@ -4,6 +4,7 @@ import {
   loadInformative, informativaAttiva, loadEventi, registraEventi, eventiDaModulo, eventoRevoca,
   schedaPrivacyHtml, storicoHtml, informativaHtml, moduloSocioHtml, privacyFromRow,
 } from './privacy.js?v=__BUILD__';
+import { initImporta, renderImporta } from './importa.js?v=__BUILD__';
 
 const $ = (s, r = document) => r.querySelector(s);
 const euro = (n) => '€ ' + Math.round(n).toLocaleString('it-IT');
@@ -1339,6 +1340,7 @@ const titles = {
   abbonamenti: ['Abbonamenti', 'Listino piani e incasso ricorrente'], entrate: ['Entrate / Accessi', 'Controllo ingressi'],
   posta: ['Posta', 'Comunicazioni automatiche agli iscritti'],
   pagamenti: ['Pagamenti', 'Riepilogo incassi'], log: ['Log attività', 'Tutte le modifiche al database, con utente e dettagli'],
+  importa: ['Import abbonamenti', 'Dal vecchio gestionale: solo abbonamenti, le anagrafiche non vengono toccate'],
 };
 function go(view) {
   document.querySelectorAll('.view').forEach((v) => (v.hidden = true));
@@ -1350,6 +1352,7 @@ function go(view) {
   window.scrollTo(0, 0);
   if (view === 'pagamenti') loadPayments();
   if (view === 'log') { logCache = null; loadLog(); }   // ogni apertura rilegge il log aggiornato
+  if (view === 'importa') renderImporta();
 }
 
 // ---------- login ----------
@@ -1672,6 +1675,7 @@ async function setupUser() {
   const email = (user?.email || '').toLowerCase();
   const admin = email === LOG_ADMIN;
   $('.nav[data-view="log"]').hidden = !admin;
+  $('.nav[data-view="importa"]').hidden = !admin;
   $('#u-name').textContent = admin ? 'Admin' : (email.split('@')[0] || 'Utente');
   $('#u-role').textContent = admin ? 'Amministratore' : 'Staff';
   $('#u-avatar').textContent = admin ? 'AD' : (email.slice(0, 2).toUpperCase() || '—');
@@ -1693,4 +1697,8 @@ async function boot() {
 }
 
 wireEvents();
+initImporta({
+  toast, askConfirm: (m, ok) => askConfirm(m, ok, ic.alert),
+  onDone: async () => { try { DATA = await loadData(); renderAll(); } catch (err) { console.error(errMsg(err)); } },
+});
 boot();
