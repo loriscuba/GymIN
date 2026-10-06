@@ -1,0 +1,157 @@
+# GymIN · Accessi
+
+Terminale di **controllo accessi** per l'ingresso della palestra, più una pagina di **gestione tessere** per lo staff.
+È un sotto-progetto di GymIN: usa lo **stesso database Supabase**, lo stesso login staff e lo stesso stile grafico.
+
+| Pagina | Per chi | Cosa fa |
+|---|---|---|
+| `/accessi/ingresso/` | PC dell'ingresso (Chrome in modalità kiosk) | Passi la tessera RFID e lo schermo diventa verde o rosso, con suono, nome del socio e abbonamento |
+| `/accessi/gestione/` | Staff (login di GymIN) | Associa le tessere, annulla un ingresso, consulta lo storico, gestisce gli accessi offline da verificare e i terminali |
+
+> **Stato:** fase 1 (versione ONLINE). In arrivo: fase 2 (offline: PWA, cache, coda, sincronizzazione) e fase 3 (script kiosk e guida installazione).
+
+## Struttura
+
+```
+accessi/
+├─ app/                    # web app statica (HTML/CSS/JS moduli, senza framework, come GymIN)
+│  ├─ ingresso/            # schermata kiosk
+│  ├─ gestione/            # pagina staff
+│  ├─ js/esito.js          # REGOLE DEGLI ESITI: funzione pura e testata
+│  ├─ js/dataLayer.js      # UNICO accesso ai dati (remoto, demo e, in fase 2, locale)
+│  ├─ js/lettore.js        # listener globale per il lettore RFID in emulazione tastiera
+│  ├─ js/suoni.js          # suoni con la Web Audio API
+│  └─ js/demo.js           # dati demo in memoria per la simulazione
+├─ sql/seed-dev.sql        # dati demo per il DB di SVILUPPO (mai in produzione)
+├─ scripts/                # dev-server, build, test-db, seed-dev (nessuna dipendenza esterna)
+└─ test/                   # test unitari (node:test) e test SQL su Postgres vero (test/db)
+supabase/migrations/20261006120000_accessi_terminale.sql   # migrazione (solo aggiunte)
+```
+
+## Database: cosa aggiunge la migrazione
+
+`supabase/migrations/20261006120000_accessi_terminale.sql` fa **solo aggiunte**: nessuna tabella o colonna esistente viene modificata.
+
+- **`tessere`**: codice letto dal lettore → socio. Il codice è attivo su un solo socio alla volta e le tessere disattivate restano nello storico. Il campo `soci.tessera` di GymIN (il numero stampato) resta invariato.
+- **`terminali`**: i PC autorizzati. Il token è salvato solo come hash SHA-256.
+- **`accessi_log`**: ogni lettura (ok, negato, doppia lettura, annullo), con tessera, socio, abbonamento, motivo, residuo prima e dopo, `ts_terminale`, `ts_server`, `offline` e `da_verificare`. `evento_id` è univoco: è la chiave di **idempotenza**.
+- **Specchio in `accessi`**: ogni ingresso valido scrive anche una riga in `accessi` (`ingresso = 'Terminale'`), così la dashboard di GymIN lo conta. Annullando l'ingresso la riga viene tolta.
+
+**Funzioni** (`security definer`):
+
+| Funzione | Chi | Cosa |
+|---|---|---|
+| `terminale_accesso(token, codice, evento_id, ts, doppia)` | terminale | Valuta, scala e registra in **un'unica transazione** e restituisce l'esito completo. Blocca le righe degli abbonamenti del socio (`FOR UPDATE`), quindi le letture concorrenti vengono serializzate e il residuo non scende mai sotto zero. Lo stesso `evento_id` restituisce l'esito già registrato, senza scalare due volte. |
+| `terminale_ping(token)` | terminale | Verifica il token e restituisce l'ora del server |
+| `staff_assegna_tessera / staff_disattiva_tessera` | staff | Associazione con conferma se il codice è di un altro socio, sostituzione e smarrimento |
+| `staff_annulla_ingresso` | staff | Ripristina l'ingresso scalato e lascia una riga `annullo` nel log |
+| `staff_tessere_non_associate` | staff | Codici letti al terminale che non appartengono a nessuno |
+| `staff_segna_verificato` | staff | Chiude un accesso offline da verificare |
+| `staff_crea_terminale / staff_revoca_terminale` | staff | Ruolo "terminale ingresso" |
+
+### Applicare la migrazione
+
+- **Supabase online** (come il resto di GymIN): SQL Editor → incolla il file → Run.
+- **Schema di test di GymIN**: `node scripts/test-schema.mjs 20261006120000` dalla radice del repo, poi incolla l'output nell'SQL Editor.
+- **Supabase locale**: `supabase db reset` (applica tutte le migrazioni).
+
+## Ruolo "terminale ingresso" (sicurezza)
+
+Il terminale **non contiene chiavi con poteri di amministratore**. Usa:
+
+1. la **chiave anon** pubblica, la stessa già pubblicata dal sito GymIN. Il ruolo `anon` non ha policy RLS su nessuna tabella, quindi non legge soci, abbonamenti né log;
+2. un **token del terminale**, che autorizza solo `terminale_accesso` e `terminale_ping`. È revocabile in ogni momento.
+
+Come configurarlo:
+
+1. Apri **Gestione accessi → Terminali → Nuovo terminale** (es. "Ingresso principale") e premi **Crea**.
+2. Il token viene mostrato **una sola volta**: nel database resta solo il suo hash.
+3. Sul PC dell'ingresso apri `/accessi/ingresso/` e incolla il token, oppure apri una volta `/accessi/ingresso/?token=…` (il token viene salvato nel browser e tolto dall'indirizzo).
+4. Se il PC viene perso o sostituito: **Revoca**. Il terminale torna subito alla schermata di configurazione.
+
+Lo staff legge `tessere` e `accessi_log` ma scrive **solo** tramite le funzioni `staff_*`. Della tabella `terminali` lo staff non vede la colonna dell'hash. Tutto questo è verificato dai test (`npm run test:db`).
+
+## Regole degli esiti
+
+Le regole sono in un'**unica funzione pura**, `decidiAbbonamenti()` in `app/js/esito.js`, usata dalla simulazione e (in fase 2) dal fallback offline. La gemella lato database è `accessi_decidi()`. Gli **stessi casi** (`test/casi-esito.json`) vengono verificati su tutte e due, così le regole non divergono.
+
+1. **Tessera inesistente o disattivata** → ROSSO "Tessera sconosciuta".
+2. **Abbonamenti validi oggi** (Europe/Rome; quelli con stato `archiviato` vengono ignorati):
+   - a **scadenza**: `data_inizio ≤ oggi ≤ data_scadenza`;
+   - a **ingressi** (piano con `entrate > 0`): residuo > 0 ed entro le date.
+3. **Priorità**, se ce n'è più di uno: prima quello a scadenza (non consuma nulla), poi quello a ingressi con la scadenza più vicina.
+4. **VERDE**:
+   - a ingressi: scala 1 e mostra il residuo;
+   - a scadenza: mostra la scadenza e i giorni rimasti.
+   - Compare una **riga gialla** se mancano meno di 7 giorni o restano 2 ingressi o meno.
+5. **ROSSO** con il motivo: "Abbonamento scaduto il gg/mm", "Ingressi esauriti", "Nessun abbonamento", oppure "Abbonamento valido dal gg/mm" se l'abbonamento non è ancora iniziato.
+6. **Stessa tessera entro 5 secondi** → ignorata, con un lieve avviso. Il controllo è locale al terminale. La lettura viene registrata come `doppia_lettura`, senza scalare nulla.
+7. Dopo **3 secondi** la schermata torna in attesa. Ogni lettura viene registrata in `accessi_log`.
+
+## Lettore RFID
+
+Il lettore USB 125 kHz EM4100 lavora in emulazione tastiera: digita il codice in pochi millisecondi e poi preme Invio.
+
+- `lettore.js` ascolta la tastiera **globalmente** (funziona anche senza focus) e accumula solo i tasti arrivati a raffica (meno di 50 ms l'uno dall'altro). I tasti digitati lentamente a mano vengono ignorati.
+- Il codice viene messo in maiuscolo e ripulito dagli spazi. Lunghezza e formato sono liberi.
+- Il codice letto può essere diverso dal numero stampato sulla tessera, quindi **le tessere si associano sempre passandole sul lettore**.
+
+## Sviluppo
+
+Prerequisiti: Node 18+.
+
+```bash
+cd accessi
+cp .env.example .env          # facoltativo: senza Supabase si lavora in simulazione
+npm run dev                   # http://localhost:5174
+```
+
+- **Simulazione senza database**: <http://localhost:5174/ingresso/?demo=1>. I dati demo restano in memoria: ricaricando la pagina tornano allo stato iniziale.
+- **Pannello simulazione** (`?sim=1`, già incluso in `?demo=1`): pulsante **SIM** in basso a destra, con campo di testo, **Tessera di test 1, 2, 3** e altri casi (esauriti, nessun abbonamento, priorità, in scadenza, disattivata, non ancora attivo, sconosciuta). Il pannello c'è anche in `/gestione/?sim=1`, nel riquadro "Passa la tessera".
+- **Con un database di sviluppo** (Supabase locale o un progetto di test):
+  ```bash
+  # .env: SUPABASE_URL, SUPABASE_ANON_KEY (anon!), DEV_DATABASE_URL
+  npm run seed:dev              # dati demo + terminale di sviluppo (token: dev-terminale-SOLO-SVILUPPO)
+  ```
+  Poi apri `/ingresso/?sim=1` e incolla il token di sviluppo. Lo script del seed **si rifiuta** di girare su host non locali (salvo `--non-locale`) e il file SQL si blocca se non viene lanciato dallo script. I dati demo non vanno **mai** in produzione.
+- **Doppio clic** sulla schermata: schermo intero (comodo in sviluppo; nel kiosk lo fa Chrome).
+
+### Test
+
+```bash
+npm test          # regole degli esiti, lettore, dataLayer (senza database)
+npm run test:db   # funzioni SQL su un Postgres VERO: avvia un cluster temporaneo (serve Postgres installato)
+                  # oppure TEST_DATABASE_URL=postgres://... npm run test:db  (DB usa-e-getta: viene azzerato!)
+```
+
+`test:db` applica tutte le migrazioni di GymIN (seed escluso) su un Postgres pulito, con un piccolo stub di Supabase (ruoli `anon` e `authenticated`, `auth.uid()`), e verifica:
+
+- la parità JS/SQL;
+- tessera sconosciuta e disattivata, scaduto, esauriti, abbonamenti archiviati, priorità;
+- la scalatura atomica;
+- l'idempotenza (stesso evento inviato due volte, anche in parallelo);
+- **12 letture concorrenti** su un carnet da 3 ingressi → esattamente 3 ok e residuo 0;
+- la doppia lettura, l'annullo, l'assegnazione con conferma e la sostituzione;
+- le tessere non associate;
+- i permessi del terminale (anon) e dello staff;
+- il seed di sviluppo, che dà gli stessi esiti della demo in memoria.
+
+## Deploy
+
+La pubblicazione è automatica su GitHub Pages insieme a GymIN (`.github/workflows/pages.yml`, passo "Build Accessi"):
+
+- <https://loriscuba.github.io/GymIN/accessi/ingresso/>
+- <https://loriscuba.github.io/GymIN/accessi/gestione/>
+- **Ambiente di test** (stesso progetto Supabase, solo schema `test`, fascia arancione "AMBIENTE DI TEST"):
+  <https://loriscuba.github.io/GymIN/test/accessi/ingresso/> e <https://loriscuba.github.io/GymIN/test/accessi/gestione/>.
+  Viene costruito dal branch `test` se contiene `accessi/`, altrimenti da `main`. Il token di un terminale vale solo nel proprio schema: un terminale creato in test non funziona in produzione, e viceversa.
+
+La build (`npm run build`) copia `app/` in `dist/` e genera `config.js` dalle Variables `SUPABASE_URL` e `SUPABASE_ANON_KEY` del repo (in mancanza, dal `web/config.js` di GymIN). Aggiunge anche la versione ai link, per invalidare la cache.
+
+Prima di usarlo con i dati veri bisogna **applicare la migrazione** in Supabase e creare un terminale da `/gestione`.
+
+## Cosa resta in GymIN (non duplicato)
+
+Anagrafica soci, creazione e rinnovo abbonamenti, ricariche dei carnet (rinnovo) e import restano nel gestionale GymIN. Il terminale legge e scala gli stessi `abbonamenti.entrate_residue`.
+
+**Da sapere:** il pulsante "Registra accesso" del gestionale GymIN aggiorna solo la vista in memoria (non scrive su `accessi` e non scala `entrate_residue` nel database). Gli ingressi veri sono quelli del terminale.

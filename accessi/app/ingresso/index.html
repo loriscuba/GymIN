@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="it" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GymIN · Ingresso</title>
+<meta name="theme-color" content="#14181f">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="../css/base.css?v=__BUILD__">
+<link rel="stylesheet" href="../css/terminale.css?v=__BUILD__">
+</head>
+<body>
+<section id="v-attesa" class="vista">
+  <div class="marchio">Gym<b>IN</b></div>
+  <div id="orologio" class="orologio">--:--</div>
+  <div id="data" class="data"></div>
+  <div class="invito">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M2.5 9.5h19M6.5 15h4"/></svg>
+    Passa la tessera
+  </div>
+</section>
+
+<section id="v-esito" class="vista" hidden aria-live="assertive">
+  <div id="e-icona" class="esito-icona"></div>
+  <div id="e-socio" class="esito-socio"><span id="e-avatar" class="avatar"></span><span id="e-nome"></span></div>
+  <div id="e-titolo" class="esito-titolo"></div>
+  <div id="e-dett" class="esito-dett"></div>
+  <div id="e-piano" class="esito-piano"></div>
+  <div id="e-avviso" class="esito-avviso" hidden></div>
+</section>
+
+<section id="v-setup" class="vista" hidden>
+  <form id="f-setup" class="setup" data-no-lettore>
+    <h1>Configura il terminale</h1>
+    <p>Incolla il <b>token del terminale</b> creato in <i>Gestione accessi → Terminali</i>. Va fatto una sola volta su questo PC: il token resta salvato nel browser.</p>
+    <input id="s-token" autocomplete="off" spellcheck="false" placeholder="Token del terminale" required>
+    <p id="s-errore" class="errore" hidden></p>
+    <button class="btn primario" type="submit">Collega terminale</button>
+  </form>
+</section>
+
+<div id="notifica" class="notifica" hidden></div>
+<footer id="barra" class="barra-stato">
+  <span id="b-sx"></span>
+  <span id="b-dx"></span>
+</footer>
+
+<script src="../config.js?v=__BUILD__" onerror="void 0"></script>
+<script type="module" src="../js/ingresso.js?v=__BUILD__"></script>
+</body>
+</html>

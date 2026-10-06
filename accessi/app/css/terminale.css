@@ -1,0 +1,59 @@
+/* Schermata kiosk /ingresso: a tutto schermo, leggibile da 3 metri */
+html,body{height:100%;overflow:hidden}
+body{background:var(--sidebar);color:#fff;user-select:none}
+body:not(.sim){cursor:none}
+.vista{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:4vh 5vw 9vh;gap:2vh}
+
+/* attesa */
+#v-attesa{background:radial-gradient(120% 90% at 50% 0%,#1d2430 0%,var(--sidebar) 60%)}
+#v-attesa .marchio{position:absolute;top:4vh;left:5vw;font-size:4.2vh;color:#fff}
+.orologio{font-family:var(--font-display);font-weight:800;font-size:24vh;line-height:1;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+.data{font-size:4.2vh;color:#aeb6c4;text-transform:capitalize}
+.invito{margin-top:5vh;display:flex;align-items:center;gap:2.4vh;font-family:var(--font-display);font-weight:700;font-size:8vh;color:#fff}
+.invito svg{width:9vh;height:9vh;color:var(--accent);animation:pulsa 2.4s ease-in-out infinite}
+@keyframes pulsa{0%,100%{transform:translateY(0)}50%{transform:translateY(-1.2vh)}}
+
+/* esito */
+#v-esito.ok{background:#15803d}
+#v-esito.negato{background:#b91c1c}
+#v-esito.errore{background:#9a3412}
+.esito-icona{width:16vh;height:16vh;border-radius:50%;display:grid;place-items:center;background:rgba(255,255,255,.18)}
+.esito-icona svg{width:11vh;height:11vh}
+.esito-titolo{font-family:var(--font-display);font-weight:800;font-size:9vh;line-height:1.05;letter-spacing:-.01em;text-transform:uppercase}
+.esito-socio{display:flex;align-items:center;gap:3vh;font-family:var(--font-display);font-weight:800;font-size:10vh;line-height:1.05}
+.avatar{flex:none;width:14vh;height:14vh;border-radius:50%;display:grid;place-items:center;background:rgba(255,255,255,.22);font-size:6vh;font-weight:800}
+.esito-dett{font-size:7vh;font-weight:700;line-height:1.15}
+.esito-dett small{display:block;font-size:4vh;font-weight:500;opacity:.9;margin-top:1vh}
+.esito-piano{font-size:4vh;opacity:.92}
+.esito-avviso{margin-top:1vh;background:#facc15;color:#1f1300;font-weight:800;font-size:5vh;padding:1.6vh 4vh;border-radius:2vh;display:flex;align-items:center;gap:2vh}
+.esito-avviso svg{width:5vh;height:5vh}
+
+/* configurazione */
+#v-setup{background:var(--sidebar);cursor:auto}
+.setup{background:var(--surface);color:var(--ink);border-radius:20px;padding:36px;width:min(560px,92vw);text-align:left;display:grid;gap:14px;box-shadow:var(--shadow)}
+.setup h1{margin:0;font-family:var(--font-display);font-size:26px}
+.setup p{margin:0;color:var(--ink-2);font-size:14px}
+.setup .errore{color:var(--bad);font-weight:600}
+body.setup-attivo{cursor:auto;user-select:auto}
+
+/* barra di stato in basso */
+.barra-stato{position:fixed;left:0;right:0;bottom:0;display:flex;justify-content:space-between;align-items:center;gap:2vh;padding:1.6vh 3vw;font-size:2.4vh;color:#aeb6c4;background:rgba(0,0,0,.18)}
+.barra-stato .punto{display:inline-block;width:1.4vh;height:1.4vh;border-radius:50%;background:#4ade80;margin-right:1vh;vertical-align:middle}
+.barra-stato .punto.off{background:#f87171}
+.barra-stato .giallo{color:#facc15;font-weight:600}
+.badge{display:inline-block;background:var(--accent);color:#fff;font-weight:700;border-radius:6px;padding:.2vh 1vh;margin-left:1vh}
+
+/* notifica lieve (doppia lettura) */
+.notifica{position:fixed;top:3vh;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.55);color:#fff;font-size:3.4vh;font-weight:600;padding:1.4vh 3.4vh;border-radius:999px;z-index:20}
+
+/* pannello simulazione (?sim=1) */
+.sim-toggle{position:fixed;right:14px;bottom:62px;z-index:30;font:700 12px/1 var(--font);background:var(--accent);color:#fff;border:0;border-radius:999px;padding:8px 12px;opacity:.55;cursor:pointer}
+.sim-toggle:hover{opacity:1}
+.sim-pannello{position:fixed;right:14px;bottom:100px;z-index:30;width:min(360px,calc(100vw - 28px));background:var(--surface);color:var(--ink);border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.45);padding:16px;display:grid;gap:10px;cursor:auto;user-select:auto;font-size:14px}
+.sim-pannello h2{margin:0;font-size:15px}
+.sim-pannello .riga{display:flex;gap:8px}
+.sim-pannello .riga input{flex:1}
+.sim-pannello .chips{display:flex;flex-wrap:wrap;gap:6px}
+.sim-pannello .nota{font-size:12px;color:var(--ink-3)}
+.sim-pannello .btn{justify-content:flex-start}
+.sim-pannello .btn span{color:var(--ink-3);font-weight:500}

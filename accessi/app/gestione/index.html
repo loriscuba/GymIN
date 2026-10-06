@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GymIN · Gestione accessi</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="../css/base.css?v=__BUILD__">
+<link rel="stylesheet" href="../css/gestione.css?v=__BUILD__">
+</head>
+<body>
+<header class="testata">
+  <span class="marchio">Gym<b>IN</b></span><span class="sotto">Gestione accessi</span>
+  <span class="spazio"></span>
+  <span id="utente" class="utente"></span>
+  <button id="esci" class="btn piccolo" hidden>Esci</button>
+</header>
+
+<div id="offline" class="banner bad" style="margin:16px 24px 0" hidden>Sei offline: le funzioni di gestione sono disponibili solo online.</div>
+
+<section id="v-login" class="card login" hidden>
+  <h2>Accedi</h2>
+  <p>Usa le stesse credenziali del gestionale GymIN.</p>
+  <form id="f-login" class="campo">
+    <input id="l-email" type="email" placeholder="Email" autocomplete="username" required>
+    <input id="l-pwd" type="password" placeholder="Password" autocomplete="current-password" required>
+    <p id="l-errore" class="banner bad" hidden></p>
+    <button class="btn primario">Accedi</button>
+  </form>
+</section>
+
+<section id="v-config" class="card login" hidden>
+  <h2>Configurazione mancante</h2>
+  <p>Imposta SUPABASE_URL e SUPABASE_ANON_KEY (vedi accessi/README.md).</p>
+</section>
+
+<div id="v-app" hidden>
+  <nav class="schede" id="schede">
+    <button data-scheda="tessere" class="attiva">Tessere</button>
+    <button data-scheda="ingressi">Annulla ingresso</button>
+    <button data-scheda="storico">Storico accessi</button>
+    <button data-scheda="verificare">Offline da verificare<span id="n-verificare" class="conta" hidden></span></button>
+    <button data-scheda="terminali">Terminali</button>
+  </nav>
+  <main id="contenuto"></main>
+</div>
+
+<div id="toast" class="toast" hidden></div>
+
+<script src="../config.js?v=__BUILD__" onerror="void 0"></script>
+<script type="module" src="../js/gestione.js?v=__BUILD__"></script>
+</body>
+</html>

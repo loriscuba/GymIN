@@ -1,0 +1,66 @@
+{
+  "_nota": "Casi condivisi: verificati sia su decidiAbbonamenti() (JS) sia su accessi_decidi() (SQL).",
+  "casi": [
+    { "nome": "nessun abbonamento", "oggi": "2026-10-06", "abbonamenti": [],
+      "atteso": { "esito": "negato", "motivo_codice": "nessun_abbonamento", "motivo": "Nessun abbonamento" } },
+    { "nome": "scadenza valido", "oggi": "2026-10-06",
+      "abbonamenti": [{ "id": "a1", "tipo": "scadenza", "piano": "Open Mese", "data_inizio": "2026-09-20", "data_scadenza": "2026-10-20", "residuo": null }],
+      "atteso": { "esito": "ok", "abbonamento_id": "a1", "tipo": "scadenza", "giorni_rimasti": 14, "residuo_prima": null, "residuo_dopo": null } },
+    { "nome": "scadenza: ultimo giorno incluso", "oggi": "2026-10-06",
+      "abbonamenti": [{ "id": "a1", "tipo": "scadenza", "piano": "Open Mese", "data_inizio": "2026-09-06", "data_scadenza": "2026-10-06", "residuo": null }],
+      "atteso": { "esito": "ok", "abbonamento_id": "a1", "giorni_rimasti": 0 } },
+    { "nome": "scaduto ieri (stesso anno: gg/mm)", "oggi": "2026-10-06",
+      "abbonamenti": [{ "id": "a1", "tipo": "scadenza", "piano": "Open Mese", "data_inizio": "2026-09-05", "data_scadenza": "2026-10-05", "residuo": null }],
+      "atteso": { "esito": "negato", "motivo_codice": "scaduto", "motivo": "Abbonamento scaduto il 05/10" } },
+    { "nome": "scaduto anno precedente (gg/mm/aaaa), vale la scadenza più recente", "oggi": "2026-01-10",
+      "abbonamenti": [
+        { "id": "a1", "tipo": "scadenza", "piano": "Open Mese", "data_inizio": "2025-10-01", "data_scadenza": "2025-10-31", "residuo": null },
+        { "id": "a2", "tipo": "scadenza", "piano": "Open Mese", "data_inizio": "2025-11-01", "data_scadenza": "2025-12-15", "residuo": null }],
+      "atteso": { "esito": "negato", "motivo_codice": "scaduto", "motivo": "Abbonamento scaduto il 15/12/2025" } },
+    { "nome": "carnet valido scala 1", "oggi": "2026-10-06",
+      "abbonamenti": [{ "id": "c1", "tipo": "ingressi", "piano": "Carnet 10", "data_inizio": "2026-09-01", "data_scadenza": "2026-12-31", "residuo": 5 }],
+      "atteso": { "esito": "ok", "abbonamento_id": "c1", "tipo": "ingressi", "residuo_prima": 5, "residuo_dopo": 4 } },
+    { "nome": "carnet esaurito", "oggi": "2026-10-06",
+      "abbonamenti": [{ "id": "c1", "tipo": "ingressi", "piano": "Carnet 10", "data_inizio": "2026-09-01", "data_scadenza": "2026-12-31", "residuo": 0 }],
+      "atteso": { "esito": "negato", "motivo_codice": "ingressi_esauriti", "motivo": "Ingressi esauriti" } },
+    { "nome": "carnet con residuo ma scaduto", "oggi": "2026-10-06",
+      "abbonamenti": [{ "id": "c1", "tipo": "ingressi", "piano": "Carnet 10", "data_inizio": "2026-06-01", "data_scadenza": "2026-09-30", "residuo": 4 }],
+      "atteso": { "esito": "negato", "motivo_codice": "scaduto", "motivo": "Abbonamento scaduto il 30/09" } },
+    { "nome": "carnet esaurito e scaduto: vince scaduto", "oggi": "2026-10-06",
+      "abbonamenti": [{ "id": "c1", "tipo": "ingressi", "piano": "Carnet 10", "data_inizio": "2026-06-01", "data_scadenza": "2026-09-30", "residuo": 0 }],
+      "atteso": { "esito": "negato", "motivo_codice": "scaduto" } },
+    { "nome": "non ancora attivo", "oggi": "2026-10-06",
+      "abbonamenti": [{ "id": "a1", "tipo": "scadenza", "piano": "Open Mese", "data_inizio": "2026-10-10", "data_scadenza": "2026-11-10", "residuo": null }],
+      "atteso": { "esito": "negato", "motivo_codice": "non_ancora_attivo", "motivo": "Abbonamento valido dal 10/10" } },
+    { "nome": "priorità: scadenza batte carnet (non consuma)", "oggi": "2026-10-06",
+      "abbonamenti": [
+        { "id": "c1", "tipo": "ingressi", "piano": "Carnet 10", "data_inizio": "2026-09-01", "data_scadenza": "2026-10-08", "residuo": 3 },
+        { "id": "a1", "tipo": "scadenza", "piano": "Open Mese", "data_inizio": "2026-09-20", "data_scadenza": "2026-10-20", "residuo": null }],
+      "atteso": { "esito": "ok", "abbonamento_id": "a1", "tipo": "scadenza", "residuo_dopo": null } },
+    { "nome": "priorità: due carnet, scala quello che scade prima", "oggi": "2026-10-06",
+      "abbonamenti": [
+        { "id": "c2", "tipo": "ingressi", "piano": "Carnet 10", "data_inizio": "2026-09-01", "data_scadenza": "2027-03-01", "residuo": 8 },
+        { "id": "c1", "tipo": "ingressi", "piano": "Carnet 5", "data_inizio": "2026-08-01", "data_scadenza": "2026-11-01", "residuo": 2 }],
+      "atteso": { "esito": "ok", "abbonamento_id": "c1", "residuo_prima": 2, "residuo_dopo": 1 } },
+    { "nome": "priorità: carnet esaurito ignorato se c'è un altro carnet valido", "oggi": "2026-10-06",
+      "abbonamenti": [
+        { "id": "c1", "tipo": "ingressi", "piano": "Carnet 5", "data_inizio": "2026-08-01", "data_scadenza": "2026-10-10", "residuo": 0 },
+        { "id": "c2", "tipo": "ingressi", "piano": "Carnet 10", "data_inizio": "2026-09-01", "data_scadenza": "2027-03-01", "residuo": 8 }],
+      "atteso": { "esito": "ok", "abbonamento_id": "c2", "residuo_dopo": 7 } },
+    { "nome": "priorità: scaduto + valido -> valido", "oggi": "2026-10-06",
+      "abbonamenti": [
+        { "id": "a0", "tipo": "scadenza", "piano": "Open Mese", "data_inizio": "2026-08-01", "data_scadenza": "2026-08-31", "residuo": null },
+        { "id": "a1", "tipo": "scadenza", "piano": "Trimestrale", "data_inizio": "2026-09-01", "data_scadenza": "2026-11-30", "residuo": null }],
+      "atteso": { "esito": "ok", "abbonamento_id": "a1", "giorni_rimasti": 55 } },
+    { "nome": "priorità: due a scadenza, quella che dura di più", "oggi": "2026-10-06",
+      "abbonamenti": [
+        { "id": "a1", "tipo": "scadenza", "piano": "Open Mese", "data_inizio": "2026-09-20", "data_scadenza": "2026-10-20", "residuo": null },
+        { "id": "a2", "tipo": "scadenza", "piano": "Annuale", "data_inizio": "2026-01-01", "data_scadenza": "2026-12-31", "residuo": null }],
+      "atteso": { "esito": "ok", "abbonamento_id": "a2" } },
+    { "nome": "esauriti ha priorità su non ancora attivo", "oggi": "2026-10-06",
+      "abbonamenti": [
+        { "id": "c1", "tipo": "ingressi", "piano": "Carnet 5", "data_inizio": "2026-08-01", "data_scadenza": "2026-12-31", "residuo": 0 },
+        { "id": "a1", "tipo": "scadenza", "piano": "Open Mese", "data_inizio": "2026-11-01", "data_scadenza": "2026-11-30", "residuo": null }],
+      "atteso": { "esito": "negato", "motivo_codice": "ingressi_esauriti" } }
+  ]
+}

@@ -1,0 +1,42 @@
+/* GymIN Accessi · design tokens (gli stessi di web/index.html di GymIN) */
+:root{
+  --bg:#f4f5f7;--surface:#fff;--surface-2:#f9fafb;--sidebar:#14181f;--ink:#161b22;--ink-2:#475067;--ink-3:#8a93a6;
+  --line:#e6e8ee;--accent:#f4511e;--accent-soft:#fff0eb;--accent-ink:#c23c13;--blue:#2563eb;--teal:#0d9488;--violet:#7c3aed;--slate:#64748b;
+  --good:#15803d;--good-bg:#e7f6ec;--warn:#b45309;--warn-bg:#fdf2e2;--bad:#c0362c;--bad-bg:#fae9e7;
+  --shadow:0 1px 2px rgba(16,22,34,.06),0 8px 24px rgba(16,22,34,.05);--radius:14px;
+  --font:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-display:"Archivo","IBM Plex Sans",system-ui,"Segoe UI",sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0c0f14;--surface:#151a22;--surface-2:#11161d;--sidebar:#0a0d12;--ink:#eef1f6;--ink-2:#aab3c4;--ink-3:#6f7889;
+    --line:#262d38;--accent:#ff6b43;--accent-soft:#2a1811;--accent-ink:#ff8a67;--blue:#5b8def;--teal:#2dd4bf;--violet:#a78bfa;--slate:#94a3b8;
+    --good:#4ade80;--good-bg:#12261a;--warn:#fbbf24;--warn-bg:#2a2010;--bad:#f87171;--bad-bg:#2a1513;
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 30px rgba(0,0,0,.35);color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0c0f14;--surface:#151a22;--surface-2:#11161d;--sidebar:#0a0d12;--ink:#eef1f6;--ink-2:#aab3c4;--ink-3:#6f7889;
+  --line:#262d38;--accent:#ff6b43;--accent-soft:#2a1811;--accent-ink:#ff8a67;--blue:#5b8def;--teal:#2dd4bf;--violet:#a78bfa;--slate:#94a3b8;
+  --good:#4ade80;--good-bg:#12261a;--warn:#fbbf24;--warn-bg:#2a2010;--bad:#f87171;--bad-bg:#2a1513;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 30px rgba(0,0,0,.35);color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--font);line-height:1.5;-webkit-font-smoothing:antialiased}
+[hidden]{display:none !important}
+.marchio{font-family:var(--font-display);font-weight:800;letter-spacing:-.02em}
+.marchio b{color:var(--accent)}
+
+/* controlli (stile GymIN) */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;font:600 14px/1 var(--font);padding:10px 16px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer;white-space:nowrap}
+.btn:hover{border-color:var(--ink-3)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn.primario{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.primario:hover{filter:brightness(1.05)}
+.btn.pericolo{color:var(--bad);border-color:color-mix(in srgb,var(--bad) 40%,var(--line))}
+.btn.piccolo{padding:6px 10px;font-size:13px}
+input,select,textarea{font:14px/1.3 var(--font);padding:9px 11px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--ink);min-width:0}
+input:focus,select:focus,textarea:focus{outline:2px solid color-mix(in srgb,var(--accent) 45%,transparent);border-color:var(--accent)}
+label{font-size:13px;color:var(--ink-2);font-weight:500}

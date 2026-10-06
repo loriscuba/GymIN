@@ -46,6 +46,17 @@ jobs:
             echo "Variabili Supabase assenti: uso il config.js del repo."
           fi
 
+      # Sotto-progetto Accessi (terminale kiosk + gestione tessere) -> /accessi/
+      # Build propria, senza dipendenze; usa le stesse Variables (solo chiave anon).
+      - name: Build Accessi
+        env:
+          SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ vars.SUPABASE_ANON_KEY }}
+        run: |
+          cd prod/accessi
+          BUILD_VERSION="${GITHUB_SHA::8}-$(date +%s)" node scripts/build.mjs --config-gymin
+          cp -r dist ../web/accessi
+
       - name: Scarica il branch test (se esiste)
         id: test
         run: |
@@ -72,6 +83,27 @@ jobs:
           mkdir -p prod/web/test
           cp -r testsrc/web/. prod/web/test/
           echo "Sito di test pubblicato in /test/ (schema test)."
+
+      # Accessi di test -> /test/accessi/ (stesso progetto Supabase, SOLO schema "test").
+      # Usa il codice del branch test se contiene accessi/, altrimenti quello di main.
+      - name: Build Accessi (test)
+        env:
+          SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ vars.SUPABASE_ANON_KEY }}
+          DB_SCHEMA: test
+        run: |
+          SRC=prod/accessi
+          [ -f testsrc/accessi/scripts/build.mjs ] && SRC=testsrc/accessi
+          OUT="$PWD/prod/web/test/accessi"
+          (cd "$SRC" && BUILD_VERSION="${GITHUB_SHA::8}-$(date +%s)" node scripts/build.mjs --config-gymin)
+          mkdir -p "$OUT"
+          cp -r "$SRC/dist/." "$OUT/"
+          # etichetta ben visibile per non confondere test e produzione
+          for f in "$OUT/ingresso/index.html" "$OUT/gestione/index.html"; do
+            sed -i 's#<title>#<title>[TEST] #' "$f"
+            sed -i 's#<body>#<body><div style="position:fixed;top:0;left:50%;transform:translateX(-50%);z-index:9999;background:\#d97706;color:\#fff;font:700 12px/1 system-ui,sans-serif;padding:5px 14px;border-radius:0 0 8px 8px;pointer-events:none">AMBIENTE DI TEST</div>#' "$f"
+          done
+          echo "Accessi di test pubblicato in /test/accessi/ (schema test, sorgente: $SRC)."
 
       # Versione nei link a JS/config: dopo ogni deploy il browser scarica
       # i file nuovi invece di usare quelli vecchi in cache.
