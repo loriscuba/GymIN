@@ -1,10 +1,12 @@
 // Cruscotto "Import abbonamenti" (solo admin).
-// Legge abbonamenti.csv prodotto da tools/import-legacy/dbf_to_csv.py e lo confronta col DB.
+// Legge i file DBF del vecchio gestionale (scelti da Esplora risorse, vedi legacydbf.js)
+// oppure abbonamenti.csv prodotto da tools/import-legacy/dbf_to_csv.py, e li confronta col DB.
 // Scrive SOLO sulla tabella abbonamenti: non crea né modifica soci, piani o pagamenti.
 //   - socio collegato via soci.cod_cli, piano via piani.nome
 //   - stesso socio + piano + data_inizio = stesso abbonamento (niente doppioni)
 //   - righe importabili una a una o in blocco, sempre dopo conferma
 import { getSupa, fetchAll } from './data.js?v=__BUILD__';
+import { abbonamentiDaDbf } from './legacydbf.js?v=__BUILD__';
 
 const $ = (s, r = document) => r.querySelector(s);
 const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -49,15 +51,23 @@ const state = { filtro: 'importabili', query: '', soloCorrenti: true };
 export function initImporta(d) {
   deps = d;
   $('#imp-file').addEventListener('change', async (e) => {
-    const f = e.target.files[0]; if (!f) return;
+    const files = [...e.target.files]; if (!files.length) return;
     try {
-      csvRows = parseCSV(await f.text());
-      if (!csvRows.length || !('cod_cli' in csvRows[0]) || !('piano_nome' in csvRows[0])) {
-        csvRows = null; throw new Error('Il file non sembra abbonamenti.csv (mancano le colonne cod_cli / piano_nome)');
+      const csv = files.find((f) => /\.csv$/i.test(f.name));
+      if (csv) {
+        csvRows = parseCSV(await csv.text());
+        if (!csvRows.length || !('cod_cli' in csvRows[0]) || !('piano_nome' in csvRows[0])) {
+          csvRows = null; throw new Error('Il file non sembra abbonamenti.csv (mancano le colonne cod_cli / piano_nome)');
+        }
+        $('#imp-nomefile').textContent = `${csv.name} · ${csvRows.length} righe`;
+      } else {
+        $('#imp-nomefile').textContent = 'Lettura file DBF…';
+        const { rows: r, info } = await abbonamentiDaDbf(files);
+        csvRows = r;
+        $('#imp-nomefile').textContent = `${info} · ${csvRows.length} abbonamenti`;
       }
-      $('#imp-nomefile').textContent = `${f.name} · ${csvRows.length} righe`;
       await analizza();
-    } catch (err) { deps.toast(`Errore lettura CSV: ${err.message || err}`, 'warn'); }
+    } catch (err) { $('#imp-nomefile').textContent = ''; deps.toast(`Errore lettura file: ${err.message || err}`, 'warn'); }
     e.target.value = '';
   });
   $('#imp-correnti').addEventListener('change', (e) => { state.soloCorrenti = e.target.checked; if (csvRows) analizza(); });
@@ -162,7 +172,7 @@ function render() {
     const n = c.dataset.f === 'tutti' ? rows.length : c.dataset.f === 'importabili' ? cnt('nuovo') + cnt('diverso') : cnt(c.dataset.f);
     c.querySelector('span').textContent = csvRows ? ` ${n}` : '';
   });
-  if (!csvRows) { $('#imp-table tbody').innerHTML = msg('Carica il file <b>abbonamenti.csv</b> generato da tools/import-legacy (npm run convert)'); aggiornaBottone(); return; }
+  if (!csvRows) { $('#imp-table tbody').innerHTML = msg('Clicca <b>Scegli file</b> e seleziona dalla cartella del vecchio gestionale <b>tessere.dbf</b>, <b>anagraf.dbf</b>, <b>cnt_bank.dbf</b> e <b>accessi.dbf</b> (Ctrl+clic per sceglierne più di uno).<br>In alternativa puoi caricare abbonamenti.csv.'); aggiornaBottone(); return; }
   const list = filtrate();
   $('#imp-table tbody').innerHTML = list.slice(0, SHOW_MAX).map((r) => {
     const [lab, cls] = STATI[r.stato];

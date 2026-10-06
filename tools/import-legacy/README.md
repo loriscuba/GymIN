@@ -112,9 +112,13 @@ npm run import:replace     # rimuove gli abbonamenti esistenti dei soci e reimpo
 
 Per riallineare **solo gli abbonamenti** senza toccare le anagrafiche:
 
-1. `npm run convert` sul PC con il backup → `data/out/abbonamenti.csv`
-2. In GymIN (utente admin) → menu **Import abbonamenti** → *Carica abbonamenti.csv*
-3. Il file viene confrontato col DB (sola lettura) e ogni riga è classificata:
+1. In GymIN (utente admin) → menu **Import abbonamenti** → *Scegli file (DBF o CSV)*
+2. Da Esplora risorse, nella cartella del vecchio gestionale, seleziona con Ctrl+clic
+   `tessere.dbf` (obbligatorio) e `anagraf.dbf`, `cnt_bank.dbf`, `accessi.dbf` (consigliati).
+   La conversione avviene nel browser (`web/js/legacydbf.js`, stesse regole di `dbf_to_csv.py`):
+   niente Python/npm e i file non vengono caricati da nessuna parte. In alternativa si può
+   scegliere l'`abbonamenti.csv` prodotto da `npm run convert`.
+3. Gli abbonamenti vengono confrontati col DB (sola lettura) e ogni riga è classificata:
    **Nuovo**, **Diverso** (scadenza/entrate/stato cambiati, mostra prima → dopo),
    **Già presente**, **Socio mancante**, **Piano mancante**.
 4. Si importa riga per riga (*Importa* / *Aggiorna*) o in blocco (*Importa selezionati*), sempre con conferma.
