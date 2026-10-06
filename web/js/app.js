@@ -279,6 +279,7 @@ function populateSettingsForm() {
   $('#s-mailpit-url').value = cfg.MAILPIT_URL || '';
   $('#s-mailer-api-url').value = cfg.MAILER_API_URL || '';
   $('#s-mailer-api-key').value = cfg.MAILER_API_KEY || '';
+  $('#s-contatti').value = contattiRule(cfg);
 }
 function openSettingsModal() {
   populateSettingsForm();
@@ -290,13 +291,33 @@ function saveSettingsFromModal(e) {
     MAILPIT_URL: $('#s-mailpit-url').value.trim(),
     MAILER_API_URL: $('#s-mailer-api-url').value.trim(),
     MAILER_API_KEY: $('#s-mailer-api-key').value.trim(),
+    CONTATTI_OBBLIGATORI: $('#s-contatti').value,
   };
   saveSettingsToStorage(form);
   closeModal('modal-settings');
-  toast('Impostazioni email salvate nel browser', 'mail');
+  applyContattiRule();
+  toast('Impostazioni salvate nel browser', 'mail');
 }
 
 applyStoredConfig();
+
+// Recapiti obbligatori per il socio: 'uno' (default) | 'email' | 'telefono' | 'entrambi' | 'nessuno'
+const CONTATTI_RULES = {
+  uno: { tel: false, email: false, hint: '** almeno uno tra telefono ed email' },
+  email: { tel: false, email: true, hint: '** email obbligatoria' },
+  telefono: { tel: true, email: false, hint: '** telefono obbligatorio' },
+  entrambi: { tel: true, email: true, hint: '** telefono ed email obbligatori' },
+  nessuno: { tel: false, email: false, hint: '' },
+};
+const contattiRule = (cfg = window.GYMIN_CONFIG || {}) => (CONTATTI_RULES[cfg.CONTATTI_OBBLIGATORI] ? cfg.CONTATTI_OBBLIGATORI : 'uno');
+function applyContattiRule() {
+  const key = contattiRule(), rule = CONTATTI_RULES[key];
+  const mark = (wrap, on) => { $(wrap).classList.toggle('req-alt', on); $(`${wrap} label i`).hidden = !on; };
+  mark('#f-tel-wrap', key === 'uno' || rule.tel);
+  mark('#f-email-wrap', key === 'uno' || rule.email);
+  $('#f-contatti-hint').textContent = rule.hint;
+  $('#f-contatti-hint').hidden = !rule.hint;
+}
 
 // ---------- MAIL ----------
 async function toMailpit(mail) {
@@ -399,6 +420,7 @@ function openSocioModal(mode = 'new', sid = null) {
   $('#socio-sub').textContent = isNew ? 'Anagrafica + primo abbonamento' : 'Aggiorna i dati anagrafici';
   $('#socio-submit').textContent = isNew ? 'Aggiungi socio' : 'Salva modifiche';
   $('#socio-abbsection').hidden = !isNew;
+  applyContattiRule();
   closeModal('modal-scheda');
   if (isNew) {
     $('#f-inizio').value = new Date().toISOString().slice(0, 10);
@@ -546,12 +568,15 @@ function socioError(msg, fields = []) {
   return !msg;
 }
 
-// Regole: nome e cognome obbligatori; almeno uno tra telefono ed email; formati validi.
+// Regole: nome e cognome obbligatori; recapiti secondo CONTATTI_OBBLIGATORI (Impostazioni); formati validi.
 function validateSocio(f) {
   if (!f.firstName || !f.lastName) {
     return socioError('Nome e cognome sono obbligatori.', [!f.firstName && '#f-nome', !f.lastName && '#f-cognome'].filter(Boolean));
   }
-  if (!f.telefono && !f.email) return socioError('Inserisci almeno un recapito: telefono oppure email.', ['#f-tel', '#f-email']);
+  const key = contattiRule(), rule = CONTATTI_RULES[key];
+  if (key === 'uno' && !f.telefono && !f.email) return socioError('Inserisci almeno un recapito: telefono oppure email.', ['#f-tel', '#f-email']);
+  if (rule.tel && !f.telefono) return socioError('Il telefono è obbligatorio.', ['#f-tel']);
+  if (rule.email && !f.email) return socioError('L\'email è obbligatoria.', ['#f-email']);
   if (f.email && !EMAIL_RE.test(f.email)) return socioError('L\'indirizzo email non è valido.', ['#f-email']);
   if (f.telefono && normTel(f.telefono).length < 6) return socioError('Il numero di telefono non è valido.', ['#f-tel']);
   return socioError('');
