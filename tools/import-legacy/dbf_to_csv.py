@@ -21,9 +21,9 @@ IMPORTANTE sul gestionale legacy: è un sistema di controllo accessi PREPAGATO
 ricaricano ingressi ("Ricarica N scatti") pagando importi variabili, registrati
 in cnt_bank.dbf. Quindi:
   - piani.prezzo resta 0 (da compilare a mano nel gestionale nuovo);
-  - le "entrate" dei carnet (N ingressi): se è presente accessi.dbf si calcola
-    il RESIDUO ESATTO (scatti ricaricati - accessi 'N ingressi' consumati),
-    altrimenti si stima dall'ultima ricarica.
+  - le "entrate" dei carnet (N ingressi) sono il contatore della tessera
+    (tessere.SCATTISING); solo se manca si calcolano da ricariche e accessi
+    ("Attivazione servizio") o si stimano dall'ultima ricarica.
 
 Nessuna dipendenza esterna: parser DBF/FPT minimale incluso.
 
@@ -203,7 +203,9 @@ def count_ingressi_consumati(path):
             continue
         o, l, _ = idx["COMMENTO"]
         com = rec[o:o + l].decode("latin1", "replace").lower()
-        if "ignorat" in com or "negat" in com:
+        # ingresso valido = "Attivazione servizio"; gli altri (tessera scaduta,
+        # disabilitata, ignorata, esaurita...) sono passaggi rifiutati
+        if "attivazione servizio" not in com:
             continue
         o, l, _ = idx["COD_CLI"]
         raw = rec[o:o + l]
@@ -269,6 +271,7 @@ def main():
             "open_ended": "true" if is_open_ended(gf) else "false",
             "entrate_residue": "",
             "disabilitato": "true" if r["DISABLED"] == "1" else "false",
+            "_scattising": r.get("SCATTISING"),
         })
     # marca l'abbonamento piu recente per socio (data_scadenza massima)
     latest = {}
@@ -278,9 +281,16 @@ def main():
             latest[k] = i
     for i, a in enumerate(abb):
         a["is_latest"] = "1" if latest.get(a["cod_cli"]) == i else "0"
-        # entrate carnet: residuo ESATTO se abbiamo gli accessi, altrimenti
+        # entrate carnet: contatore della tessera (SCATTISING), lo stesso che il
+        # gestionale usa per far entrare; se manca, residuo dagli accessi o
         # stima dall'ultima ricarica (best-effort).
-        if a["is_latest"] == "1" and "ingress" in a["piano_nome"].lower():
+        sc = a.pop("_scattising")
+        if a["is_latest"] == "1" and "ingress" in a["piano_nome"].lower() and sc not in (None, ""):
+            try:
+                a["entrate_residue"] = str(max(0, int(float(sc))))
+            except ValueError:
+                pass
+        elif a["is_latest"] == "1" and "ingress" in a["piano_nome"].lower():
             ric = ricariche_per_cli.get(a["cod_cli"])
             if ric:
                 if "residuo" in ric:

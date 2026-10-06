@@ -172,7 +172,7 @@ function render() {
     const n = c.dataset.f === 'tutti' ? rows.length : c.dataset.f === 'importabili' ? cnt('nuovo') + cnt('diverso') : cnt(c.dataset.f);
     c.querySelector('span').textContent = csvRows ? ` ${n}` : '';
   });
-  if (!csvRows) { $('#imp-table tbody').innerHTML = msg('Clicca <b>Scegli file</b> e seleziona dalla cartella del vecchio gestionale <b>tessere.dbf</b>, <b>anagraf.dbf</b>, <b>cnt_bank.dbf</b> e <b>accessi.dbf</b> (Ctrl+clic per sceglierne più di uno).<br>In alternativa puoi caricare abbonamenti.csv.'); aggiornaBottone(); return; }
+  if (!csvRows) { $('#imp-table tbody').innerHTML = msg('Clicca <b>Scegli file</b> e seleziona dalla cartella del vecchio gestionale <b>tessere.dbf</b> e <b>anagraf.dbf</b> (Ctrl+clic per sceglierne più di uno).<br>In alternativa puoi caricare abbonamenti.csv.'); aggiornaBottone(); return; }
   const list = filtrate();
   $('#imp-table tbody').innerHTML = list.slice(0, SHOW_MAX).map((r) => {
     const [lab, cls] = STATI[r.stato];
