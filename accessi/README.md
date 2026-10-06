@@ -8,7 +8,7 @@ Terminale di **controllo accessi** per l'ingresso della palestra, più una pagin
 | `/accessi/ingresso/` | PC dell'ingresso (Chrome in modalità kiosk) | Passi la tessera RFID e lo schermo diventa verde o rosso, con suono, nome del socio e abbonamento |
 | `/accessi/gestione/` | Staff (login di GymIN) | Associa le tessere, annulla un ingresso, consulta lo storico, gestisce gli accessi offline da verificare e i terminali |
 
-> **Stato:** fase 1 (online) e fase 2 (offline: PWA, cache locale, coda eventi, sincronizzazione, conflitti). In arrivo: fase 3 (script kiosk e guida di installazione).
+> **Stato:** completo. Fase 1 (online), fase 2 (offline: PWA, cache locale, coda eventi, sincronizzazione, conflitti) e fase 3 (script kiosk per Windows e guida di installazione).
 
 ## Struttura
 
@@ -26,6 +26,7 @@ accessi/
 │  ├─ js/demo.js           # dati demo in memoria per la simulazione
 │  ├─ sw.js                # service worker (PWA): la pagina funziona anche senza internet
 │  └─ manifest.webmanifest
+├─ kiosk/                  # PC del cliente: script .bat di avvio kiosk + LEGGIMI.txt (installazione)
 ├─ sql/seed-dev.sql        # dati demo per il DB di SVILUPPO (mai in produzione)
 ├─ scripts/                # dev-server, build, test-db, seed-dev (nessuna dipendenza esterna)
 └─ test/                   # test unitari (node:test) e test SQL su Postgres vero (test/db)
@@ -221,7 +222,38 @@ La pubblicazione è automatica su GitHub Pages insieme a GymIN (`.github/workflo
 
 La build (`npm run build`) copia `app/` in `dist/` e genera `config.js` dalle Variables `SUPABASE_URL` e `SUPABASE_ANON_KEY` del repo (in mancanza, dal `web/config.js` di GymIN). Aggiunge anche la versione ai link, per invalidare la cache.
 
-Prima di usarlo con i dati veri bisogna **applicare la migrazione** in Supabase e creare un terminale da `/gestione`.
+Prima di usarlo con i dati veri bisogna **applicare le migrazioni** in Supabase e creare un terminale da `/gestione` (vedi la checklist qui sotto).
+
+### Messa in produzione (checklist)
+
+1. **Supabase, schema `public`**: SQL Editor → esegui `supabase/migrations/20261006120000_accessi_terminale.sql`, poi `20261007120000_accessi_offline.sql`. Sono solo aggiunte, nessun dato esistente viene toccato.
+2. Apri `/accessi/gestione/` con un utente staff di GymIN e crea il terminale da **Terminali → Nuovo terminale**. Copia il token: viene mostrato una sola volta.
+3. **Tessere**: usa "Associazione rapida" per il primo caricamento. Le tessere passate al terminale e non ancora associate finiscono in "Tessere lette non associate".
+4. Installa il PC dell'ingresso seguendo il paragrafo successivo.
+5. Esegui la **procedura di test offline** sul PC del cliente.
+
+## Installazione dal cliente (PC Windows in kiosk)
+
+Tutto il necessario è nella cartella [`kiosk/`](kiosk/). La guida passo-passo per chi installa è [`kiosk/LEGGIMI.txt`](kiosk/LEGGIMI.txt).
+
+| File | Cosa fa |
+|---|---|
+| `avvia-ingresso.bat` | Apre Chrome in **modalità kiosk** su `/ingresso`. Usa un **profilo dedicato** (`%LOCALAPPDATA%\GymIN-Ingresso\chrome-profilo`) che non cancella i dati alla chiusura, quindi service worker, cache e coda offline restano sul PC. Passa il flag **`--autoplay-policy=no-user-gesture-required`** per i suoni. Se Chrome si chiude o va in crash lo riapre dopo 5 s, e non apre mai due kiosk. L'URL si cambia nella prima riga di configurazione. |
+| `installa-avvio-automatico.bat` | Crea il collegamento "GymIN Ingresso" (finestra ridotta a icona) nella cartella **Esecuzione automatica** (`shell:startup`), più "GymIN Ingresso" e "Ferma GymIN Ingresso" sul Desktop |
+| `ferma-ingresso.bat` / `rimuovi-avvio-automatico.bat` | Chiude il kiosk senza che si riapra / toglie l'avvio automatico |
+| `configura-windows.bat` | Va eseguito come amministratore. Disattiva sospensione, ibernazione, spegnimento dello schermo e sospensione selettiva USB (il lettore resta sempre attivo). Sincronizza l'orologio in automatico (servizio Ora di Windows, `time.windows.com` e `ntp1.inrim.it`), imposta il fuso di Roma e disattiva lo screen saver |
+
+**Impostazioni Windows da fare a mano** (dettagli in `LEGGIMI.txt`):
+- **Account e sessione**: account locale dedicato, non amministratore, con **accesso automatico** (`netplwiz`), nessuna richiesta di accesso al rientro e nessuno screen saver.
+- **Schermo**: niente sospensione né spegnimento (lo fa già lo script, ma va verificato).
+- **Volume fisso**: livello deciso una volta, combinazione suoni di Windows su "Nessun suono", "Comunicazioni → Non fare nulla", casse come dispositivo predefinito.
+- **Notifiche e aggiornamenti**: notifiche disattivate e orario di attività di Windows Update sull'orario di apertura, così i riavvii avvengono a palestra chiusa e il terminale riparte da solo.
+- **Orologio**: "Imposta ora automaticamente" e fuso UTC+01:00 Roma. Se l'orologio è sfasato di oltre 3 minuti, il terminale lo segnala.
+- **Profilo Chrome**: niente programmi di pulizia sulla cartella del profilo, niente "cancella dati alla chiusura", niente modalità ospite o in incognito.
+
+**La prima apertura deve avvenire online**: installa l'app e scarica i dati. Il token si incolla nella schermata "Configura il terminale".
+
+**Uscire dal kiosk**: tasto Windows (o Alt+Tab) → Desktop → "Ferma GymIN Ingresso". Alt+F4 chiude Chrome, ma lo script lo riapre dopo 5 s.
 
 ## Cosa resta in GymIN (non duplicato)
 

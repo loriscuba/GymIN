@@ -1,0 +1,3 @@
+# file per il PC Windows del cliente: salvati con fine riga CRLF, senza conversioni
+kiosk/*.bat -text
+kiosk/*.txt -text
