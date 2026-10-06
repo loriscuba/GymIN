@@ -29,19 +29,17 @@ Il gestionale legacy è un **sistema di controllo accessi prepagato "a scatti"**
   e le tabelle tariffe non hanno un campo prezzo. I soci pagano ricaricando
   ingressi (importi variabili). Perciò `piani.prezzo` resta `0`, da compilare nel
   gestionale nuovo.
-- **Entrate dei carnet ("N ingressi"): residuo esatto se disponibile.** Da
-  `cnt_bank.dbf` si leggono i movimenti "Ricarica N scatti" per socio. Se è
-  presente anche `accessi.dbf`, l'`entrate_residue` viene calcolato in modo
-  **esatto**:
+- **Entrate dei carnet ("N ingressi"): contatore della tessera.** L'`entrate_residue`
+  è il campo `SCATTISING` di `tessere.dbf`, cioè il contatore che il gestionale
+  stesso usa per far entrare (mai < 0). Solo se il campo manca si ricalcola:
 
   ```
-  residuo = scatti ricaricati − accessi 'N ingressi' validi consumati   (mai < 0)
+  residuo = scatti ricaricati (cnt_bank.dbf) − accessi "Attivazione servizio" (accessi.dbf)
   ```
 
-  Gli accessi ignorati/negati (campo COMMENTO) sono esclusi; ogni accesso valido
-  sul servizio "N ingressi" consuma 1 scatto (verificato: sono quasi tutti
-  entrate, `DIREZIONE=A`, nessun doppio conteggio). Senza `accessi.dbf` si usa
-  invece la stima dall'ultima ricarica.
+  Attenzione: in `accessi.dbf` ogni passaggio della tessera è registrato, anche
+  quelli rifiutati ("Tessera scaduta", "Disabilitata", "Disponibilità esaurita",
+  "Tessera ignorata…"). Solo "Attivazione servizio" è un ingresso che consuma uno scatto.
 
 ### Soci senza abbonamento
 
@@ -66,7 +64,7 @@ la sostituisce con `data_inizio + durata del piano`.
 1. Estrai dal backup del gestionale questi file in `./data/`:
    - `anagraf.dbf`, `anagraf.fpt`, `tessere.dbf` (obbligatori)
    - `cnt_bank.dbf` (opzionale, per le ricariche/entrate dei carnet)
-   - `accessi.dbf` (opzionale, per il residuo esatto dei carnet)
+   - `accessi.dbf` (opzionale, usato solo se `tessere.dbf` non ha il campo `SCATTISING`)
 2. Python 3 (nessuna dipendenza esterna per la conversione).
 3. Node 18+ e le dipendenze per l'import:
    ```bash
@@ -114,7 +112,8 @@ Per riallineare **solo gli abbonamenti** senza toccare le anagrafiche:
 
 1. In GymIN (utente admin) → menu **Import abbonamenti** → *Scegli file (DBF o CSV)*
 2. Da Esplora risorse, nella cartella del vecchio gestionale, seleziona con Ctrl+clic
-   `tessere.dbf` (obbligatorio) e `anagraf.dbf`, `cnt_bank.dbf`, `accessi.dbf` (consigliati).
+   `tessere.dbf` (obbligatorio) e `anagraf.dbf` (consigliato). `cnt_bank.dbf` e `accessi.dbf`
+   non servono più: le entrate dei carnet vengono dal contatore della tessera.
    La conversione avviene nel browser (`web/js/legacydbf.js`, stesse regole di `dbf_to_csv.py`):
    niente Python/npm e i file non vengono caricati da nessuna parte. In alternativa si può
    scegliere l'`abbonamenti.csv` prodotto da `npm run convert`.
@@ -141,8 +140,8 @@ Regole: scrive solo su `abbonamenti` (mai `soci`, `piani`, `pagamenti`); stesso 
 - **Prezzi dei piani** (`piani.prezzo = 0`): non esistono nel gestionale legacy
   (sistema prepagato a scatti, listino vuoto). Vanno inseriti a mano nel nuovo
   gestionale in base al listino attuale della palestra.
-- **Entrate dei carnet** (`N ingressi`): con `accessi.dbf` il residuo è esatto
-  (scatti ricaricati − accessi consumati); senza, è stimato dall'ultima ricarica.
+- **Entrate dei carnet** (`N ingressi`): presi dal contatore della tessera
+  (`tessere.SCATTISING`), come li vede il vecchio gestionale.
 - **Soci senza abbonamento**: importati e marcati (`senza_abbonamento`); l'app li
   mostra con badge e filtro dedicati (modifiche in `web/js/data.js`,
   `web/js/app.js`, `web/index.html`).

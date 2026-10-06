@@ -2,8 +2,10 @@
 // Porting della parte abbonamenti di tools/import-legacy/dbf_to_csv.py (stesse regole):
 //   tessere.dbf  (obbligatorio) abbonamenti; esclusi i record tecnici "Ufficio"
 //   anagraf.dbf  (opzionale)    esclude "Cliente generico" e codici non in anagrafica
-//   cnt_bank.dbf (opzionale)    ricariche "N scatti" → entrate dei carnet
-//   accessi.dbf  (opzionale)    accessi consumati → residuo ESATTO dei carnet
+// Entrate residue dei carnet: contatore della tessera (tessere.SCATTISING), lo stesso che il
+// gestionale usa per far entrare. Solo se il campo manca si ricalcolano da:
+//   cnt_bank.dbf (opzionale)    ricariche "N scatti"
+//   accessi.dbf  (opzionale)    ingressi consumati (solo "Attivazione servizio")
 // I file restano nel browser: non vengono caricati da nessuna parte.
 
 const dec = new TextDecoder('windows-1252');
@@ -62,8 +64,8 @@ function consumati(rows) {
   const used = {};
   for (const r of rows) {
     if (!(r.SERVIZIO || '').toLowerCase().includes('ingress')) continue;
-    const com = (r.COMMENTO || '').toLowerCase();
-    if (com.includes('ignorat') || com.includes('negat')) continue;
+    // ingresso valido = "Attivazione servizio"; gli altri (tessera scaduta, disabilitata, ignorata…) sono rifiutati
+    if (!(r.COMMENTO || '').toLowerCase().includes('attivazione servizio')) continue;
     const cod = String(parseInt(r.COD_CLI, 10) || '');
     if (cod) used[cod] = (used[cod] || 0) + 1;
   }
@@ -77,9 +79,10 @@ export async function abbonamentiDaDbf(files) {
   if (!by['tessere.dbf']) throw new Error('Manca tessere.dbf: selezionalo insieme agli altri file');
   const leggi = async (n, want) => (by[n] ? readDbf(await by[n].arrayBuffer(), want) : null);
 
-  const tess = await leggi('tessere.dbf', ['COD_CLI', 'SERVIZIO', 'TIPO_SERV', 'G_INIZIO', 'G_FINE', 'DISABLED']);
+  const tess = await leggi('tessere.dbf', ['COD_CLI', 'SERVIZIO', 'TIPO_SERV', 'G_INIZIO', 'G_FINE', 'DISABLED', 'SCATTISING']);
   const anag = await leggi('anagraf.dbf', ['COD_CLI', 'NOME', 'COGNOME']);
-  const cnt = await leggi('cnt_bank.dbf', ['CAUSALE', 'BANCA', 'DATA_MOV']);
+  const contatore = tess.length > 0 && 'SCATTISING' in tess[0];
+  const cnt = !contatore && await leggi('cnt_bank.dbf', ['CAUSALE', 'BANCA', 'DATA_MOV']);
   const acc = cnt && await leggi('accessi.dbf', ['SERVIZIO', 'COMMENTO', 'COD_CLI']);
 
   const generico = (r) => r.COGNOME.trim().toUpperCase() === 'CLIENTE' && r.NOME.toUpperCase().includes('GENERICO');
@@ -101,7 +104,7 @@ export async function abbonamentiDaDbf(files) {
       cod_cli: cod, piano_nome: serv, tipo_serv: r.TIPO_SERV.trim(),
       data_inizio: r.G_INIZIO, data_scadenza: r.G_FINE,
       open_ended: r.G_FINE >= '2900-01-01' ? 'true' : 'false',
-      entrate_residue: '', disabilitato: r.DISABLED === '1' ? 'true' : 'false',
+      entrate_residue: '', scattising: r.SCATTISING, disabilitato: r.DISABLED === '1' ? 'true' : 'false',
     });
   }
   // abbonamento più recente per socio (data_scadenza massima)
@@ -109,11 +112,15 @@ export async function abbonamentiDaDbf(files) {
   abb.forEach((a, i) => { const k = a.cod_cli; if (!(k in latest) || (a.data_scadenza || '0000') > (abb[latest[k]].data_scadenza || '0000')) latest[k] = i; });
   abb.forEach((a, i) => {
     a.is_latest = latest[a.cod_cli] === i ? '1' : '0';
-    if (a.is_latest === '1' && a.piano_nome.toLowerCase().includes('ingress')) {
+    const carnet = a.is_latest === '1' && a.piano_nome.toLowerCase().includes('ingress');
+    if (carnet && contatore) a.entrate_residue = String(Math.max(0, parseInt(a.scattising, 10) || 0));
+    else if (carnet) {
       const p = ric[a.cod_cli];
       if (p) a.entrate_residue = 'residuo' in p ? String(p.residuo) : p.ultimi ? String(p.ultimi) : '';
     }
   });
+  abb.forEach((a) => delete a.scattising);
   const usati = ['tessere.dbf', anag && 'anagraf.dbf', cnt && 'cnt_bank.dbf', acc && 'accessi.dbf'].filter(Boolean);
-  return { rows: abb, info: `${usati.join(', ')}${acc ? ' · residuo carnet esatto' : cnt ? ' · residuo carnet stimato' : ''}` };
+  const nota = contatore ? ' · entrate carnet dal contatore tessera' : acc ? ' · entrate carnet calcolate dagli accessi' : cnt ? ' · entrate carnet stimate' : '';
+  return { rows: abb, info: `${usati.join(', ')}${nota}` };
 }
