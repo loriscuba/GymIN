@@ -1,4 +1,4 @@
-// Cruscotto "Import abbonamenti" (solo admin).
+// Cruscotto "Import abbonamenti" (visibile a tutti gli utenti staff).
 // Legge i file DBF del vecchio gestionale (scelti da Esplora risorse, vedi legacydbf.js)
 // oppure abbonamenti.csv prodotto da tools/import-legacy/dbf_to_csv.py, e li confronta col DB.
 // Scrive SOLO sulla tabella abbonamenti: non crea né modifica soci, piani o pagamenti.
