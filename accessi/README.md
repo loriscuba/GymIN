@@ -142,6 +142,9 @@ La pubblicazione è automatica su GitHub Pages insieme a GymIN (`.github/workflo
 
 - <https://loriscuba.github.io/GymIN/accessi/ingresso/>
 - <https://loriscuba.github.io/GymIN/accessi/gestione/>
+- **Ambiente di test** (stesso progetto Supabase, solo schema `test`, fascia arancione "AMBIENTE DI TEST"):
+  <https://loriscuba.github.io/GymIN/test/accessi/ingresso/> e <https://loriscuba.github.io/GymIN/test/accessi/gestione/>.
+  Viene costruito dal branch `test` se contiene `accessi/`, altrimenti da `main`. Il token di un terminale vale solo nel proprio schema: un terminale creato in test non funziona in produzione, e viceversa.
 
 La build (`npm run build`) copia `app/` in `dist/` e genera `config.js` dalle Variables `SUPABASE_URL` e `SUPABASE_ANON_KEY` del repo (in mancanza, dal `web/config.js` di GymIN). Aggiunge anche la versione ai link, per invalidare la cache.
 
