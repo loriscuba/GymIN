@@ -46,7 +46,7 @@ let deps = {};            // { toast, askConfirm, onDone }
 let csvRows = null;       // righe grezze del CSV
 let rows = [];            // righe analizzate
 const sel = new Set();    // indici selezionati
-const state = { filtro: 'importabili', query: '', soloCorrenti: true };
+const state = { filtro: 'importabili', query: '', soloCorrenti: true, anno: '' };   // anno: '' | 'ge:2025' | 'eq:2023'
 
 export function initImporta(d) {
   deps = d;
@@ -75,6 +75,7 @@ export function initImporta(d) {
     const c = e.target.closest('.chip'); if (!c) return;
     state.filtro = c.dataset.f; render();
   });
+  $('#imp-anno').addEventListener('change', (e) => { state.anno = e.target.value; render(); });
   let t; $('#imp-search').addEventListener('input', (e) => { clearTimeout(t); t = setTimeout(() => { state.query = e.target.value; render(); }, 150); });
   $('#imp-all').addEventListener('change', (e) => {
     filtrate().filter((r) => IMPORTABILI.has(r.stato)).forEach((r) => (e.target.checked ? sel.add(r.i) : sel.delete(r.i)));
@@ -114,7 +115,9 @@ async function analizza() {
   rows = src.map((a, i) => {
     const s = socioBy.get(String(a.cod_cli).trim());
     const p = pianoBy.get(a.piano_nome);
-    const r = { i, cod: a.cod_cli, piano: a.piano_nome, socio: s ? `${s.cognome} ${s.nome}` : '' };
+    // anno di scadenza per il filtro (righe non collegate: dalla data del file; senza scadenza: dall'inizio)
+    const anno = (dz(a.data_scadenza) || dz(a.data_inizio) || '').slice(0, 4);
+    const r = { i, cod: a.cod_cli, piano: a.piano_nome, socio: s ? `${s.cognome} ${s.nome}` : '', anno };
     if (!s) return { ...r, stato: 'nosocio' };
     if (!p) return { ...r, stato: 'nopiano' };
     // stessi calcoli di tools/import-legacy/import.mjs
@@ -129,6 +132,7 @@ async function analizza() {
     const ex = inizioCsv ? esist.find((x) => x.data_inizio === inizioCsv)
       : esist.sort((x, y) => (x.data_scadenza < y.data_scadenza ? 1 : -1))[0];
     const chiave = `${s.id}|${p.id}|${inizio}`;
+    r.anno = scad.slice(0, 4);
     if (!ex && visti.has(chiave)) return { ...r, stato: 'presente', nuovo, dup: true };
     visti.add(chiave);
     if (!ex) return { ...r, stato: 'nuovo', nuovo };
@@ -140,12 +144,25 @@ async function analizza() {
     return { ...r, stato: 'diverso', nuovo, ex, diff };
   });
   sel.clear();
+  opzioniAnno();
   render();
 }
+
+// tendina anni: "dal ... in poi" e "solo ...", dagli anni presenti nel file
+function opzioniAnno() {
+  const anni = [...new Set(rows.map((r) => r.anno).filter(Boolean))].sort().reverse();
+  if (state.anno && !anni.includes(state.anno.slice(3))) state.anno = '';
+  const opt = (v, t) => `<option value="${v}"${v === state.anno ? ' selected' : ''}>${t}</option>`;
+  $('#imp-anno').innerHTML = opt('', 'Scadenza: tutti gli anni')
+    + `<optgroup label="Dal … in poi">${anni.slice(0, -1).map((a) => opt(`ge:${a}`, `Scadenza dal ${a} in poi`)).join('')}</optgroup>`
+    + `<optgroup label="Solo un anno">${anni.map((a) => opt(`eq:${a}`, `Scadenza nel ${a}`)).join('')}</optgroup>`;
+}
+const inAnno = (r) => !state.anno || (state.anno.startsWith('ge:') ? r.anno >= state.anno.slice(3) : r.anno === state.anno.slice(3));
 
 function filtrate() {
   const q = state.query.trim().toLowerCase();
   return rows.filter((r) => {
+    if (!inAnno(r)) return false;
     if (state.filtro === 'importabili' ? !IMPORTABILI.has(r.stato) : state.filtro !== 'tutti' && r.stato !== state.filtro) return false;
     return !q || `${r.cod} ${r.socio} ${r.piano}`.toLowerCase().includes(q);
   });
@@ -166,10 +183,11 @@ function dettaglio(r) {
 }
 
 function render() {
-  const cnt = (s) => rows.filter((r) => r.stato === s).length;
+  const nell = rows.filter(inAnno);   // i conteggi dei filtri seguono l'anno scelto
+  const cnt = (s) => nell.filter((r) => r.stato === s).length;
   document.querySelectorAll('#imp-filtri .chip').forEach((c) => {
     c.classList.toggle('active', c.dataset.f === state.filtro);
-    const n = c.dataset.f === 'tutti' ? rows.length : c.dataset.f === 'importabili' ? cnt('nuovo') + cnt('diverso') : cnt(c.dataset.f);
+    const n = c.dataset.f === 'tutti' ? nell.length : c.dataset.f === 'importabili' ? cnt('nuovo') + cnt('diverso') : cnt(c.dataset.f);
     c.querySelector('span').textContent = csvRows ? ` ${n}` : '';
   });
   if (!csvRows) { $('#imp-table tbody').innerHTML = msg('Clicca <b>Scegli file</b> e seleziona dalla cartella del vecchio gestionale <b>tessere.dbf</b> e <b>anagraf.dbf</b> (Ctrl+clic per sceglierne più di uno).<br>In alternativa puoi caricare abbonamenti.csv.'); aggiornaBottone(); return; }
