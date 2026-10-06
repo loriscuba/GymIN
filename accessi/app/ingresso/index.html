@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>GymIN · Ingresso</title>
 <meta name="theme-color" content="#14181f">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="../img/icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
@@ -23,12 +25,19 @@
 </section>
 
 <section id="v-esito" class="vista" hidden aria-live="assertive">
+  <div id="e-badge" class="badge-offline" hidden></div>
   <div id="e-icona" class="esito-icona"></div>
   <div id="e-socio" class="esito-socio"><span id="e-avatar" class="avatar"></span><span id="e-nome"></span></div>
   <div id="e-titolo" class="esito-titolo"></div>
   <div id="e-dett" class="esito-dett"></div>
   <div id="e-piano" class="esito-piano"></div>
   <div id="e-avviso" class="esito-avviso" hidden></div>
+</section>
+
+<section id="v-nonsync" class="vista" hidden>
+  <div class="esito-icona"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 8.8a15 15 0 0 1 20 0M5 12.5a10 10 0 0 1 14 0M8.5 16a5 5 0 0 1 7 0M12 19.5h.01"/><path d="M3 3l18 18"/></svg></div>
+  <div class="esito-titolo">Terminale non ancora sincronizzato</div>
+  <div class="esito-piano">Collega il PC a internet: alla prima sincronizzazione vengono scaricati i dati per funzionare anche offline.<br>Per ora gli ingressi vanno registrati in reception.</div>
 </section>
 
 <section id="v-setup" class="vista" hidden>
@@ -41,6 +50,7 @@
   </form>
 </section>
 
+<div class="bande"><div id="banda-offline" class="banda offline" hidden></div><div id="banda-cache" class="banda gialla" hidden></div></div>
 <div id="notifica" class="notifica" hidden></div>
 <footer id="barra" class="barra-stato">
   <span id="b-sx"></span>

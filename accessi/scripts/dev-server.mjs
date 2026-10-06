@@ -9,6 +9,8 @@ import { ROOT, leggiEnv, configJs } from './env.mjs';
 const APP = join(ROOT, 'app');
 const env = leggiEnv();
 const PORT = Number(env.PORT || 5174);
+// versione per il service worker: cambia a ogni avvio del server di sviluppo
+const VERSIONE_DEV = `dev-${Date.now()}`;
 const TIPI = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8',
   '.json': 'application/json', '.webmanifest': 'application/manifest+json', '.png': 'image/png', '.svg': 'image/svg+xml', '.ico': 'image/x-icon' };
 
@@ -26,7 +28,7 @@ createServer(async (req, res) => {
       if (!path.endsWith('/')) { res.writeHead(301, { location: path + '/' }); return res.end(); }
       file = join(file, 'index.html');
     }
-    const body = (await readFile(file)).toString('binary').replaceAll('__BUILD__', 'dev');
+    const body = (await readFile(file)).toString('binary').replaceAll('__BUILD__', VERSIONE_DEV);
     res.writeHead(200, { 'content-type': TIPI[extname(file)] || 'application/octet-stream', 'cache-control': 'no-store' });
     res.end(body, 'binary');
   } catch {

@@ -8,7 +8,7 @@ Terminale di **controllo accessi** per l'ingresso della palestra, più una pagin
 | `/accessi/ingresso/` | PC dell'ingresso (Chrome in modalità kiosk) | Passi la tessera RFID e lo schermo diventa verde o rosso, con suono, nome del socio e abbonamento |
 | `/accessi/gestione/` | Staff (login di GymIN) | Associa le tessere, annulla un ingresso, consulta lo storico, gestisce gli accessi offline da verificare e i terminali |
 
-> **Stato:** fase 1 (versione ONLINE). In arrivo: fase 2 (offline: PWA, cache, coda, sincronizzazione) e fase 3 (script kiosk e guida installazione).
+> **Stato:** fase 1 (online) e fase 2 (offline: PWA, cache locale, coda eventi, sincronizzazione, conflitti). In arrivo: fase 3 (script kiosk e guida di installazione).
 
 ## Struttura
 
@@ -18,14 +18,19 @@ accessi/
 │  ├─ ingresso/            # schermata kiosk
 │  ├─ gestione/            # pagina staff
 │  ├─ js/esito.js          # REGOLE DEGLI ESITI: funzione pura e testata
-│  ├─ js/dataLayer.js      # UNICO accesso ai dati (remoto, demo e, in fase 2, locale)
+│  ├─ js/dataLayer.js      # UNICO accesso ai dati: sorgente remota, locale e demo + fallback online/offline
+│  ├─ js/archivio.js       # IndexedDB: cache minima + coda eventi offline
+│  ├─ js/sync.js           # sincronizzazione: coda a lotti, ricarica cache, stato, retry con backoff
 │  ├─ js/lettore.js        # listener globale per il lettore RFID in emulazione tastiera
 │  ├─ js/suoni.js          # suoni con la Web Audio API
-│  └─ js/demo.js           # dati demo in memoria per la simulazione
+│  ├─ js/demo.js           # dati demo in memoria per la simulazione
+│  ├─ sw.js                # service worker (PWA): la pagina funziona anche senza internet
+│  └─ manifest.webmanifest
 ├─ sql/seed-dev.sql        # dati demo per il DB di SVILUPPO (mai in produzione)
 ├─ scripts/                # dev-server, build, test-db, seed-dev (nessuna dipendenza esterna)
 └─ test/                   # test unitari (node:test) e test SQL su Postgres vero (test/db)
-supabase/migrations/20261006120000_accessi_terminale.sql   # migrazione (solo aggiunte)
+supabase/migrations/20261006120000_accessi_terminale.sql   # fase 1 (solo aggiunte)
+supabase/migrations/20261007120000_accessi_offline.sql     # fase 2 (solo aggiunte)
 ```
 
 ## Database: cosa aggiunge la migrazione
@@ -54,6 +59,53 @@ supabase/migrations/20261006120000_accessi_terminale.sql   # migrazione (solo ag
 - **Supabase online** (come il resto di GymIN): SQL Editor → incolla il file → Run.
 - **Schema di test di GymIN**: `node scripts/test-schema.mjs 20261006120000` dalla radice del repo, poi incolla l'output nell'SQL Editor.
 - **Supabase locale**: `supabase db reset` (applica tutte le migrazioni).
+
+### Fase 2 (offline): `20261007120000_accessi_offline.sql`
+
+Aggiunge solo funzioni, più due colonne alla tabella `terminali` creata in fase 1 (`stato`, `sync_richiesta_il`). Le tabelle di GymIN non vengono toccate.
+
+| Funzione | Chi | Cosa |
+|---|---|---|
+| `terminale_snapshot(token, versione)` | terminale | Dati **minimi** per la cache: tessere attive, soci con solo id, nome e cognome, abbonamenti non archiviati validi, futuri o scaduti da al massimo 60 giorni. Niente telefono, email, note o prezzi. Se la versione non è cambiata risponde solo `{invariato: true}` |
+| `terminale_sync(token, eventi)` | terminale | Applica gli eventi offline **in ordine cronologico**, ognuno con `accessi_esegui`: stesse regole, stessa atomicità e idempotenza su `evento_id`. Usa il timestamp del terminale e la marcatura `offline`; il timestamp di ricezione resta in `ts_server`. Un evento non valido non blocca gli altri |
+| `terminale_stato(token, stato)` | terminale | Il terminale comunica coda, età della cache e sfasamento dell'orologio, e riceve l'eventuale "Sincronizza ora" |
+| `staff_richiedi_sync(id)` | staff | Pulsante "Sincronizza ora" in /gestione |
+
+## Modalità offline
+
+Principio: **online-first con fallback locale**. Il server è la fonte di verità e un socio non viene mai bloccato solo perché manca internet.
+
+- **Lettura online**: `terminale_accesso` con un `evento_id` (UUID) generato dal terminale. Se il server non risponde entro ~2 s (`TIMEOUT_ONLINE_MS`), il terminale decide in **locale con lo stesso `evento_id`**. Se il server aveva in realtà elaborato la richiesta, alla sincronizzazione l'evento risulta duplicato e non si scala due volte. Dopo un errore di rete le letture vanno subito in locale per 30 s, finché la sincronizzazione non ritrova il server.
+- **Lettura offline**: stessa funzione pura (`esito.js`) sui dati della cache IndexedDB. Se l'esito è verde e l'abbonamento è a ingressi, scala il residuo locale. L'evento finisce in una **coda persistente** con ID evento, codice, timestamp locale, esito deciso, abbonamento usato e residuo prima e dopo.
+- **Schermo**: verde, rosso e suoni restano identici. Nella schermata di attesa compare la banda **"OFFLINE – n accessi da sincronizzare"**; sull'esito, un piccolo badge.
+- **Cache troppo vecchia** (oltre `CACHE_MAX_ORE`, di default 72): il terminale continua a funzionare, mostra l'avviso giallo fisso **"Dati non aggiornati da X ore"** e lo segnala nel log (colonna `nota` degli eventi).
+- **Cache vuota e offline**: schermata dedicata **"Terminale non ancora sincronizzato"**.
+- **Sincronizzazione**:
+  - alla prima apertura scarica tutto;
+  - poi ogni 60 s se online (`SYNC_INTERVALLO_MS`), subito dopo la riconnessione e su "Sincronizza ora";
+  - la coda parte in ordine cronologico, a lotti da 50, e un evento esce dalla coda **solo** quando il server ne conferma la registrazione;
+  - poi la cache viene ricaricata;
+  - in caso di errore riprova con backoff (5 s, 10 s, 20 s… fino a 5 min).
+- **Conflitti**: l'ingresso offline è già avvenuto e non si annulla. Se sul server l'abbonamento nel frattempo non è più valido, o gli ingressi sono finiti, l'accesso viene registrato con **`da_verificare`** e senza scalare: il residuo non va mai sotto zero. Compare in **/gestione → Offline da verificare**. Un socio respinto offline resta respinto.
+- **Orologio**: si usa quello del PC. Ogni risposta porta l'ora del server; se la differenza supera 3 minuti compare un avviso nella barra in basso e lo stato arriva in /gestione.
+- **Storage**: il terminale chiede lo storage persistente (`navigator.storage.persist()`). Token, cache e coda sono separati per schema, perché produzione e test stanno sullo stesso dominio.
+- **PWA**: il service worker mette in cache tutta l'app (versionata a ogni deploy) e la pagina si apre anche dopo il riavvio del PC senza rete. **La prima apertura deve avvenire online.** Le chiamate al database non passano mai dalla cache. Quando esce una nuova versione, la pagina si ricarica da sola appena il terminale è in attesa.
+- **/gestione → Terminali**: stato di ogni terminale (online o non raggiungibile, ultima sincronizzazione, accessi in coda, età dei dati locali, orologio) e pulsante **"Sincronizza ora"**. Le funzioni di /gestione richiedono la connessione: offline mostrano "disponibile solo online".
+- **Più terminali**: ognuno ha il proprio token, la propria cache e la propria coda. Il server serializza gli accessi sullo stesso socio.
+
+### Procedura di test offline
+
+1. Apri `/accessi/ingresso/` **online**, configura il token e attendi la prima sincronizzazione: in basso compare "Online".
+2. **Stacca la rete** (cavo o Wi-Fi). Il primo errore viene rilevato entro 2 s, oppure subito con l'evento `offline` del browser. Compare la banda "OFFLINE – 0 accessi da sincronizzare".
+3. Passa alcune tessere:
+   - un carnet scala il residuo e mostra il verde;
+   - un abbonamento scaduto mostra il rosso;
+   - la banda conta gli accessi in coda.
+4. **Riavvia il PC o chiudi Chrome**, sempre senza rete: la pagina si riapre e la coda è ancora lì.
+5. **Riattacca la rete**. Entro pochi secondi la coda si svuota e la barra torna "Online".
+6. In **/gestione → Storico accessi** (filtro "Solo offline") trovi gli accessi con il loro orario reale. Se nel frattempo un abbonamento è scaduto, l'accesso è in **Offline da verificare**.
+
+Senza staccare la rete: `?sim=1` (oppure `?demo=1`, senza database) → pulsante **SIM** → **Simula offline**.
 
 ## Ruolo "terminale ingresso" (sicurezza)
 
@@ -134,7 +186,28 @@ npm run test:db   # funzioni SQL su un Postgres VERO: avvia un cluster temporane
 - la doppia lettura, l'annullo, l'assegnazione con conferma e la sostituzione;
 - le tessere non associate;
 - i permessi del terminale (anon) e dello staff;
-- il seed di sviluppo, che dà gli stessi esiti della demo in memoria.
+- il seed di sviluppo, che dà gli stessi esiti della demo in memoria;
+- **fase 2**:
+  - snapshot minimo, senza dati sensibili, con versione;
+  - sync idempotente, con l'evento elaborato online e poi reinviato da offline;
+  - ordine cronologico;
+  - conflitti "da verificare" senza andare sotto zero;
+  - tessera disattivata durante l'offline;
+  - errori isolati per evento;
+  - "Sincronizza ora";
+  - un test d'**integrazione** con il terminale completo (sorgente remota, IndexedDB e sincronizzatore) collegato al DB come `anon`: online → offline → riconnessione.
+
+`npm test` copre anche lo scenario offline (`test/offline.test.js`, IndexedDB simulato):
+
+- lettura offline con scalatura locale;
+- sincronizzazione idempotente;
+- timeout online con fallback e lo stesso `evento_id`;
+- carnet esaurito o abbonamento scaduto sul server durante l'offline;
+- cache vecchia, cache vuota;
+- riavvio con coda piena (60 eventi, inviati in ordine a lotti);
+- orologio sfasato;
+- backoff;
+- doppia lettura offline.
 
 ## Deploy
 

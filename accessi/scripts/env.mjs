@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 export const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
-const CHIAVI = ['SUPABASE_URL', 'SUPABASE_ANON_KEY', 'DB_SCHEMA', 'TIMEOUT_ONLINE_MS', 'RITARDO_SUONI_MS', 'DURATA_ESITO_MS', 'PORT', 'DEV_DATABASE_URL'];
+const CHIAVI = ['SUPABASE_URL', 'SUPABASE_ANON_KEY', 'DB_SCHEMA', 'TIMEOUT_ONLINE_MS', 'RITARDO_SUONI_MS', 'DURATA_ESITO_MS', 'CACHE_MAX_ORE', 'SYNC_INTERVALLO_MS', 'PORT', 'DEV_DATABASE_URL'];
 
 export function leggiEnv() {
   const env = {};
@@ -30,6 +30,8 @@ export function configJs(env) {
     TIMEOUT_ONLINE_MS: num(env.TIMEOUT_ONLINE_MS, 2000),
     RITARDO_SUONI_MS: num(env.RITARDO_SUONI_MS, 150),
     DURATA_ESITO_MS: num(env.DURATA_ESITO_MS, 3000),
+    CACHE_MAX_ORE: num(env.CACHE_MAX_ORE, 72),
+    SYNC_INTERVALLO_MS: num(env.SYNC_INTERVALLO_MS, 60000),
   };
   return `// generato automaticamente: non modificare\nwindow.ACCESSI_CONFIG = ${JSON.stringify(cfg, null, 2)};\n`;
 }
