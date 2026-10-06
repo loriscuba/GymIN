@@ -1675,7 +1675,6 @@ async function setupUser() {
   const email = (user?.email || '').toLowerCase();
   const admin = email === LOG_ADMIN;
   $('.nav[data-view="log"]').hidden = !admin;
-  $('.nav[data-view="importa"]').hidden = !admin;
   $('#u-name').textContent = admin ? 'Admin' : (email.split('@')[0] || 'Utente');
   $('#u-role').textContent = admin ? 'Amministratore' : 'Staff';
   $('#u-avatar').textContent = admin ? 'AD' : (email.slice(0, 2).toUpperCase() || '—');
