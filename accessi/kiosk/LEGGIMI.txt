@@ -1,0 +1,118 @@
+﻿GymIN · TERMINALE INGRESSO — INSTALLAZIONE SUL PC DEL CLIENTE
+=============================================================
+
+Cosa serve
+----------
+- PC Windows 10 o 11 con monitor e casse, collegato a internet (meglio via cavo).
+- Google Chrome installato (https://www.google.com/chrome/).
+- Lettore USB RFID 125 kHz (EM4100) in emulazione tastiera.
+- Un token "terminale" creato dallo staff in Gestione accessi → Terminali.
+- La PRIMA apertura deve avvenire con internet: scarica l'app e i dati per
+  lavorare anche offline.
+
+File di questa cartella
+-----------------------
+avvia-ingresso.bat            apre Chrome a schermo intero (kiosk) su /ingresso, con l'audio
+                              abilitato e un profilo Chrome dedicato; se Chrome si chiude lo riapre
+ferma-ingresso.bat            chiude il kiosk e impedisce che si riapra
+installa-avvio-automatico.bat mette "GymIN Ingresso" nell'Esecuzione automatica di Windows
+                              (più i collegamenti "GymIN Ingresso" e "Ferma GymIN Ingresso" sul Desktop)
+rimuovi-avvio-automatico.bat  toglie l'avvio automatico
+configura-windows.bat         (come amministratore) niente sospensione/spegnimento schermo,
+                              USB sempre attive, orologio sincronizzato, fuso orario Roma
+
+1. Copia la cartella
+--------------------
+Copia questa cartella "kiosk" in  C:\GymIN-Ingresso  (o un'altra cartella fissa).
+Se l'indirizzo dell'app non è quello di produzione, modifica la riga URL_INGRESSO
+all'inizio di avvia-ingresso.bat (tasto destro → Modifica).
+
+2. Prova il lettore
+-------------------
+Collega il lettore, apri Blocco note e passa una tessera: deve comparire un codice
+(es. 0012345678) e andare a capo da solo. Chiudi Blocco note senza salvare.
+
+3. Prima apertura (CON internet)
+--------------------------------
+- Doppio clic su avvia-ingresso.bat (dopo ~10 secondi si apre Chrome a schermo intero).
+- Compare "Configura il terminale": incolla il token e premi "Collega terminale".
+- Attendi in basso a destra "Online": la prima sincronizzazione è fatta.
+- Passa una tessera associata: schermo verde/rosso e suono.
+
+4. Avvio automatico
+-------------------
+- Doppio clic su installa-avvio-automatico.bat.
+- Tasto destro su configura-windows.bat → "Esegui come amministratore".
+
+5. Impostazioni di Windows da fare a mano
+-----------------------------------------
+Account e sessione sempre aperta
+- Usa un account locale dedicato e NON amministratore (es. "ingresso").
+- Accesso automatico: Impostazioni → Account → Opzioni di accesso → disattiva
+  "Per maggiore sicurezza, consenti l'accesso a Windows Hello solo per gli account
+  Microsoft"; poi Win+R → netplwiz → seleziona l'utente → togli la spunta
+  "Per utilizzare questo computer è necessario che l'utente immetta il nome e la
+  password" → OK e inserisci la password.
+- Impostazioni → Account → Opzioni di accesso → "Se sei stato lontano, quando deve
+  essere necessario eseguire di nuovo l'accesso?" → Mai.
+- Impostazioni → Personalizzazione → Schermata di blocco → Screen saver → Nessuno.
+
+Schermo e sospensione (già fatto da configura-windows.bat, verifica)
+- Impostazioni → Sistema → Alimentazione: schermo e sospensione "Mai" (con alimentazione).
+
+Volume fisso
+- Imposta il volume delle casse a un livello udibile all'ingresso (es. 70%) e non toccarlo più.
+- Pannello di controllo → Suoni → scheda Suoni → Combinazione: "Nessun suono"
+  (evita i suoni di Windows sopra quelli dell'app).
+- Scheda Comunicazioni → "Non fare nulla".
+- Le casse devono essere il dispositivo di riproduzione predefinito.
+
+Notifiche e aggiornamenti
+- Impostazioni → Sistema → Notifiche → disattivate (o "Non disturbare" sempre attivo).
+- Impostazioni → Windows Update → Opzioni avanzate → Orario di attività: ad es. 6:00–23:00,
+  così i riavvii avvengono a palestra chiusa. Dopo un riavvio il terminale riparte da solo.
+
+Orologio (già fatto da configura-windows.bat, verifica)
+- Impostazioni → Ora e lingua → Data e ora: "Imposta ora automaticamente" attivo,
+  fuso orario "(UTC+01:00) Amsterdam, Berlino, Berna, Roma, Stoccolma, Vienna".
+- Se l'orologio del PC è sfasato di più di 3 minuti il terminale lo segnala in basso
+  e in Gestione accessi → Terminali.
+
+Profilo Chrome dedicato (non cancellare i dati!)
+- Lo script usa un profilo separato in  %LOCALAPPDATA%\GymIN-Ingresso\chrome-profilo :
+  contiene l'app installata, i dati per l'offline e gli accessi in attesa di invio.
+- Non usare programmi di pulizia (CCleaner & co.) su quella cartella, non attivare in
+  quel profilo "Cancella cookie e dati dei siti alla chiusura", non usare la modalità
+  Ospite/In incognito per il terminale.
+
+6. Uso quotidiano
+-----------------
+- Il terminale si avvia da solo all'accensione e lavora anche senza internet:
+  se manca la rete compare la banda arancione "OFFLINE – n accessi da sincronizzare";
+  al ritorno della rete gli accessi vengono inviati da soli.
+- Per uscire dal kiosk: tasto Windows (o Alt+Tab) → Desktop → "Ferma GymIN Ingresso".
+  (Alt+F4 chiude Chrome ma il terminale si riapre dopo 5 secondi.)
+- Per ripartire: "GymIN Ingresso" sul Desktop oppure riavvia il PC.
+- Gli aggiornamenti dell'app arrivano da soli (la pagina si ricarica quando è in attesa).
+
+7. Prova offline (consigliata dopo l'installazione)
+---------------------------------------------------
+1. Con internet, verifica "Online" in basso a destra.
+2. Stacca il cavo di rete / disattiva il Wi-Fi: compare "OFFLINE – 0 accessi da sincronizzare".
+3. Passa 2–3 tessere: verde/rosso come sempre, il contatore aumenta.
+4. Riavvia il PC senza rete: il terminale si riapre e il contatore è ancora lì.
+5. Riattacca la rete: entro pochi secondi la banda sparisce (accessi inviati).
+6. In Gestione accessi → Storico accessi (filtro "Solo offline") trovi gli accessi.
+
+Problemi frequenti
+------------------
+- Nessun suono: il terminale va aperto con avvia-ingresso.bat (non con l'icona normale
+  di Chrome), controlla volume e dispositivo predefinito.
+- "Terminale non ancora sincronizzato": il PC non è mai stato online con l'app;
+  collegalo a internet e attendi.
+- "Configura il terminale" / "Terminale non autorizzato": il token è stato revocato o
+  cancellato; creane uno nuovo in Gestione accessi → Terminali.
+- "Dati non aggiornati da X ore": il terminale è offline da tanto; ricollega internet.
+- La tessera non fa nulla: prova il lettore in Blocco note (punto 2); se la tessera
+  non è associata compare "Tessera sconosciuta" e il codice finisce in
+  Gestione accessi → Tessere → "Tessere lette non associate".
