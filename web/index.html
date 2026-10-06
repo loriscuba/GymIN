@@ -420,7 +420,8 @@
       <div class="field"><label for="s-mailpit-url">Mailpit URL</label><input id="s-mailpit-url" placeholder="http://localhost:8025"></div>
       <div class="field"><label for="s-mailer-api-url">Mailer API URL</label><input id="s-mailer-api-url" placeholder="http://localhost:3001/api/send"></div>
       <div class="field"><label for="s-mailer-api-key">Mailer API key</label><input id="s-mailer-api-key" type="password" placeholder="opzionale"></div>
-      <div class="fhint" style="margin-top:8px"><span class="k">Supabase URL e anon key sono già configurate in config.js: qui puoi solo gestire le impostazioni di posta.</span></div>
+      <div class="field"><label for="s-contatti">Recapiti obbligatori per un nuovo socio</label><select id="s-contatti"><option value="uno">Almeno uno tra telefono ed email</option><option value="email">Email obbligatoria</option><option value="telefono">Telefono obbligatorio</option><option value="entrambi">Email e telefono obbligatori</option><option value="nessuno">Nessuno obbligatorio</option></select></div>
+      <div class="fhint" style="margin-top:8px"><span class="k">Supabase URL e anon key sono già configurate in config.js: qui puoi gestire posta e recapiti obbligatori.</span></div>
       <div class="mfoot" style="padding:16px 0 0;border-top:0;justify-content:flex-end;gap:8px">
         <button type="button" class="btn-ghost" id="settings-reset">Ripristina default</button>
         <button type="submit" class="btn-primary">Salva impostazioni</button>
@@ -436,9 +437,9 @@
     <div class="mbody">
       <div class="field row"><div class="req"><label for="f-nome">Nome <i>*</i></label><input id="f-nome" required></div><div class="req"><label for="f-cognome">Cognome <i>*</i></label><input id="f-cognome" required></div></div>
       <div class="field row"><div><label for="f-sesso">Sesso</label><select id="f-sesso"><option value="">—</option><option>M</option><option>F</option><option>Altro</option></select></div><div><label for="f-nascita">Data di nascita</label><input id="f-nascita" type="date"></div></div>
-      <div class="field row"><div><label for="f-cf">Codice fiscale</label><input id="f-cf" maxlength="16" placeholder="RSSMRA90A01F205X" style="text-transform:uppercase"></div><div class="req-alt"><label for="f-tel">Telefono <i>**</i></label><input id="f-tel" type="tel" placeholder="+39 3xx xxxxxxx"></div></div>
-      <div class="field req-alt"><label for="f-email">Email <i>**</i></label><input id="f-email" type="email" placeholder="mario.rossi@email.it"></div>
-      <div class="fhint"><span class="k req">* obbligatorio</span><span class="k req-alt">** almeno uno tra telefono ed email</span></div>
+      <div class="field row"><div><label for="f-cf">Codice fiscale</label><input id="f-cf" maxlength="16" placeholder="RSSMRA90A01F205X" style="text-transform:uppercase"></div><div class="req-alt" id="f-tel-wrap"><label for="f-tel">Telefono <i>**</i></label><input id="f-tel" type="tel" placeholder="+39 3xx xxxxxxx"></div></div>
+      <div class="field req-alt" id="f-email-wrap"><label for="f-email">Email <i>**</i></label><input id="f-email" type="email" placeholder="mario.rossi@email.it"></div>
+      <div class="fhint"><span class="k req">* obbligatorio</span><span class="k req-alt" id="f-contatti-hint">** almeno uno tra telefono ed email</span></div>
       <div class="ferr" id="socio-err" hidden></div>
       <div class="dupbox" id="socio-dup" hidden></div>
       <div class="field"><label for="f-indirizzo">Indirizzo</label><input id="f-indirizzo" placeholder="Via, numero civico"></div>
