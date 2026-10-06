@@ -46,6 +46,17 @@ jobs:
             echo "Variabili Supabase assenti: uso il config.js del repo."
           fi
 
+      # Sotto-progetto Accessi (terminale kiosk + gestione tessere) -> /accessi/
+      # Build propria, senza dipendenze; usa le stesse Variables (solo chiave anon).
+      - name: Build Accessi
+        env:
+          SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ vars.SUPABASE_ANON_KEY }}
+        run: |
+          cd prod/accessi
+          BUILD_VERSION="${GITHUB_SHA::8}-$(date +%s)" node scripts/build.mjs --config-gymin
+          cp -r dist ../web/accessi
+
       - name: Scarica il branch test (se esiste)
         id: test
         run: |

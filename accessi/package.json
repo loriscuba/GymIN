@@ -1,0 +1,17 @@
+{
+  "name": "gymin-accessi",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "GymIN Accessi — terminale di controllo accessi (kiosk) e pagina di gestione tessere",
+  "scripts": {
+    "dev": "node scripts/dev-server.mjs",
+    "build": "node scripts/build.mjs",
+    "test": "node --test test/*.test.js",
+    "test:db": "node scripts/test-db.mjs",
+    "seed:dev": "node scripts/seed-dev.mjs"
+  },
+  "devDependencies": {
+    "pg": "^8.23.1"
+  }
+}

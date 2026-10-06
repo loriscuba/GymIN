@@ -11,6 +11,7 @@ gymin/
 │  ├─ config.example.js # → copia in config.js con le tue chiavi Supabase
 │  └─ js/               # data (Supabase + demo) · app (UI)
 ├─ mailer/              # worker Node: scheduler + invio mail via SMTP (Mailpit)
+├─ accessi/             # sotto-progetto: terminale controllo accessi RFID + gestione tessere (vedi accessi/README.md)
 ├─ supabase/migrations/ # schema + dati demo (SQL)
 ├─ docker-compose.yml   # Mailpit (SMTP :1025 · UI :8025)
 └─ .env.example
