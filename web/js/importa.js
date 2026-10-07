@@ -1,7 +1,8 @@
 // Cruscotto "Import abbonamenti" (visibile a tutti gli utenti staff).
 // Legge i file DBF del vecchio gestionale (scelti da Esplora risorse, vedi legacydbf.js)
 // oppure abbonamenti.csv prodotto da tools/import-legacy/dbf_to_csv.py, e li confronta col DB.
-// Scrive SOLO sulla tabella abbonamenti: non crea né modifica soci, piani o pagamenti.
+// Scrive sulla tabella abbonamenti: non crea soci, piani o pagamenti. Sui soci toccati
+// valorizza solo soci.aggiornato_da_import (badge "UP" nelle anagrafiche).
 //   - socio collegato via soci.cod_cli, piano via piani.nome
 //   - stesso socio + piano + data_inizio = stesso abbonamento (niente doppioni)
 //   - righe importabili una a una o in blocco, sempre dopo conferma
@@ -218,20 +219,26 @@ async function importa(ids) {
   const agg = scelte.filter((r) => r.stato === 'diverso');
   const testo = [nuovi.length && `inserire <b>${nuovi.length}</b> ${nuovi.length === 1 ? 'abbonamento nuovo' : 'abbonamenti nuovi'}`,
     agg.length && `aggiornare <b>${agg.length}</b> ${agg.length === 1 ? 'abbonamento esistente' : 'abbonamenti esistenti'}`].filter(Boolean).join(' e ');
-  if (!(await deps.askConfirm(`Vuoi ${testo}?<br><span style="font-size:12.5px">Le anagrafiche dei soci non vengono toccate.</span>`, 'Importa'))) return;
+  if (!(await deps.askConfirm(`Vuoi ${testo}?<br><span style="font-size:12.5px">I soci coinvolti vengono segnati col badge UP.</span>`, 'Importa'))) return;
   const btn = $('#imp-go'); btn.disabled = true;
   let ok = 0, ko = 0;
+  const toccati = new Set();
   try {
     const supa = await getSupa();
     for (let k = 0; k < nuovi.length; k += CHUNK) {
       const part = nuovi.slice(k, k + CHUNK);
       const { error } = await supa.from('abbonamenti').insert(part.map((r) => r.nuovo));
-      if (error) { ko += part.length; console.error(error.message); } else ok += part.length;
+      if (error) { ko += part.length; console.error(error.message); } else { ok += part.length; part.forEach((r) => toccati.add(r.nuovo.socio_id)); }
     }
     for (const r of agg) {
       btn.textContent = `Aggiornamento ${ok + ko + 1}/${scelte.length}…`;
       const { error } = await supa.from('abbonamenti').update(r.diff).eq('id', r.ex.id);
-      if (error) { ko++; console.error(error.message); } else ok++;
+      if (error) { ko++; console.error(error.message); } else { ok++; toccati.add(r.ex.socio_id); }
+    }
+    const ids = [...toccati], now = new Date().toISOString();
+    for (let k = 0; k < ids.length; k += CHUNK) {
+      const { error } = await supa.from('soci').update({ aggiornato_da_import: now }).in('id', ids.slice(k, k + CHUNK));
+      if (error) console.error(error.message);
     }
   } catch (err) { deps.toast(`Errore import: ${err.message || err}`, 'warn'); }
   deps.toast(ko ? `Importati ${ok}, errori ${ko} (dettagli in console)` : `Importati ${ok} abbonamenti`, ko ? 'warn' : 'ok');

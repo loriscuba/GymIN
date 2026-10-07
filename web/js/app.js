@@ -114,7 +114,9 @@ function kpi(label, icon, bg, col, val, trend, tclass, spark) {
     <div class="kval num">${val}</div><div class="ktrend"><span class="${tclass}">${trend}</span></div>${spark || ''}</div>`;
 }
 const tagFor = (s) => s === 'Attivo' ? '<span class="tag g">Attivo</span>' : s === 'In scadenza' ? '<span class="tag w">In scadenza</span>' : s === 'Senza abbonamento' ? '<span class="tag n">Senza abbonamento</span>' : '<span class="tag b">Scaduto</span>';
-const who = (m) => `<div class="who" data-member="${m.sid}" role="button" tabindex="0" data-tip="Apri scheda socio"><div class="av" style="background:${m.av}">${initials(m.nome)}</div><div><b>${m.nome}</b><span>${m.id}</span></div></div>`;
+// badge "UP": anagrafica toccata dall'import abbonamenti (soci.aggiornato_da_import)
+const upBadge = (m) => (m && m.importUp ? ' <span class="tag g up" data-tip="Aggiornato da import">UP</span>' : '');
+const who = (m) => `<div class="who" data-member="${m.sid}" role="button" tabindex="0" data-tip="Apri scheda socio"><div class="av" style="background:${m.av}">${initials(m.nome)}</div><div><b>${m.nome}${upBadge(m)}</b><span>${m.id}</span></div></div>`;
 const zapSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8z"/></svg>';
 const refreshSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v6h-6"/></svg>';
 const mailSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg>';
@@ -221,7 +223,7 @@ function renderAccessi() {
     kpi('Accessi oggi', ic.door, 'var(--accent-soft)', 'var(--accent-ink)', acc.length, 'Ingressi registrati', '', '') +
     kpi('Validati', ic.check, 'var(--good-bg)', 'var(--good)', ok, `${acc.length ? (ok / acc.length * 100).toFixed(0) : 0}% senza anomalie`, 'trend-up', '') +
     kpi('Negati', ic.alert, 'var(--bad-bg)', 'var(--bad)', acc.length - ok, 'Abbonamento scaduto', '', '');
-  $('#acctable tbody').innerHTML = acc.map((a) => `<tr><td class="mono" style="font-weight:600">${a.time}</td><td><div class="who"><div class="av" style="background:${a.av}">${initials(a.nome)}</div><div><b>${a.nome}</b><span>${a.id}</span></div></div></td><td><span class="plan-pill">${a.plan}</span></td><td class="mono">${a.ing}</td><td>${a.ok ? (a.warnScad ? '<span class="tag w">Valido · in scadenza</span>' : '<span class="tag g">Valido</span>') : '<span class="tag b">Negato</span>'}</td></tr>`).join('') || '<tr><td colspan="5" style="text-align:center;color:var(--ink-3);padding:24px">Nessun accesso oggi</td></tr>';
+  $('#acctable tbody').innerHTML = acc.map((a) => `<tr><td class="mono" style="font-weight:600">${a.time}</td><td><div class="who"><div class="av" style="background:${a.av}">${initials(a.nome)}</div><div><b>${a.nome}${upBadge(a)}</b><span>${a.id}</span></div></div></td><td><span class="plan-pill">${a.plan}</span></td><td class="mono">${a.ing}</td><td>${a.ok ? (a.warnScad ? '<span class="tag w">Valido · in scadenza</span>' : '<span class="tag g">Valido</span>') : '<span class="tag b">Negato</span>'}</td></tr>`).join('') || '<tr><td colspan="5" style="text-align:center;color:var(--ink-3);padding:24px">Nessun accesso oggi</td></tr>';
 }
 
 function renderPosta() {
@@ -595,7 +597,7 @@ function openDupModal(f, dups) {
     return `<div class="dupcard">
       <div class="dupcard-head">
         <div class="av" style="background:${m.av}">${initials(m.nome)}</div>
-        <div style="flex:1;min-width:0">${hl('nome', `<b>${esc(m.nome)}</b>`)}<small>Tessera ${esc(m.id)} · ${esc(m.stato)}${m.plan && m.plan.name !== '—' ? ' · ' + esc(m.plan.name) : ''}</small></div>
+        <div style="flex:1;min-width:0">${hl('nome', `<b>${esc(m.nome)}${upBadge(m)}</b>`)}<small>Tessera ${esc(m.id)} · ${esc(m.stato)}${m.plan && m.plan.name !== '—' ? ' · ' + esc(m.plan.name) : ''}</small></div>
       </div>
       <div class="dupmatch">${why.map((w) => `<span class="tag w">${DUP_LABEL[w]}</span>`).join('')}</div>
       <dl class="dupdl">
@@ -727,7 +729,7 @@ function socioPicker(key, onPick = () => {}) {
   const hid = $(`#${key}`), q = $(`#${key}-q`), res = $(`#${key}-res`);
   let hits = [], cur = 0;
   const draw = () => {
-    res.innerHTML = hits.map((m, i) => `<button type="button" class="${i === cur ? 'on' : ''}" data-i="${i}"><b>${esc(m.nome)}</b><span>${esc(m.id)} · ${esc(m.stato)}</span></button>`).join('')
+    res.innerHTML = hits.map((m, i) => `<button type="button" class="${i === cur ? 'on' : ''}" data-i="${i}"><b>${esc(m.nome)}${upBadge(m)}</b><span>${esc(m.id)} · ${esc(m.stato)}</span></button>`).join('')
       || (q.value.trim() && !hid.value ? '<div class="none">Nessun socio trovato</div>' : '');
   };
   const pick = (m) => { hid.value = m ? m.sid : ''; q.value = m ? `${m.nome} — ${m.id}` : ''; hits = []; draw(); onPick(m); };
@@ -882,7 +884,7 @@ function openScheda(sid) {
   $('#modal-scheda .modal').innerHTML = `
     <div class="mhead"><div style="display:flex;align-items:center;gap:12px">
       <div class="av" style="width:46px;height:46px;background:${m.av};border-radius:50%;display:grid;place-items:center;color:#fff;font-weight:700;font-size:15px">${initials(m.nome)}</div>
-      <div><h3>${m.nome}</h3><div class="msub">${m.id} · ${m.plan.name}</div></div></div>
+      <div><h3>${m.nome}${upBadge(m)}</h3><div class="msub">${m.id} · ${m.plan.name}</div></div></div>
       <button type="button" class="xbtn" data-close="modal-scheda">×</button></div>
     <div class="mbody">
       <div style="margin-bottom:14px">${tagFor(m.stato)}</div>
