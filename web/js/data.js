@@ -82,7 +82,7 @@ async function loadSupabase(supa) {
   // Tutti i soci (anche quelli senza abbonamento) + tutti gli abbonamenti.
   const soci = await fetchAll(supa, 'soci',
     'id,nome,cognome,email,telefono,data_nascita,sesso,codice_fiscale,indirizzo,citta,cap,note,consenso_mail,tessera,creato_il,' +
-    'privacy_acknowledged,privacy_acknowledged_at,privacy_policy_version,marketing_email_consent,marketing_email_consent_at,marketing_email_revoked_at');
+    'privacy_acknowledged,privacy_acknowledged_at,privacy_policy_version,marketing_email_consent,marketing_email_consent_at,marketing_email_revoked_at,aggiornato_da_import');
   const abb = await fetchAll(supa, 'abbonamenti',
     'id,socio_id,data_inizio,data_scadenza,entrate_residue,stato,piano:piani(nome,prezzo,durata_mesi,entrate)');
   const planCatalog = await fetchAll(supa, 'piani', 'id,nome,prezzo,durata_mesi,entrate,descrizione,attivo');
@@ -102,6 +102,7 @@ async function loadSupabase(supa) {
       email: s.email || '', telefono: s.telefono, dataNascita: s.data_nascita, sesso: s.sesso,
       cf: s.codice_fiscale, indirizzo: s.indirizzo, citta: s.citta, cap: s.cap,
       note: s.note, consenso: s.consenso_mail, ...privacyFromRow(s), av: AV[i % AV.length],
+      importUp: !!s.aggiornato_da_import,
     };
     const a = lastBySocio[s.id];
     if (!a) {
@@ -134,7 +135,7 @@ async function loadSupabase(supa) {
     const d = new Date(a.registrato_il);
     return {
       time: d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }),
-      nome: `${a.socio.nome} ${a.socio.cognome}`, id: a.socio.tessera || '', av: (m && m.av) || AV[0],
+      nome: `${a.socio.nome} ${a.socio.cognome}`, id: a.socio.tessera || '', av: (m && m.av) || AV[0], importUp: !!m?.importUp,
       plan: m ? m.plan.name : '—', ing: a.ingresso,
       ok: a.esito === 'valido', warnScad: m ? m.stato === 'In scadenza' : false,
     };
