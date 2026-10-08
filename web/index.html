@@ -55,6 +55,9 @@
   .nav svg{width:18px;height:18px;flex:none;opacity:.85}.nav:hover{background:rgba(255,255,255,.05);color:#fff}
   .nav.active{background:rgba(244,81,30,.16);color:#fff}.nav.active svg{opacity:1;color:var(--accent)}
   .nav .count{margin-left:auto;font-size:12px;font-variant-numeric:tabular-nums;background:rgba(255,255,255,.08);padding:1px 8px;border-radius:20px;color:#cdd4e0}
+  /* se il menu non sta in altezza resta scorribile, ma senza barra di scorrimento visibile */
+  .sidebar{scrollbar-width:none}.sidebar::-webkit-scrollbar{display:none}
+  @media (max-height:860px){.nav{padding-top:8px;padding-bottom:8px}.navlabel{padding:10px 12px 4px}.brand{padding-bottom:12px}}
   .sidebar-foot{margin-top:auto;border-top:1px solid var(--sidebar-line);padding-top:14px;display:flex;align-items:center;gap:10px}
   .avatar{width:34px;height:34px;border-radius:50%;background:#2a3342;display:grid;place-items:center;color:#cdd4e0;font-weight:600;font-size:13px;flex:none}
   .sidebar-foot b{color:#e7ebf2;font-size:13px;display:block}.sidebar-foot span{color:#6f7889;font-size:11.5px}
