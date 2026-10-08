@@ -329,7 +329,6 @@
     <button class="nav" data-view="anagrafiche" data-tip="Anagrafiche"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg> <span class="nav-label">Anagrafiche</span> <span class="count" id="c-mem"></span></button>
     <button class="nav" data-view="abbonamenti" data-tip="Abbonamenti"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg> <span class="nav-label">Abbonamenti</span></button>
     <button class="nav" data-view="pagamenti" data-tip="Pagamenti"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 12h.01M18 12h.01"/></svg> <span class="nav-label">Pagamenti</span></button>
-    <button class="nav" data-view="entrate" data-tip="Entrate / Accessi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"/></svg> <span class="nav-label">Entrate / Accessi</span> <span class="count" id="c-acc"></span></button>
     <button class="nav" data-view="tessere" data-tip="Tessere"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M2.5 9.5h19M6.5 15h4"/></svg> <span class="nav-label">Tessere</span> <span class="count" id="c-tessere" hidden title="Accessi offline da verificare"></span></button>
     <button class="nav" data-view="posta" data-tip="Posta"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg> <span class="nav-label">Posta</span> <span class="count" id="c-posta"></span></button>
     <button class="nav" data-view="log" hidden data-tip="Log attività"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/></svg> <span class="nav-label">Log attività</span></button>
@@ -351,18 +350,14 @@
 
     <section class="view" id="view-dashboard">
       <div class="kpis" id="kpis"></div>
-      <div class="grid-2 even">
-        <div class="panel"><div class="phead"><h3>Soci per abbonamento</h3></div><div class="dist" id="distchart"></div></div>
-        <div class="panel"><div class="phead"><h3>Stato contratti</h3></div><div class="split" id="contractsplit"></div>
-          <div style="margin-top:16px"><div class="track" style="height:12px" id="contractbar"></div>
-          <div class="legend"><span><i style="background:var(--good)"></i> Attivi</span><span><i style="background:var(--warn)"></i> In scadenza</span><span><i style="background:var(--bad)"></i> Scaduti</span></div></div></div>
-      </div>
       <div class="panel"><div class="phead" style="flex-wrap:wrap;gap:12px"><div><h3 id="exp-title">In scadenza entro 7 giorni</h3><div class="psub" id="exp-sub">Da contattare per il rinnovo</div></div>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
           <div class="filters" id="exp-filters"><button class="chip active" data-w="7">≤ 7 giorni</button></div>
           <button class="btn-sm" id="btn-reminders"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg> Invia promemoria</button>
         </div></div>
         <div class="scroll"><table id="expiring"><thead><tr><th>Socio</th><th>Abbonamento</th><th>Scadenza</th><th>Quota</th><th>Azioni</th></tr></thead><tbody></tbody></table></div></div>
+      <div class="panel"><div class="phead"><div><h3>Ultimi 10 ingressi</h3><div class="psub">Accessi registrati più recenti</div></div></div>
+        <div class="scroll"><table id="acctable"><thead><tr><th>Data e ora</th><th>Socio</th><th>Abbonamento</th><th>Ingresso</th><th>Esito</th></tr></thead><tbody></tbody></table></div></div>
     </section>
 
     <section class="view" id="view-anagrafiche" hidden>
@@ -430,12 +425,6 @@
       </div>
       <div class="tablewrap"><div class="scroll"><table id="imp-table"><thead><tr><th><input type="checkbox" id="imp-all" aria-label="Seleziona tutte"></th><th>Cod. cliente</th><th>Socio</th><th>Piano</th><th>Esito</th><th>Dettaglio</th><th></th></tr></thead><tbody></tbody></table></div>
         <div class="tfoot"><span id="imp-count"></span></div></div>
-    </section>
-
-    <section class="view" id="view-entrate" hidden>
-      <div class="kpis kpis-3" id="acckpis"></div>
-      <div class="tablewrap"><div class="phead" style="padding:16px 18px 0;align-items:center"><div><h3 style="font-size:15.5px">Accessi di oggi</h3><div class="psub">Validazione ingressi in tempo reale</div></div><button class="btn-sm" id="btn-accesso" style="margin:0 4px 8px 0"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"/></svg> Registra accesso</button></div>
-        <div class="scroll"><table id="acctable"><thead><tr><th>Orario</th><th>Socio</th><th>Abbonamento</th><th>Ingresso</th><th>Esito</th></tr></thead><tbody></tbody></table></div></div>
     </section>
 
     <section class="view" id="view-posta" hidden>

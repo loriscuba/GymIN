@@ -125,17 +125,16 @@ async function loadSupabase(supa) {
   });
   const bySid = Object.fromEntries(members.map((m) => [m.sid, m]));
 
-  // accessi di oggi
-  const start = today.toISOString();
+  // ultimi 10 ingressi
   const { data: acc } = await supa
     .from('accessi')
     .select('registrato_il,ingresso,esito,socio:soci(id,nome,cognome,tessera)')
-    .gte('registrato_il', start).order('registrato_il', { ascending: false }).limit(40);
+    .order('registrato_il', { ascending: false }).limit(10);
   const accessi = (acc || []).filter((a) => a.socio).map((a) => {
     const m = bySid[a.socio.id];
     const d = new Date(a.registrato_il);
     return {
-      time: d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }),
+      time: d.toLocaleString('it-IT', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }),
       nome: `${a.socio.nome} ${a.socio.cognome}`, id: a.socio.tessera || '', av: (m && m.av) || AV[0], importUp: !!m?.importUp,
       plan: m ? m.plan.name : '—', ing: a.ingresso,
       ok: a.esito === 'valido', warnScad: m ? m.stato === 'In scadenza' : false,

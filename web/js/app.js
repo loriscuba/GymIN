@@ -132,7 +132,6 @@ const actionsCell = (m) => `<td><div class="actions-cell">${actionIcons(m)}</div
 function renderDashboard() {
   const { revenue } = DATA;
   const members = DATA.members.filter((m) => m.stato !== 'Senza abbonamento');
-  const plans = DATA.plans.filter((p) => p.attivo !== false);
   const attivi = members.filter((m) => m.stato === 'Attivo');
   const scad = members.filter((m) => m.stato === 'In scadenza');
   const scaduti = members.filter((m) => m.stato === 'Scaduto');
@@ -145,18 +144,6 @@ function renderDashboard() {
     kpi('Contratti attivi', ic.users, 'var(--good-bg)', 'var(--good)', attivi.length, `${(attivi.length / members.length * 100).toFixed(0)}% dei soci`, 'trend-up', '') +
     kpi('In scadenza (7gg)', ic.alert, 'var(--warn-bg)', 'var(--warn)', scad.length, 'Da contattare per rinnovo', '', '') +
     kpi('Contratti scaduti', ic.door, 'var(--bad-bg)', 'var(--bad)', scaduti.length, 'Recuperabili con win-back', '', '');
-
-  const pmax = Math.max(...plans.map((p) => p.count), 1);
-  $('#distchart').innerHTML = plans.map((p) => `<div class="distrow"><span class="dl">${p.name}</span><div class="track"><div class="fill" style="width:${(p.count / pmax * 100).toFixed(0)}%;background:${p.color}"></div></div><span class="dv">${p.count} soci</span></div>`).join('');
-
-  $('#contractsplit').innerHTML =
-    `<div class="statbox"><div class="s1"><i style="background:var(--good)"></i>Attivi</div><div class="s2 num" style="color:var(--good)">${attivi.length}</div><div class="s3">${(attivi.length / members.length * 100).toFixed(0)}% del totale</div></div>` +
-    `<div class="statbox"><div class="s1"><i style="background:var(--bad)"></i>Scaduti</div><div class="s2 num" style="color:var(--bad)">${scaduti.length}</div><div class="s3">Tasso abbandono ${(scaduti.length / members.length * 100).toFixed(0)}%</div></div>`;
-  const tot = members.length;
-  $('#contractbar').innerHTML = `<div style="display:flex;height:100%;width:100%">
-    <div style="width:${attivi.length / tot * 100}%;background:var(--good)"></div>
-    <div style="width:${scad.length / tot * 100}%;background:var(--warn)"></div>
-    <div style="width:${scaduti.length / tot * 100}%;background:var(--bad)"></div></div>`;
 
   const expAll = expiringList();
   const exp = expAll.slice(0, 12);
@@ -219,13 +206,7 @@ function renderPlans() {
 }
 
 function renderAccessi() {
-  const acc = DATA.accessi;
-  const ok = acc.filter((a) => a.ok).length;
-  $('#acckpis').innerHTML =
-    kpi('Accessi oggi', ic.door, 'var(--accent-soft)', 'var(--accent-ink)', acc.length, 'Ingressi registrati', '', '') +
-    kpi('Validati', ic.check, 'var(--good-bg)', 'var(--good)', ok, `${acc.length ? (ok / acc.length * 100).toFixed(0) : 0}% senza anomalie`, 'trend-up', '') +
-    kpi('Negati', ic.alert, 'var(--bad-bg)', 'var(--bad)', acc.length - ok, 'Abbonamento scaduto', '', '');
-  $('#acctable tbody').innerHTML = acc.map((a) => `<tr><td class="mono" style="font-weight:600">${a.time}</td><td><div class="who"><div class="av" style="background:${a.av}">${initials(a.nome)}</div><div><b>${a.nome}${upBadge(a)}</b><span>${a.id}</span></div></div></td><td><span class="plan-pill">${a.plan}</span></td><td class="mono">${a.ing}</td><td>${a.ok ? (a.warnScad ? '<span class="tag w">Valido · in scadenza</span>' : '<span class="tag g">Valido</span>') : '<span class="tag b">Negato</span>'}</td></tr>`).join('') || '<tr><td colspan="5" style="text-align:center;color:var(--ink-3);padding:24px">Nessun accesso oggi</td></tr>';
+  $('#acctable tbody').innerHTML = DATA.accessi.map((a) => `<tr><td class="mono" style="font-weight:600">${a.time}</td><td><div class="who"><div class="av" style="background:${a.av}">${initials(a.nome)}</div><div><b>${a.nome}${upBadge(a)}</b><span>${a.id}</span></div></div></td><td><span class="plan-pill">${a.plan}</span></td><td class="mono">${a.ing}</td><td>${a.ok ? (a.warnScad ? '<span class="tag w">Valido · in scadenza</span>' : '<span class="tag g">Valido</span>') : '<span class="tag b">Negato</span>'}</td></tr>`).join('') || '<tr><td colspan="5" style="text-align:center;color:var(--ink-3);padding:24px">Nessun ingresso registrato</td></tr>';
 }
 
 function renderPosta() {
@@ -243,7 +224,6 @@ async function canManagePlans() {
 
 function renderAll() {
   $('#c-mem').textContent = DATA.members.length;
-  $('#c-acc').textContent = DATA.accessi.length;
   renderDashboard(); renderMembers(); renderPlans(); renderAccessi(); renderPosta();
 }
 
@@ -1352,7 +1332,7 @@ function openLogDetail(id) {
 // ---------- navigazione ----------
 const titles = {
   dashboard: ['Dashboard', 'Panoramica attività'], anagrafiche: ['Anagrafiche soci', 'Gestione iscritti e tesseramenti'],
-  abbonamenti: ['Abbonamenti', 'Listino piani e incasso ricorrente'], entrate: ['Entrate / Accessi', 'Controllo ingressi'],
+  abbonamenti: ['Abbonamenti', 'Listino piani e incasso ricorrente'],
   posta: ['Posta', 'Comunicazioni automatiche agli iscritti'],
   pagamenti: ['Pagamenti', 'Riepilogo incassi'], log: ['Log attività', 'Tutte le modifiche al database, con utente e dettagli'],
   importa: ['Import abbonamenti', 'Dal vecchio gestionale: solo abbonamenti, le anagrafiche non vengono toccate'],
@@ -1583,7 +1563,6 @@ function wireEvents() {
     closeDupModal();
     await saveSocio(f);
   });
-  $('#btn-accesso').addEventListener('click', openAccessoModal);
   $('#privacyform').addEventListener('submit', submitPrivacySocio);
   $('#accessoform').addEventListener('submit', submitAccesso);
   $('#btn-reminders').addEventListener('click', sendReminders);
