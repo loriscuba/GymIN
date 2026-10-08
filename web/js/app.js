@@ -51,6 +51,8 @@ function nextTessera() {
   const nums = DATA.members.map((m) => +(String(m.id).match(/(\d+)/)?.[1] || 0));
   return 'GY-' + (Math.max(1200, ...nums) + 1);
 }
+// piani proponibili per un nuovo abbonamento: i disattivati restano solo nello storico
+const activePlans = () => DATA.plans.filter((p) => p.attivo !== false);
 function recomputePlans() {
   for (const p of DATA.plans) {
     const list = DATA.members.filter((m) => m.plan.name === p.name);
@@ -417,7 +419,7 @@ function openSocioModal(mode = 'new', sid = null) {
   $('#socioform').reset();
   socioError('');
   $('#socio-dup').hidden = true;
-  $('#f-piano').innerHTML = DATA.plans.map((p) => `<option value="${p.name}">${p.name} — ${euro(p.price)} · ${p.dur} mese/i</option>`).join('');
+  $('#f-piano').innerHTML = activePlans().map((p) => `<option value="${p.name}">${p.name} — ${euro(p.price)} · ${p.dur} mese/i</option>`).join('');
   const isNew = mode === 'new';
   $('#socio-title').textContent = isNew ? 'Nuovo socio' : 'Modifica socio';
   $('#socio-sub').textContent = isNew ? 'Anagrafica + primo abbonamento' : 'Aggiorna i dati anagrafici';
@@ -805,7 +807,7 @@ function openRinnovoModal(sid) {
   renewSid = sid;
   closeModal('modal-scheda');
   $('#r-socio').textContent = `${m.nome} · ${m.id}`;
-  $('#r-piano').innerHTML = DATA.plans.map((p) => `<option value="${p.name}"${p.name === m.plan.name ? ' selected' : ''}>${p.name} — ${euro(p.price)} · ${p.dur} mese/i</option>`).join('');
+  $('#r-piano').innerHTML = activePlans().map((p) => `<option value="${p.name}"${p.name === m.plan.name ? ' selected' : ''}>${p.name} — ${euro(p.price)} · ${p.dur} mese/i</option>`).join('');
   $('#r-old').textContent = fmtDate(m.end);
   $('#r-metodo').value = 'contanti';
   updateRinnovoPreview();
@@ -860,7 +862,7 @@ let quickSid = null, quickFromScheda = false;
 function quickRenew(sid) {
   const m = DATA.members.find((x) => x.sid === sid); if (!m) return;
   const plan = DATA.plans.find((p) => p.name === m.plan.name) || m.plan;
-  if (!plan || plan.name === '—') { openRinnovoModal(sid); return; }   // senza piano: serve il rinnovo completo
+  if (!plan || plan.name === '—' || plan.attivo === false) { openRinnovoModal(sid); return; }   // senza piano o piano disattivato: serve il rinnovo completo
   quickSid = sid;
   quickFromScheda = !$('#modal-scheda').hidden;
   closeModal('modal-scheda');
@@ -1135,7 +1137,7 @@ async function submitPayDel(e) {
 // Abbonamento: se "Già utilizzato" registra solo l'incasso (socio che si era dimenticato di pagare),
 // altrimenti attiva/rinnova l'abbonamento come il rinnovo. Prezzo libero: solo incasso (es. entrata libera).
 function openPagamentoModal() {
-  $('#p-piano').innerHTML = DATA.plans.map((p) => `<option value="${esc(p.name)}">${esc(p.name)} — ${euro(p.price)}</option>`).join('');
+  $('#p-piano').innerHTML = activePlans().map((p) => `<option value="${esc(p.name)}">${esc(p.name)} — ${euro(p.price)}</option>`).join('');
   $('#p-tipo').value = 'abbonamento';
   $('#p-usato').checked = true;
   $('#p-descr').value = 'Entrata libera';
