@@ -151,3 +151,18 @@ Regole: scrive solo su `abbonamenti` (mai `soci`, `piani`, `pagamenti`); stesso 
 `dbf_to_csv.py` include un parser DBF/FPT minimale (nessuna dipendenza): legge
 l'header, i descrittori di campo, converte date `AAAAMMGG→AAAA-MM-GG`, i booleani
 e i campi memo (blocchi del file `.fpt`).
+
+## Import delle vecchie tessere RFID (`tessere_rfid.py`)
+
+Il vecchio gestionale salva il codice tessera (`COD_TESS`) in 13 cifre: 3 di prefisso + 10 cifre
+con i bit di **ogni byte in ordine rovesciato** rispetto a quanto "digita" il nuovo lettore USB EM4100
+(es. `0540006035015` → `0003827938`; verificato su tessere reali). Lo script converte i codici e genera
+un SQL idempotente che popola `tessere` collegando i soci via `cod_cli`:
+
+```bash
+python3 tessere_rfid.py --in ./data/tessere.dbf --out ./data/out/tessere_rfid.sql   # --schema test per il test
+python3 -m unittest test_tessere_rfid
+```
+
+Le tessere già attive non vengono toccate; i codici presenti su più soci sono esclusi ed elencati a video
+(da associare a mano da GymIN → Tessere). Il file SQL contiene codici di accesso reali: **non committarlo**.

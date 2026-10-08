@@ -8,3 +8,4 @@ supabase/.temp/
 dist/
 # Runtime config for GitHub Pages must be published so the app can connect to Supabase.
 !web/config.js
+__pycache__/
