@@ -793,6 +793,12 @@ function forcedEnd(sel) {
   const d = new Date(v), t = new Date(); t.setHours(0, 0, 0, 0);
   return isNaN(d) || d < t ? null : d;
 }
+// abbonamenti a tempo: la nuova scadenza deve superare quella attuale, altrimenti si crea un abbonamento vuoto e un doppio incasso
+function endNotAfterCurrent(m, end) {
+  if (!m.end || m.plan.entrate || end > new Date(m.end)) return false;   // i carnet si possono ricaricare prima
+  toast(`La nuova scadenza deve essere successiva a quella attuale (${fmtDate(m.end)})`, 'warn');
+  return true;
+}
 function renewBase(m) { const t = new Date(); t.setHours(0, 0, 0, 0); return new Date(m.end) >= t ? new Date(m.end) : t; }
 function openRinnovoModal(sid) {
   const m = DATA.members.find((x) => x.sid === sid); if (!m) return;
@@ -845,6 +851,7 @@ async function doRenew(e) {
   const ricevuta = $('#r-ricevuta').checked;
   const end = forcedEnd('#r-new');
   if (!end) { toast('Scegli una data di scadenza valida (da oggi in poi)', 'warn'); return; }
+  if (endNotAfterCurrent(m, end)) return;
   closeModal('modal-rinnovo');
   await applyRenewal(m, plan, ricevuta, $('#r-metodo').value, plan.price, end);
 }
@@ -869,6 +876,7 @@ async function doQuickRenew(e) {
   const plan = DATA.plans.find((p) => p.name === m.plan.name) || m.plan;
   const end = forcedEnd('#q-new');
   if (!end) { toast('Scegli una data di scadenza valida (da oggi in poi)', 'warn'); return; }
+  if (endNotAfterCurrent(m, end)) return;
   closeModal('modal-quick');
   await applyRenewal(m, plan, true, $('#q-metodo').value, plan.price, end);
   if (quickFromScheda) openScheda(m.sid);        // torna alla scheda aggiornata
