@@ -12,8 +12,8 @@ const FILE = [
   './', 'ingresso/', 'gestione/', 'config.js', 'manifest.webmanifest',
   'css/base.css', 'css/terminale.css', 'css/gestione.css',
   'js/esito.js', 'js/lettore.js', 'js/suoni.js', 'js/dataLayer.js', 'js/demo.js', 'js/archivio.js', 'js/sync.js',
-  'js/ingresso.js', 'js/gestione.js',
-  'img/icon-192.png', 'img/icon-512.png', 'img/icon-maskable-512.png',
+  'js/ingresso.js', 'js/gestione.js', 'js/meteo.js',
+  'img/logo.png', 'img/icon-192.png', 'img/icon-512.png', 'img/icon-maskable-512.png',
 ];
 
 self.addEventListener('install', (e) => {

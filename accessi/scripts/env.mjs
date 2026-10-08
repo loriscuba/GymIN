@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 export const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
-const CHIAVI = ['SUPABASE_URL', 'SUPABASE_ANON_KEY', 'DB_SCHEMA', 'TIMEOUT_ONLINE_MS', 'RITARDO_SUONI_MS', 'DURATA_ESITO_MS', 'CACHE_MAX_ORE', 'SYNC_INTERVALLO_MS', 'LETTORE_MAX_GAP_MS', 'PORT', 'DEV_DATABASE_URL'];
+const CHIAVI = ['SUPABASE_URL', 'SUPABASE_ANON_KEY', 'DB_SCHEMA', 'TIMEOUT_ONLINE_MS', 'RITARDO_SUONI_MS', 'DURATA_ESITO_MS', 'CACHE_MAX_ORE', 'SYNC_INTERVALLO_MS', 'LETTORE_MAX_GAP_MS', 'METEO_LAT', 'METEO_LON', 'METEO_LUOGO', 'PORT', 'DEV_DATABASE_URL'];
 
 export function leggiEnv() {
   const env = {};
@@ -33,6 +33,10 @@ export function configJs(env) {
     CACHE_MAX_ORE: num(env.CACHE_MAX_ORE, 72),
     SYNC_INTERVALLO_MS: num(env.SYNC_INTERVALLO_MS, 60000),
     LETTORE_MAX_GAP_MS: num(env.LETTORE_MAX_GAP_MS, 100),
+    // meteo nella schermata d'attesa (default: Vado Ligure); METEO_LAT vuoto = meteo spento
+    METEO_LAT: env.METEO_LAT ?? '44.2697',
+    METEO_LON: env.METEO_LON ?? '8.4361',
+    METEO_LUOGO: env.METEO_LUOGO ?? 'Vado Ligure',
   };
   return `// generato automaticamente: non modificare\nwindow.ACCESSI_CONFIG = ${JSON.stringify(cfg, null, 2)};\n`;
 }
