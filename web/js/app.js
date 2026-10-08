@@ -1458,6 +1458,41 @@ async function cercaPerTessera(codice) {
   openScheda(m.sid);
 }
 
+// ---------- aggiornamento automatico dopo gli ingressi dal terminale ----------
+// Ogni 20 s (e quando la scheda del browser torna in primo piano) controlla l'ultimo id di
+// accessi_log: se è cambiato ricarica i dati, così residui e scadenze restano allineati.
+const AGGIORNA_MS = 20000;
+let ultimoLogId = null;
+let aggiornando = false;
+let timerAggiorna = null;
+function avviaAggiornamentoAutomatico() {
+  controllaNuoviIngressi();
+  if (timerAggiorna) return;                           // un solo timer anche se l'avvio si ripete (nuovo login)
+  timerAggiorna = setInterval(controllaNuoviIngressi, AGGIORNA_MS);
+  document.addEventListener('visibilitychange', controllaNuoviIngressi);
+}
+async function controllaNuoviIngressi() {
+  if (document.hidden || aggiornando || !DATA) return;
+  aggiornando = true;
+  try {
+    const supa = await getSupa(); if (!supa) return;
+    const { data, error } = await supa.from('accessi_log').select('id').order('id', { ascending: false }).limit(1);
+    if (error) return;                                   // tabella assente o non leggibile: nessun aggiornamento
+    const id = data[0]?.id ?? 0;
+    const cambiato = ultimoLogId !== null && id !== ultimoLogId;
+    ultimoLogId = id;
+    if (!cambiato) return;
+    DATA = await loadData();
+    renderAll();
+    caricaContaTessere().catch(() => {});
+    if (!$('#modal-scheda').hidden && schedaSid) openScheda(schedaSid);   // scheda aperta: mostra i dati nuovi
+  } catch (err) {
+    console.error(errMsg(err));
+  } finally {
+    aggiornando = false;
+  }
+}
+
 // ---------- login ----------
 async function ensureAuth() {
   const supa = await getSupa();
@@ -1794,6 +1829,7 @@ async function boot() {
   try {
     DATA = await loadData();
     renderAll();
+    avviaAggiornamentoAutomatico();
   } catch (err) {
     console.error(errMsg(err));
     $('#loginerr').textContent = errMsg(err) || 'Impossibile connettersi al database Supabase.';
