@@ -298,7 +298,7 @@ window.addEventListener('offline', () => { data?.segnaOffline(); aggiornaStato()
 // ---------------------------------------------------------------------------
 // lettore + simulazione
 // ---------------------------------------------------------------------------
-agganciaLettore(onCodice, { attivo: () => !!data && vista !== 'setup' });
+agganciaLettore(onCodice, { attivo: () => !!data && vista !== 'setup', maxGapMs: CFG.LETTORE_MAX_GAP_MS });
 window.addEventListener('pointerdown', sbloccaAudio);
 window.addEventListener('dblclick', () => {
   if (!document.fullscreenElement) document.documentElement.requestFullscreen?.().catch(() => {});

@@ -60,12 +60,13 @@ const residuoTxt = (l) => (l.residuo_prima != null || l.residuo_dopo != null ? `
 // cattura dal lettore ("Passa la tessera")
 // ---------------------------------------------------------------------------
 let cattura = null;   // { onCodice(codice) } quando si attende una tessera
+let diagnosi = null;  // riceve le misure del lettore durante "Prova lettore"
 agganciaLettore((codice) => {
   const c = cattura;
   if (!c) return;
   suona('lieve', 0);
   c.onCodice(codice);
-}, { attivo: () => !!cattura });
+}, { attivo: () => !!cattura, maxGapMs: CFG.LETTORE_MAX_GAP_MS, onDiagnosi: (info) => diagnosi?.(info) });
 window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && cattura) cattura.annulla?.(); });
 
 function boxCattura(testo) {
@@ -92,7 +93,7 @@ function attivaCattura(contenitore, { onCodice, annulla }) {
   });
   $$('[data-sim]', contenitore).forEach((b) => b.addEventListener('click', () => cattura?.onCodice(b.dataset.sim)));
 }
-const fermaCattura = () => { cattura = null; };
+const fermaCattura = () => { cattura = null; diagnosi = null; };
 
 // ---------------------------------------------------------------------------
 // assegnazione (comune a manuale, rapida e da "tessere non associate")
@@ -144,6 +145,7 @@ async function schedaTessere(el) {
         <div id="sel" class="campo"></div>
       </section>
       <section class="card" id="c-rapida"></section>
+      <section class="card" id="c-prova"></section>
       <section class="card" id="c-orfane" style="grid-column:1/-1"><h2>Tessere lette non associate</h2><div class="vuoto">Caricamento…</div></section>
     </div>`;
 
@@ -165,7 +167,61 @@ async function schedaTessere(el) {
 
   disegnaSelezione();
   disegnaRapida();
+  disegnaProva();
   disegnaOrfane();
+}
+
+// --- prova lettore: verifica il lettore reale e la tessera, senza associare nulla ---
+const prova = { attiva: false, letture: [], ultimaDiag: null };
+function disegnaProva() {
+  const box = $('#c-prova');
+  if (!box) return;
+  if (!prova.attiva) {
+    box.innerHTML = `<h2>Prova lettore</h2>
+      <p>Verifica il lettore RFID: passa una tessera e vedi il codice letto, la velocità del lettore e a chi è associata. Non modifica nulla.</p>
+      <div><button class="btn primario" type="button" data-avvia-prova>Avvia prova</button></div>`;
+    $('[data-avvia-prova]', box).addEventListener('click', () => {
+      if (!soloOnline()) return;
+      prova.attiva = true;
+      prova.letture = [];
+      disegnaProva();
+    });
+    return;
+  }
+  const righe = prova.letture.map((l) => {
+    const t = stato.tessere.find((x) => x.codice === l.codice && x.attiva);
+    const socio = t ? stato.sociById.get(t.socio_id) : null;
+    const esito = l.accettato === false
+      ? `<span class="pill negato">Scartato</span> <span class="vuoto">troppo lento: ${l.gapMaxMs} ms tra due tasti (soglia ${l.sogliaMs} ms)</span>`
+      : socio ? `<span class="pill ok">Associata</span> ${esc(nome(socio))}`
+        : `<span class="pill warn">Non associata</span> <button class="btn piccolo" type="button" data-associa-codice="${esc(l.codice)}">Associa a un socio…</button>`;
+    const misure = l.caratteri ? `${l.caratteri} caratteri · ${l.durataMs} ms · max ${l.gapMaxMs} ms tra due tasti` : 'simulazione';
+    return `<tr><td class="mono">${esc(l.codice)}</td><td>${misure}</td><td>${esito}</td></tr>`;
+  }).join('');
+  box.innerHTML = `<h2>Prova lettore</h2>
+    <div id="zona-prova">${boxCattura('Passa una tessera sul lettore')}</div>
+    ${righe ? `<div class="tabella-wrap"><table><thead><tr><th>Codice letto</th><th>Lettura</th><th>Tessera</th></tr></thead><tbody>${righe}</tbody></table></div>` : ''}
+    <div><button class="btn" type="button" data-termina-prova>Termina prova</button></div>`;
+  const chiudi = () => { prova.attiva = false; fermaCattura(); disegnaProva(); };
+  $('[data-termina-prova]', box).addEventListener('click', chiudi);
+  $$('[data-associa-codice]', box).forEach((b) => b.addEventListener('click', () => {
+    chiudi();
+    assegnazione.codicePreimpostato = b.dataset.associaCodice;
+    disegnaSelezione();
+    $('#c-assegna').scrollIntoView({ behavior: 'smooth' });
+    if (!assegnazione.socio) $('#q-socio')?.focus();
+  }));
+  const aggiungi = (l) => { prova.letture = [l, ...prova.letture].slice(0, 8); disegnaProva(); };
+  attivaCattura($('#zona-prova', box), {
+    annulla: chiudi,
+    // lettura accettata: se arriva dal lettore la diagnostica è già stata registrata, altrimenti è la simulazione
+    onCodice: (codice) => {
+      const giaMisurata = prova.ultimaDiag?.codice === codice;
+      prova.ultimaDiag = null;
+      if (!giaMisurata) aggiungi({ codice });
+    },
+  });
+  diagnosi = (info) => { prova.ultimaDiag = info; aggiungi(info); };
 }
 
 function disegnaSelezione() {
