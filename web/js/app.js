@@ -1353,6 +1353,7 @@ const titles = {
   posta: ['Posta', 'Comunicazioni automatiche agli iscritti'],
   pagamenti: ['Pagamenti', 'Riepilogo incassi'], log: ['Log attività', 'Tutte le modifiche al database, con utente e dettagli'],
   importa: ['Import abbonamenti', 'Dal vecchio gestionale: solo abbonamenti, le anagrafiche non vengono toccate'],
+  tessere: ['Tessere', 'Tessere RFID, terminale ingresso e storico accessi'],
 };
 function go(view) {
   document.querySelectorAll('.view').forEach((v) => (v.hidden = true));
@@ -1365,6 +1366,24 @@ function go(view) {
   if (view === 'pagamenti') loadPayments();
   if (view === 'log') { logCache = null; loadLog(); }   // ogni apertura rilegge il log aggiornato
   if (view === 'importa') renderImporta();
+  // sezione Tessere: la pagina di gestione di accessi/ incorporata (caricata alla prima apertura)
+  if (view === 'tessere' && !$('#frame-tessere').src) $('#frame-tessere').src = 'accessi/gestione/?embed=1';
+}
+
+// contatore "accessi offline da verificare" sulla voce Tessere
+function mostraContaTessere(n) {
+  const c = $('#c-tessere');
+  c.hidden = !n;
+  c.textContent = n || '';
+}
+window.addEventListener('message', (e) => {
+  if (e.origin === location.origin && e.data?.tipo === 'gymin-tessere') mostraContaTessere(e.data.daVerificare);
+});
+async function caricaContaTessere() {
+  const supa = await getSupa();
+  const { count, error } = await supa.from('accessi_log').select('id', { count: 'exact', head: true })
+    .eq('da_verificare', true).is('verificato_il', null);
+  if (!error) mostraContaTessere(count);   // tabella assente (migrazione non applicata): nessun contatore
 }
 
 // ---------- login ----------
@@ -1696,6 +1715,7 @@ async function boot() {
   const ok = await ensureAuth();
   if (!ok) return;
   try { await setupUser(); } catch (err) { console.error(errMsg(err)); }
+  caricaContaTessere().catch(() => {});
 
   try {
     DATA = await loadData();

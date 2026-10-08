@@ -6,7 +6,7 @@ Terminale di **controllo accessi** per l'ingresso della palestra, più una pagin
 | Pagina | Per chi | Cosa fa |
 |---|---|---|
 | `/accessi/ingresso/` | PC dell'ingresso (Chrome in modalità kiosk) | Passi la tessera RFID e lo schermo diventa verde o rosso, con suono, nome del socio e abbonamento |
-| `/accessi/gestione/` | Staff (login di GymIN) | Associa le tessere, annulla un ingresso, consulta lo storico, gestisce gli accessi offline da verificare e i terminali |
+| `/accessi/gestione/` | Staff (login di GymIN), anche dentro GymIN alla voce **Tessere** | Associa le tessere, annulla un ingresso, consulta lo storico, gestisce gli accessi offline da verificare e i terminali |
 
 > **Stato:** completo. Fase 1 (online), fase 2 (offline: PWA, cache locale, coda eventi, sincronizzazione, conflitti) e fase 3 (script kiosk per Windows e guida di installazione).
 
@@ -225,6 +225,16 @@ La pubblicazione è automatica su GitHub Pages insieme a GymIN (`.github/workflo
 La build (`npm run build`) copia `app/` in `dist/` e genera `config.js` dalle Variables `SUPABASE_URL` e `SUPABASE_ANON_KEY` del repo (in mancanza, dal `web/config.js` di GymIN). Aggiunge anche la versione ai link, per invalidare la cache.
 
 Prima di usarlo con i dati veri bisogna **applicare le migrazioni** in Supabase e creare un terminale da `/gestione` (vedi la checklist qui sotto).
+
+### Sezione "Tessere" di GymIN
+
+Nel menu di GymIN la voce **Tessere** mostra la pagina di gestione incorporata (`accessi/gestione/?embed=1`):
+
+- non ha una testata propria;
+- usa la stessa sessione e lo stesso tema chiaro/scuro di GymIN;
+- il numero di accessi offline da verificare compare sulla voce di menu.
+
+Il codice resta uno solo, in `accessi/`. In sviluppo, `npm run web` di GymIN serve solo `web/`, quindi la sezione appare vuota: per provarla usa il sito di test o `accessi/`.
 
 ### Messa in produzione (checklist)
 
