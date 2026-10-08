@@ -7,6 +7,7 @@ import { apriArchivio } from './archivio.js';
 import { creaSincronizzatore, SOGLIA_OROLOGIO_MS } from './sync.js';
 import { TESSERE_TEST, ALTRI_CASI } from './demo.js';
 import { scaricaMeteo } from './meteo.js';
+import { configPorta, creaApriporta } from './porta.js';
 
 const CFG = window.ACCESSI_CONFIG || {};
 const DURATA_ESITO = CFG.DURATA_ESITO_MS || 3000;
@@ -23,6 +24,7 @@ const SPAZIO = DEMO ? 'demo' : (CFG.DB_SCHEMA || 'public');
 const CHIAVE_TOKEN = `gymin.accessi.token${SPAZIO === 'public' ? '' : `.${SPAZIO}`}`;
 const NOME_DB = `gymin-accessi-${SPAZIO}`;
 const CHIAVE_NOME = `gymin.accessi.nome.${SPAZIO}`;
+const CHIAVE_SHELLY = `gymin.accessi.shelly.${SPAZIO}`;
 
 const store = {
   get: (k) => { try { return localStorage.getItem(k); } catch { return null; } },
@@ -35,6 +37,20 @@ if (params.get('token')) {
   params.delete('token');
   history.replaceState(null, '', location.pathname + (params.size ? `?${params}` : ''));
 }
+
+// indirizzo dello Shelly di QUESTO PC, passato una volta via URL (?shelly=http://192.168.1.50, ?shelly=off per toglierlo)
+if (params.has('shelly')) {
+  const v = params.get('shelly').trim();
+  store.set(CHIAVE_SHELLY, !v || v === 'off' ? null : v);
+  params.delete('shelly');
+  history.replaceState(null, '', location.pathname + (params.size ? `?${params}` : ''));
+}
+const porta = creaApriporta(configPorta(CFG, { shellyUrl: store.get(CHIAVE_SHELLY), sim: SIM }), {
+  onEsito: (e) => {
+    if (!e.ok && !e.saltato) console.warn('Apertura porta non riuscita:', e.errore);
+    aggiornaPannelloSim();
+  },
+});
 
 let data = null;          // terminale (dataLayer: remoto + locale)
 let sync = null;          // sincronizzatore
@@ -194,6 +210,8 @@ function mostraEsito(r) {
   $('#e-avviso').hidden = !a;
   if (a) $('#e-avviso').innerHTML = `${ICONE.avviso}${esc(a)}`;
 
+  $('#e-porta').hidden = true;
+
   // colori e suoni identici offline: solo un piccolo badge
   $('#e-badge').hidden = !r.offline;
   $('#e-badge').textContent = `OFFLINE · ${inCoda()} da sincronizzare`;
@@ -231,10 +249,14 @@ async function onCodice(codice) {
   try {
     // online entro ~2 s, altrimenti decisione locale con lo STESSO evento_id
     const r = await data.registraLettura({ codice, evento_id: crypto.randomUUID(), ts });
+    // tessera valida: apre SUBITO la porta (in LAN, funziona anche offline), senza aspettare la risposta
+    const apertura = r.esito === 'ok' && porta.attivo ? porta.apri() : null;
     if (!r.offline && r.ora_server && sync) sync.stato.sfasamentoMs = Date.now() - Date.parse(r.ora_server);
     await sync?.aggiornaContatori();
     suona(r.esito === 'ok' ? 'ok' : 'negato', RITARDO_SUONI);
     mostraEsito(r);
+    // l'ingresso resta valido (già registrato): se il relè non risponde lo si dice sullo schermo verde
+    apertura?.then((e) => { if (!e.ok && vista === 'esito') $('#e-porta').hidden = false; });
   } catch (e) {
     if (e instanceof ErroreAutorizzazione) { apriSetup('Terminale non autorizzato: il token è stato revocato o non è valido.'); return; }
     suona('negato', RITARDO_SUONI);
@@ -325,12 +347,17 @@ window.addEventListener('dblclick', () => {
 });
 
 let pannelloSim = null;
+const fmtOraSec = new Intl.DateTimeFormat('it-IT', { timeZone: TZ, hour: '2-digit', minute: '2-digit', second: '2-digit' });
 function aggiornaPannelloSim() {
   if (!pannelloSim) return;
   const s = sync?.stato;
   const ultima = s?.ultimaSync ? fmtOra.format(new Date(s.ultimaSync)) : 'mai';
   pannelloSim.querySelector('#sim-stato').textContent =
     `${data?.online === false ? 'Offline' : 'Online'} · in coda: ${s?.inCoda ?? 0} · ultima sincronizzazione: ${ultima}${s?.ultimoErrore ? ` · errore: ${s.ultimoErrore}` : ''}`;
+  const u = porta.ultimo;
+  const descr = porta.tipo === 'shelly' ? `Shelly ${porta.url}` : porta.tipo === 'sim' ? 'simulata (nessun relè)' : 'spenta';
+  pannelloSim.querySelector('#sim-porta').textContent = `Porta: ${descr}`
+    + (u ? ` · ultimo comando ${fmtOraSec.format(new Date(u.quando))}: ${u.ok ? `aperta${u.ms ? ` (${u.ms} ms)` : ''}` : u.errore || 'non inviato'}` : '');
 }
 
 if (SIM) {
@@ -351,8 +378,9 @@ if (SIM) {
     <div class="nota">Altri casi</div>
     <div class="chips">${ALTRI_CASI.map((t) => `<button class="btn piccolo" data-codice="${t.codice}" title="${t.codice}">${t.descr}</button>`).join('')}</div>
     <label class="interruttore"><input type="checkbox" id="sim-offline"> Simula offline</label>
-    <div class="riga"><button class="btn piccolo" id="sim-sync">Sincronizza ora</button></div>
+    <div class="riga"><button class="btn piccolo" id="sim-sync">Sincronizza ora</button><button class="btn piccolo" id="sim-apri">Apri porta (prova)</button></div>
     <div class="nota" id="sim-stato"></div>
+    <div class="nota" id="sim-porta"></div>
     <div class="nota">Le tessere di test esistono nei dati demo (in memoria, senza database) e nel seed di sviluppo (sql/seed-dev.sql).</div>`;
   document.body.append(btn, p);
   btn.addEventListener('click', () => { p.hidden = !p.hidden; aggiornaPannelloSim(); });
@@ -371,6 +399,7 @@ if (SIM) {
     aggiornaStato();
   });
   p.querySelector('#sim-sync').addEventListener('click', () => sync?.sincronizza());
+  p.querySelector('#sim-apri').addEventListener('click', () => porta.apri());
 }
 
 avvia();

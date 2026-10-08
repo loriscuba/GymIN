@@ -9,7 +9,8 @@
     "build": "node scripts/build.mjs",
     "test": "node --test test/*.test.js",
     "test:db": "node scripts/test-db.mjs",
-    "seed:dev": "node scripts/seed-dev.mjs"
+    "seed:dev": "node scripts/seed-dev.mjs",
+    "shelly:finto": "node scripts/shelly-finto.mjs"
   },
   "devDependencies": {
     "fake-indexeddb": "^6.2.5",

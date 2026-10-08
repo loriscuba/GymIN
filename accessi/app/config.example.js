@@ -12,4 +12,11 @@ window.ACCESSI_CONFIG = {
   CACHE_MAX_ORE: 72,
   SYNC_INTERVALLO_MS: 60000,
   LETTORE_MAX_GAP_MS: 100,
+  // apriporta (relè Shelly in LAN): SHELLY_URL vuoto = spento
+  PORTA_TIPO: '',
+  SHELLY_URL: '',
+  SHELLY_GEN: 2,
+  SHELLY_CANALE: 0,
+  PORTA_IMPULSO_S: 1,
+  PORTA_TIMEOUT_MS: 1500,
 };
