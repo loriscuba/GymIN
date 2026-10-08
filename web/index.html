@@ -238,6 +238,7 @@
   .ibtn svg{width:17px;height:17px}
   .ibtn.quick{color:var(--good);background:var(--good-bg)}
   .ibtn.full{color:var(--accent-ink);background:var(--accent-soft)}
+  .ibtn.entry{color:var(--violet);background:color-mix(in srgb,var(--violet) 12%,transparent)}
   .ibtn.pay{color:var(--teal);background:color-mix(in srgb,var(--teal) 12%,transparent)}
   .ibtn.remind{color:var(--blue);background:color-mix(in srgb,var(--blue) 15%,transparent)}
   .ibtn.del{color:var(--bad);background:var(--bad-bg)}
@@ -481,16 +482,6 @@
 </div>
 
 <!-- Modale: registra accesso -->
-<div class="overlay" id="modal-accesso" hidden>
-  <form class="modal" id="accessoform">
-    <div class="mhead"><div><h3>Registra accesso</h3><div class="msub">L'esito dipende dallo stato dell'abbonamento</div></div><button type="button" class="xbtn" data-close="modal-accesso">×</button></div>
-    <div class="mbody">
-      <div class="field"><label for="a-socio-q">Socio</label><input type="hidden" id="a-socio"><input id="a-socio-q" placeholder="Cerca per nome, tessera, email o telefono…" autocomplete="off"><div class="socio-res" id="a-socio-res"></div></div>
-      <div class="field"><label for="a-ingresso">Ingresso</label><select id="a-ingresso"><option>Tornello A</option><option>Tornello B</option><option>Reception</option></select></div>
-    </div>
-    <div class="mfoot"><button type="button" class="btn-ghost" data-close="modal-accesso">Annulla</button><button type="submit" class="btn-primary">Registra</button></div>
-  </form>
-</div>
 
 <!-- Modale: registra pagamento diretto (saldo abbonamento o prezzo libero) -->
 <div class="overlay" id="modal-pagamento" hidden>

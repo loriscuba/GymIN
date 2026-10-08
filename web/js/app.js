@@ -122,11 +122,12 @@ const who = (m) => `<div class="who" data-member="${m.sid}" role="button" tabind
 const zapSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8z"/></svg>';
 const refreshSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v6h-6"/></svg>';
 const mailSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg>';
+const doorSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"/></svg>';
 const cardSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20M6 15h4"/></svg>';
 const trashSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>';
 const editSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>';
 // stessi pulsanti-icona usati sia in tabella sia nella scheda socio
-const actionIcons = (m) => `<button class="ibtn edit" data-edit="${m.sid}" data-tip="Modifica dati" aria-label="Modifica dati">${editSvg}</button><button class="ibtn remind" data-remind="${m.sid}" data-tip="Invia promemoria" aria-label="Invia promemoria">${mailSvg}</button><button class="ibtn quick" data-quickrenew="${m.sid}" data-tip="Rinnovo rapido · mantiene il piano" aria-label="Rinnovo rapido">${zapSvg}</button><button class="ibtn full" data-renew="${m.sid}" data-tip="Rinnova · scegli il piano" aria-label="Rinnova con opzioni">${refreshSvg}</button><button class="ibtn pay" data-payments="${m.sid}" data-tip="Visualizza pagamenti" aria-label="Visualizza pagamenti">${cardSvg}</button>`;
+const actionIcons = (m) => `<button class="ibtn edit" data-edit="${m.sid}" data-tip="Modifica dati" aria-label="Modifica dati">${editSvg}</button><button class="ibtn remind" data-remind="${m.sid}" data-tip="Invia promemoria" aria-label="Invia promemoria">${mailSvg}</button><button class="ibtn quick" data-quickrenew="${m.sid}" data-tip="Rinnovo rapido · mantiene il piano" aria-label="Rinnovo rapido">${zapSvg}</button><button class="ibtn full" data-renew="${m.sid}" data-tip="Rinnova · scegli il piano" aria-label="Rinnova con opzioni">${refreshSvg}</button>${m.plan.entrate ? `<button class="ibtn entry" data-entry="${m.sid}" data-tip="Registra ingresso · scala un'entrata" aria-label="Registra ingresso">${doorSvg}</button>` : ''}<button class="ibtn pay" data-payments="${m.sid}" data-tip="Visualizza pagamenti" aria-label="Visualizza pagamenti">${cardSvg}</button>`;
 const actionsCell = (m) => `<td><div class="actions-cell">${actionIcons(m)}</div></td>`;
 
 function renderDashboard() {
@@ -731,39 +732,20 @@ function socioPicker(key, onPick = () => {}) {
   res.addEventListener('mousedown', (e) => { const b = e.target.closest('[data-i]'); if (b) { e.preventDefault(); pick(hits[+b.dataset.i]); } });
   return { set: (sid) => pick(DATA.members.find((m) => m.sid === sid) || null), focus: () => q.focus() };
 }
-let accPicker, payPicker;
+let payPicker;
 
-function openAccessoModal() {
-  accPicker.set(null);
-  openModal('modal-accesso');
-  accPicker.focus();
-}
-function submitAccesso(e) {
-  e.preventDefault();
-  const m = DATA.members.find((x) => x.sid === $('#a-socio').value);
-  if (!m) { toast('Cerca e seleziona un socio', 'warn'); accPicker.focus(); return; }
-  const isCarnet = !!m.plan.entrate;
-  let ok, extra = '', motivo = 'abbonamento scaduto';
-  if (isCarnet) {
-    if ((m.entrateResidue || 0) <= 0) { ok = false; motivo = 'carnet esaurito'; }
-    else {
-      ok = true;
-      m.entrateResidue -= 1;                       // consuma un'entrata dal carnet
-      m.stato = computeStato(m);
-      extra = ` · ${m.entrateResidue} ${m.entrateResidue === 1 ? 'entrata rimasta' : 'entrate rimaste'}`;
-    }
-  } else {
-    ok = m.stato !== 'Scaduto';
-  }
-  const now = new Date();
-  DATA.accessi.unshift({
-    time: now.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }),
-    nome: m.nome, id: m.id, av: m.av, plan: m.plan.name, ing: $('#a-ingresso').value,
-    ok, warnScad: m.stato === 'In scadenza',
-  });
-  renderAll();                                     // aggiorna anche stato/entrate nelle altre viste
-  closeModal('modal-accesso');
-  toast(ok ? `Accesso registrato · ${m.nome}${extra}` : `Accesso NEGATO · ${m.nome} (${motivo})`, ok ? 'ok' : 'warn');
+// ingresso manuale per i soci con carnet: stesse regole del terminale, scala un'entrata
+async function registraIngresso(sid) {
+  const m = DATA.members.find((x) => x.sid === sid); if (!m) return;
+  const supa = await getSupa();
+  if (!supa) { toast('Connessione Supabase non disponibile. Verifica la configurazione del database.', 'warn'); return; }
+  const { data, error } = await supa.rpc('staff_registra_ingresso', { p_socio: m.sid });
+  if (error) { console.error(errMsg(error)); toast('Errore ingresso: ' + errMsg(error), 'warn'); return; }
+  const ok = data.esito === 'ok';
+  const extra = data.residuo_dopo != null ? ` · ${data.residuo_dopo} ${data.residuo_dopo === 1 ? 'entrata rimasta' : 'entrate rimaste'}` : '';
+  toast(ok ? `Ingresso registrato · ${m.nome}${extra}` : `Ingresso NEGATO · ${m.nome} (${data.motivo || 'non valido'})`, ok ? 'ok' : 'warn');
+  DATA = await loadData();
+  renderAll();
   if (!$('#modal-scheda').hidden && schedaSid === m.sid) openScheda(m.sid);
 }
 
@@ -1564,7 +1546,6 @@ function wireEvents() {
     await saveSocio(f);
   });
   $('#privacyform').addEventListener('submit', submitPrivacySocio);
-  $('#accessoform').addEventListener('submit', submitAccesso);
   $('#btn-reminders').addEventListener('click', sendReminders);
   $('#exp-filters').addEventListener('click', (e) => { const b = e.target.closest('.chip'); if (!b) return; expWindow = +b.dataset.w; renderDashboard(); });
   $('#btn-send-real-mail').addEventListener('click', sendRealMail);
@@ -1596,7 +1577,6 @@ function wireEvents() {
   let logTimer;
   $('#logsearch').addEventListener('input', (e) => { clearTimeout(logTimer); logTimer = setTimeout(() => { logState.query = e.target.value; renderLog(); }, 150); });
   $('#pagamentoform').addEventListener('submit', submitPagamento);
-  accPicker = socioPicker('a-socio');
   payPicker = socioPicker('p-socio', onPagamentoSocio);
   $('#p-piano').addEventListener('change', onPagamentoPiano);
   $('#p-tipo').addEventListener('change', onPagamentoPiano);
@@ -1617,6 +1597,7 @@ function wireEvents() {
     const rd = e.target.closest('[data-remind]'); if (rd) return sendReminderTo(rd.dataset.remind);
     const q = e.target.closest('[data-quickrenew]'); if (q) return quickRenew(q.dataset.quickrenew);
     const r = e.target.closest('[data-renew]'); if (r) return openRinnovoModal(r.dataset.renew);
+    const en = e.target.closest('[data-entry]'); if (en) return registraIngresso(en.dataset.entry);
     const pay = e.target.closest('[data-payments]'); if (pay) return openPayments(pay.dataset.payments);
     const pe = e.target.closest('[data-payedit]'); if (pe) return openPayEdit(pe.dataset.payedit);
     const pd = e.target.closest('[data-paydel]'); if (pd) return openPayDel(pd.dataset.paydel);
