@@ -22,9 +22,9 @@ const memState = { filter: 'Attivo', query: '', page: 1, PER: 9, expWindow: 7, s
 let planFilter = 'attivo';
 let socioMode = 'new';
 let editSid = null;
-let expWindow = 7;   // fascia "in scadenza" della dashboard: 7 / 15 / 30
-// fasce giorni alla scadenza: 7 = 0–7, 15 = 8–15, 30 = 16–31
-const EXP_BANDS = { 7: [0, 7], 15: [8, 15], 30: [16, 31] };
+let expWindow = 7;   // fascia "in scadenza" della dashboard
+// fascia giorni alla scadenza: "In scadenza" = 0–7 (oltre è Attivo)
+const EXP_BANDS = { 7: [0, 7] };
 const inExpBand = (dleft, w) => { const [lo, hi] = EXP_BANDS[w]; return dleft >= lo && dleft <= hi; };
 const expBandLabel = (w) => { const [lo, hi] = EXP_BANDS[w]; return lo ? `tra ${lo} e ${hi} giorni` : `entro ${hi} giorni`; };
 // soci con abbonamento a tempo nella fascia expWindow (esclude i carnet, che sono a consumo)
@@ -42,7 +42,7 @@ const ic = {
 // ---------- helpers di stato ----------
 const addMonths = (d, m) => { const x = new Date(d); x.setMonth(x.getMonth() + m); return x; };
 const giorniTo = (d) => { const t = new Date(); t.setHours(0, 0, 0, 0); return Math.round((new Date(d) - t) / 86400000); };
-const statoDa = (dleft) => (dleft < 0 ? 'Scaduto' : dleft <= 31 ? 'In scadenza' : 'Attivo');
+const statoDa = (dleft) => (dleft < 0 ? 'Scaduto' : dleft <= 7 ? 'In scadenza' : 'Attivo');
 // stato che tiene conto dei carnet a consumo
 const computeStato = (m) => m.plan.entrate ? (m.entrateResidue <= 0 ? 'Scaduto' : m.entrateResidue <= 1 ? 'In scadenza' : 'Attivo') : statoDa(m.dleft);
 // testo colonna "Scadenza": data per gli abbonamenti a tempo, entrate residue per i carnet
@@ -141,7 +141,7 @@ function renderDashboard() {
   $('#kpis').innerHTML =
     kpi('Fatturato (mese)', ic.euro, 'var(--accent-soft)', 'var(--accent-ink)', euro(cur), `${growth >= 0 ? '↑' : '↓'} ${Math.abs(growth).toFixed(1)}% vs mese prec.`, growth >= 0 ? 'trend-up' : 'trend-dn', sparkline(rev.slice(6), 'var(--accent)')) +
     kpi('Contratti attivi', ic.users, 'var(--good-bg)', 'var(--good)', attivi.length, `${(attivi.length / members.length * 100).toFixed(0)}% dei soci`, 'trend-up', '') +
-    kpi('In scadenza (31gg)', ic.alert, 'var(--warn-bg)', 'var(--warn)', scad.length, 'Da contattare per rinnovo', '', '') +
+    kpi('In scadenza (7gg)', ic.alert, 'var(--warn-bg)', 'var(--warn)', scad.length, 'Da contattare per rinnovo', '', '') +
     kpi('Contratti scaduti', ic.door, 'var(--bad-bg)', 'var(--bad)', scaduti.length, 'Recuperabili con win-back', '', '');
 
   const pmax = Math.max(...plans.map((p) => p.count), 1);
