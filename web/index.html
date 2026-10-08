@@ -168,6 +168,7 @@
   .overlay{position:fixed;inset:0;background:rgba(10,13,18,.55);z-index:70;display:grid;place-items:center;padding:20px}
   .modal{background:var(--surface);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);width:100%;max-width:460px;max-height:90vh;overflow:auto;display:block;min-height:0}
   .modal.wide{max-width:600px}
+  .tessera-attesa{display:grid;gap:6px;text-align:center;padding:22px 16px;border:2px dashed var(--accent);border-radius:14px;background:var(--accent-soft)}.tessera-attesa b{font-size:16px}.tessera-attesa span{color:var(--ink-2);font-size:13px}.tessera-attesa.warn{border-color:var(--warn,#b7791f);background:var(--warn-bg,#fdf6e3)}
   .modal .mhead{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:18px 22px;border-bottom:1px solid var(--line)}
   .modal .mhead h3{font-size:17px;font-weight:700}.modal .mhead .msub{font-size:12.5px;color:var(--ink-3);margin-top:2px}
   .modal .mbody{padding:20px 22px;display:block}.modal .mfoot{display:flex;gap:10px;justify-content:flex-end;padding:16px 22px;border-top:1px solid var(--line)}
@@ -606,6 +607,9 @@
 
 <!-- Modale: scheda socio (contenuto generato da JS) -->
 <div class="overlay" id="modal-scheda" hidden><div class="modal wide"></div></div>
+
+<!-- Modale: associa tessera (lettore USB) -->
+<div class="overlay" id="modal-tessera" hidden><div class="modal"></div></div>
 
 <!-- Modale: informativa privacy (versioni) -->
 <div class="overlay" id="modal-informativa" hidden>

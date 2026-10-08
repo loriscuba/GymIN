@@ -699,6 +699,7 @@ async function saveSocio(f) {
   }
   resetMemberList();
   go('anagrafiche');
+  openAssociaTessera(member.sid, true);
 }
 
 // "Sì, usa questo": il socio esistente resta com'è, riceve solo il nuovo abbonamento.
@@ -917,7 +918,7 @@ function openScheda(sid) {
       <div id="scheda-privacy">${schedaPrivacyHtml(m, null)}</div>
     </div>
     <div class="mfoot" style="justify-content:space-between;align-items:center">
-      <button type="button" class="btn-ghost" data-close="modal-scheda">Chiudi</button>
+      <div style="display:flex;gap:8px"><button type="button" class="btn-ghost" data-close="modal-scheda">Chiudi</button><button type="button" class="btn-ghost" data-tessera="${m.sid}">Associa tessera</button></div>
       <div class="actions-cell">${actionIcons(m)}</div>
     </div>`;
   openModal('modal-scheda');
@@ -1386,13 +1387,17 @@ async function caricaContaTessere() {
   if (!error) mostraContaTessere(count);   // tabella assente (migrazione non applicata): nessun contatore
 }
 
-// ---------- Anagrafiche: ricerca passando la tessera sul lettore USB ----------
+// ---------- lettore tessere USB: ricerca in Anagrafiche e associazione al socio ----------
 // Il lettore (emulazione tastiera) "digita" il codice in pochi ms e chiude con Invio/Tab:
 // lo si distingue dalla digitazione a mano per la velocità (stessa soglia del terminale accessi/).
+// Con la finestra "Associa tessera" aperta il codice va all'associazione; altrimenti, in
+// Anagrafiche senza finestre aperte, apre la scheda del socio.
 const LETTORE_MAX_GAP_MS = 100;
 const lettoreAnag = { buf: '', ultimo: -Infinity };
 function onTastoAnagrafica(e) {
-  if ($('#view-anagrafiche').hidden || document.querySelector('.overlay:not([hidden])') || e.ctrlKey || e.altKey || e.metaKey) return;
+  const associa = !$('#modal-tessera').hidden;
+  if (!associa && ($('#view-anagrafiche').hidden || document.querySelector('.overlay:not([hidden])'))) return;
+  if (e.ctrlKey || e.altKey || e.metaKey) return;
   const t = e.timeStamp || performance.now();
   const veloce = t - lettoreAnag.ultimo <= LETTORE_MAX_GAP_MS;
   lettoreAnag.ultimo = t;
@@ -1401,6 +1406,7 @@ function onTastoAnagrafica(e) {
     lettoreAnag.buf = '';
     if (codice.length < 6) return;
     e.preventDefault();
+    if (associa) { associaTessera(codice); return; }
     const q = $('#memsearch');                        // toglie dal campo di ricerca i caratteri "digitati" dal lettore
     if (q.value.includes(codice)) { q.value = q.value.replace(codice, '').trim(); memState.query = q.value; memState.page = 1; renderMembers(); }
     cercaPerTessera(codice);
@@ -1408,6 +1414,41 @@ function onTastoAnagrafica(e) {
   }
   if (e.key.length === 1) lettoreAnag.buf = veloce && lettoreAnag.buf ? lettoreAnag.buf + e.key : e.key;
 }
+
+let tesseraSid = null;
+function openAssociaTessera(sid, nuovo = false) {
+  const m = DATA.members.find((x) => x.sid === sid); if (!m) return;
+  tesseraSid = sid;
+  closeModal('modal-scheda');
+  $('#modal-tessera .modal').innerHTML = `
+    <div class="mhead"><div><h3>Associa tessera</h3><div class="msub">${esc(m.nome)} · ${esc(m.id)}</div></div>
+      <button type="button" class="xbtn" data-close="modal-tessera">×</button></div>
+    <div class="mbody" id="tessera-body">
+      ${nuovo ? `<p style="margin:0 0 12px;color:var(--ink-2)">Socio aggiunto. Vuoi associargli subito una tessera?</p>` : ''}
+      <div class="tessera-attesa"><b>Passa la tessera sul lettore…</b><span>Il codice viene letto e associato automaticamente.</span></div>
+    </div>
+    <div class="mfoot"><button type="button" class="btn-ghost" data-close="modal-tessera">${nuovo ? 'Salta' : 'Chiudi'}</button></div>`;
+  lettoreAnag.buf = '';
+  openModal('modal-tessera');
+}
+async function associaTessera(codice, conferma = false) {
+  const m = DATA.members.find((x) => x.sid === tesseraSid); if (!m) return;
+  const supa = await getSupa();
+  const { data, error } = await supa.rpc('staff_assegna_tessera', { p_socio_id: m.sid, p_codice: codice, p_modo: 'aggiungi', p_conferma: conferma });
+  if (error) { toast('Associazione tessera non riuscita: ' + error.message, 'warn'); return; }
+  if (data.stato === 'conferma') {
+    const a = data.altro_socio || {};
+    $('#tessera-body').innerHTML = `<div class="tessera-attesa warn"><b>La tessera ${esc(data.codice)} è già di ${esc(`${a.nome || ''} ${a.cognome || ''}`.trim())}</b>
+      <span>Associandola a ${esc(m.nome)} verrà disattivata per l’altro socio.</span>
+      <div style="display:flex;gap:10px;justify-content:center;margin-top:10px"><button type="button" class="btn-ghost" id="tessera-annulla">Annulla</button><button type="button" class="btn-primary" id="tessera-conferma">Riassegna a ${esc(m.nome)}</button></div></div>`;
+    $('#tessera-conferma').onclick = () => associaTessera(data.codice, true);
+    $('#tessera-annulla').onclick = () => openAssociaTessera(m.sid);
+    return;
+  }
+  closeModal('modal-tessera');
+  toast(data.stato === 'gia_associata' ? `La tessera ${data.codice} è già di ${m.nome}` : `Tessera ${data.codice} associata a ${m.nome}`);
+}
+
 async function cercaPerTessera(codice) {
   const supa = await getSupa();
   const { data, error } = await supa.from('tessere').select('socio_id').eq('codice', codice).eq('attiva', true).maybeSingle();
@@ -1553,6 +1594,7 @@ function wireEvents() {
   // delega globale: chiusura modali, rinnovo rapido, rinnovo con opzioni, apri scheda
   document.addEventListener('click', (e) => {
     const c = e.target.closest('[data-close]'); if (c) return closeModal(c.dataset.close);
+    const ts = e.target.closest('[data-tessera]'); if (ts) return openAssociaTessera(ts.dataset.tessera);
     const planEdit = e.target.closest('[data-plan-edit]'); if (planEdit) return editPlan(planEdit.dataset.planEdit);
     const planDel = e.target.closest('[data-plan-delete]'); if (planDel) return deletePlan(planDel.dataset.planDelete);
     const ed = e.target.closest('[data-edit]'); if (ed) return openSocioModal('edit', ed.dataset.edit);
