@@ -6,6 +6,7 @@ import { creaDataLayerTerminale, remotoConfigurato, ErroreAutorizzazione, Errore
 import { apriArchivio } from './archivio.js';
 import { creaSincronizzatore, SOGLIA_OROLOGIO_MS } from './sync.js';
 import { TESSERE_TEST, ALTRI_CASI } from './demo.js';
+import { scaricaMeteo } from './meteo.js';
 
 const CFG = window.ACCESSI_CONFIG || {};
 const DURATA_ESITO = CFG.DURATA_ESITO_MS || 3000;
@@ -73,6 +74,25 @@ function tick() {
 }
 setInterval(tick, 1000);
 tick();
+
+// meteo di oggi (facoltativo: senza rete o con METEO_LAT vuoto il riquadro resta nascosto)
+async function aggiornaMeteo() {
+  if (!CFG.METEO_LAT || !CFG.METEO_LON) return;
+  try {
+    const m = await scaricaMeteo(CFG.METEO_LAT, CFG.METEO_LON);
+    if (!m) return;
+    const minmax = m.min != null && m.max != null ? `min ${m.min}° · max ${m.max}°` : '';
+    const pioggia = m.pioggia ? ` · pioggia ${m.pioggia}%` : '';
+    $('#meteo').innerHTML = `<span class="m-icona">${m.icona}</span><span class="m-temp">${m.temp}°</span>`
+      + `<span class="m-testo">${esc(m.testo)}</span>`
+      + `<span class="m-dett">${CFG.METEO_LUOGO ? `${esc(CFG.METEO_LUOGO)} · ` : ''}${minmax}${pioggia}</span>`;
+    $('#meteo').hidden = false;
+  } catch (e) {
+    console.warn('Meteo non disponibile:', e.message);   // resta l'ultimo valore mostrato (o nascosto)
+  }
+}
+aggiornaMeteo();
+setInterval(aggiornaMeteo, 30 * 60 * 1000);
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const offline = () => !!data && data.online === false;

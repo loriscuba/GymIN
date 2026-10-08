@@ -6,8 +6,14 @@ body:not(.sim){cursor:none}
 
 /* attesa */
 #v-attesa{background:radial-gradient(120% 90% at 50% 0%,#1d2430 0%,var(--sidebar) 60%)}
-#v-attesa .marchio{position:absolute;top:4vh;left:5vw;font-size:4.2vh;color:#fff}
-.orologio{font-family:var(--font-display);font-weight:800;font-size:24vh;line-height:1;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+#v-attesa .logo-box{background:#fff;border-radius:3vh;padding:2.2vh 3vh;box-shadow:0 2vh 6vh rgba(0,0,0,.35);margin-bottom:1vh}
+#v-attesa .logo-box img{display:block;height:26vh;width:auto}
+.meteo{position:absolute;top:4vh;right:5vw;display:grid;grid-template-columns:auto auto;align-items:center;column-gap:2vh;text-align:left;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);border-radius:2.5vh;padding:1.6vh 2.4vh;max-width:28vw}
+.meteo .m-icona{font-size:7vh;line-height:1;grid-row:span 3}
+.meteo .m-temp{font-family:var(--font-display);font-weight:800;font-size:5vh;line-height:1}
+.meteo .m-testo{font-size:2.2vh;color:#fff}
+.meteo .m-dett{font-size:1.9vh;color:#aeb6c4}
+.orologio{font-family:var(--font-display);font-weight:800;font-size:17vh;line-height:1;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
 .data{font-size:4.2vh;color:#aeb6c4;text-transform:capitalize}
 .invito{margin-top:5vh;display:flex;align-items:center;gap:2.4vh;font-family:var(--font-display);font-weight:700;font-size:8vh;color:#fff}
 .invito svg{width:9vh;height:9vh;color:var(--accent);animation:pulsa 2.4s ease-in-out infinite}
