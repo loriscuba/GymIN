@@ -67,3 +67,10 @@ tr.annullato td:last-child{text-decoration:none}
 
 /* simulazione in gestione */
 .sim-box{border:1px dashed var(--ink-3);border-radius:10px;padding:10px;display:grid;gap:8px;font-size:13px}
+
+/* incorporata nella sezione "Tessere" di GymIN: niente testata propria, sfondo di GymIN */
+body.incorporata .testata{display:none}
+body.incorporata main{padding:20px 0}
+body.incorporata .schede{border-radius:var(--radius);border:1px solid var(--line);margin:0}
+body.incorporata #offline{margin:0 0 12px}
+body.incorporata .login{margin:4vh auto}

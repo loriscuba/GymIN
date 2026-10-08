@@ -8,6 +8,23 @@ import { TESSERE_TEST, ALTRI_CASI } from './demo.js';
 
 const CFG = window.ACCESSI_CONFIG || {};
 const SIM = new URLSearchParams(location.search).get('sim') === '1';
+// ?embed=1: pagina incorporata nella sezione "Tessere" di GymIN (stessa origine, stessa sessione)
+const EMBED = new URLSearchParams(location.search).get('embed') === '1' && window.parent !== window;
+if (EMBED) {
+  document.body.classList.add('incorporata');
+  // stesso tema chiaro/scuro di GymIN, anche quando lo si cambia
+  try {
+    const radice = window.parent.document.documentElement;
+    const copiaTema = () => {
+      const t = radice.getAttribute('data-theme');
+      if (t) document.documentElement.setAttribute('data-theme', t); else document.documentElement.removeAttribute('data-theme');
+    };
+    copiaTema();
+    new MutationObserver(copiaTema).observe(radice, { attributes: true, attributeFilter: ['data-theme'] });
+  } catch { /* origine diversa: tema del sistema */ }
+}
+/** Avvisa GymIN (pagina contenitore) del numero di accessi offline da verificare */
+const avvisaContenitore = (n) => { if (EMBED) window.parent.postMessage({ tipo: 'gymin-tessere', daVerificare: n }, location.origin); };
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -421,6 +438,7 @@ async function aggiornaContaVerificare() {
     const n = (await dl.daVerificare()).length;
     $('#n-verificare').hidden = !n;
     $('#n-verificare').textContent = n;
+    avvisaContenitore(n);
   } catch { /* non bloccante */ }
 }
 async function schedaVerificare(el) {
