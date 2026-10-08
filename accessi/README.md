@@ -143,11 +143,13 @@ Le regole sono in un'**unica funzione pura**, `decidiAbbonamenti()` in `app/js/e
 
 ## Lettore RFID
 
-Il lettore USB 125 kHz EM4100 lavora in emulazione tastiera: digita il codice in pochi millisecondi e poi preme Invio.
+Il lettore USB 125 kHz EM4100 lavora in emulazione tastiera: digita il codice in pochi millisecondi (es. `0003827938`) e poi preme Invio.
 
-- `lettore.js` ascolta la tastiera **globalmente** (funziona anche senza focus) e accumula solo i tasti arrivati a raffica (meno di 50 ms l'uno dall'altro). I tasti digitati lentamente a mano vengono ignorati.
-- Il codice viene messo in maiuscolo e ripulito dagli spazi. Lunghezza e formato sono liberi.
+- `lettore.js` ascolta la tastiera **globalmente** (funziona anche senza focus) e accumula solo i tasti arrivati a raffica. La soglia è **100 ms** tra un tasto e l'altro, configurabile con `LETTORE_MAX_GAP_MS`. I tasti digitati lentamente a mano vengono ignorati.
+- La lettura si chiude con **Invio** oppure con **Tab**, perché alcuni lettori usano quest'ultimo.
+- Il codice viene messo in maiuscolo e ripulito dagli spazi. Lunghezza e formato sono liberi e gli **zeri iniziali vengono conservati**.
 - Il codice letto può essere diverso dal numero stampato sulla tessera, quindi **le tessere si associano sempre passandole sul lettore**.
+- **Prova lettore** (/gestione → Tessere) mostra, per ogni tessera passata, il codice letto, quanti caratteri, quanto tempo ha impiegato il lettore e l'intervallo massimo tra due tasti. Dice anche se la lettura sarebbe stata scartata perché troppo lenta, e se la tessera è associata o a chi; se non lo è, si associa con un clic. Non modifica nulla da sola: serve a verificare un lettore nuovo. Se un lettore risulta "troppo lento", alza `LETTORE_MAX_GAP_MS` (per esempio a 150).
 
 ## Sviluppo
 
