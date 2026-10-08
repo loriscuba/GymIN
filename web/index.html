@@ -259,6 +259,12 @@
   .scheda-grid>div{background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
   .scheda-grid span{display:block;font-size:11.5px;color:var(--ink-3);margin-bottom:4px}
   .scheda-grid b{font-size:14px}
+  /* scheda socio in orizzontale: dati a sinistra, privacy a destra, niente scorrimento verticale */
+  #modal-scheda .modal{max-width:min(1180px,96vw)}
+  .scheda-cols{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr);gap:20px;align-items:start}
+  .scheda-cols .scheda-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+  #scheda-privacy>.pv-sec:first-child{margin-top:0}
+  @media (max-width:900px){.scheda-cols{grid-template-columns:1fr}.scheda-cols .scheda-grid{grid-template-columns:1fr 1fr}}
   /* privacy socio */
   .pv-sec{margin-top:14px;padding:14px;border:1px solid var(--line);border-radius:10px;background:var(--surface-2)}
   .pv-h{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:12px;font-weight:700;color:var(--ink-2);letter-spacing:.04em;margin-bottom:8px}

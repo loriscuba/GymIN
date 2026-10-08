@@ -898,6 +898,7 @@ function openScheda(sid) {
       <div><h3>${m.nome}${upBadge(m)}</h3><div class="msub">${m.id} · ${m.plan.name}</div></div></div>
       <button type="button" class="xbtn" data-close="modal-scheda">×</button></div>
     <div class="mbody">
+      <div class="scheda-cols"><div>
       <div style="margin-bottom:14px">${tagFor(m.stato)}</div>
       <div class="scheda-grid">
         ${row('Email', m.email)}
@@ -915,7 +916,8 @@ function openScheda(sid) {
         : row('Scadenza', `${fmtDate(m.end)} · ${m.dleft >= 0 ? m.dleft + 'gg' : 'scaduto'}`)}
       </div>
       ${m.note ? `<div class="scheda-grid" style="grid-template-columns:1fr;margin-top:12px"><div><span>Note</span><b style="font-weight:500">${m.note}</b></div></div>` : ''}
-      <div id="scheda-privacy">${schedaPrivacyHtml(m, null)}</div>
+      </div>
+      <div id="scheda-privacy">${schedaPrivacyHtml(m, null)}</div></div>
     </div>
     <div class="mfoot" style="justify-content:space-between;align-items:center">
       <div style="display:flex;gap:8px"><button type="button" class="btn-ghost" data-close="modal-scheda">Chiudi</button><button type="button" class="btn-ghost" data-tessera="${m.sid}">Associa tessera</button></div>
