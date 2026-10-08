@@ -1386,6 +1386,37 @@ async function caricaContaTessere() {
   if (!error) mostraContaTessere(count);   // tabella assente (migrazione non applicata): nessun contatore
 }
 
+// ---------- Anagrafiche: ricerca passando la tessera sul lettore USB ----------
+// Il lettore (emulazione tastiera) "digita" il codice in pochi ms e chiude con Invio/Tab:
+// lo si distingue dalla digitazione a mano per la velocità (stessa soglia del terminale accessi/).
+const LETTORE_MAX_GAP_MS = 100;
+const lettoreAnag = { buf: '', ultimo: -Infinity };
+function onTastoAnagrafica(e) {
+  if ($('#view-anagrafiche').hidden || document.querySelector('.overlay:not([hidden])') || e.ctrlKey || e.altKey || e.metaKey) return;
+  const t = e.timeStamp || performance.now();
+  const veloce = t - lettoreAnag.ultimo <= LETTORE_MAX_GAP_MS;
+  lettoreAnag.ultimo = t;
+  if (e.key === 'Enter' || e.key === 'Tab') {
+    const codice = veloce ? lettoreAnag.buf.replace(/\s+/g, '').toUpperCase() : '';
+    lettoreAnag.buf = '';
+    if (codice.length < 6) return;
+    e.preventDefault();
+    const q = $('#memsearch');                        // toglie dal campo di ricerca i caratteri "digitati" dal lettore
+    if (q.value.includes(codice)) { q.value = q.value.replace(codice, '').trim(); memState.query = q.value; memState.page = 1; renderMembers(); }
+    cercaPerTessera(codice);
+    return;
+  }
+  if (e.key.length === 1) lettoreAnag.buf = veloce && lettoreAnag.buf ? lettoreAnag.buf + e.key : e.key;
+}
+async function cercaPerTessera(codice) {
+  const supa = await getSupa();
+  const { data, error } = await supa.from('tessere').select('socio_id').eq('codice', codice).eq('attiva', true).maybeSingle();
+  if (error) { toast('Ricerca tessera non riuscita: ' + error.message, 'warn'); return; }
+  const m = data && DATA.members.find((x) => x.sid === data.socio_id);
+  if (!m) { toast(data ? `Tessera ${codice}: socio non trovato` : `Tessera ${codice} non associata a nessun socio`, 'warn'); return; }
+  openScheda(m.sid);
+}
+
 // ---------- login ----------
 async function ensureAuth() {
   const supa = await getSupa();
@@ -1537,6 +1568,7 @@ function wireEvents() {
     const mm = e.target.closest('[data-member]'); if (mm) return openScheda(mm.dataset.member);
   });
   document.querySelectorAll('.overlay').forEach((o) => o.addEventListener('click', (e) => { if (e.target === o) closeModal(o.id); }));
+  document.addEventListener('keydown', onTastoAnagrafica, true);
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') document.querySelectorAll('.overlay:not([hidden])').forEach((o) => closeModal(o.id));
     if (e.key === 'Enter') { const mm = e.target.closest && e.target.closest('[data-member]'); if (mm) { e.preventDefault(); openScheda(mm.dataset.member); } }
