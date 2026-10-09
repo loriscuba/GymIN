@@ -6,6 +6,17 @@ import { privacyFromRow } from './privacy.js?v=__BUILD__';
 let _supa;
 let _tried = false;
 
+// supabase-js servito dal nostro dominio (vendor/, versione fissata): niente CDN di terze parti.
+function caricaSupabaseJs() {
+  if (window.supabase?.createClient) return Promise.resolve(window.supabase);
+  return new Promise((ok, ko) => {
+    const s = document.createElement('script');
+    s.src = new URL('../vendor/supabase.js', import.meta.url).href;
+    s.onload = () => (window.supabase?.createClient ? ok(window.supabase) : ko(new Error('supabase-js non valido')));
+    s.onerror = () => ko(new Error('supabase-js non caricato'));
+    document.head.append(s);
+  });
+}
 export async function getSupa() {
   if (_tried) return _supa;
   _tried = true;
@@ -16,7 +27,7 @@ export async function getSupa() {
   }
 
   try {
-    const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
+    const { createClient } = await caricaSupabaseJs();
     // DB_SCHEMA: 'test' nell'ambiente di test (stesso progetto Supabase, tabelle nello schema test)
     _supa = createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY, cfg.DB_SCHEMA ? { db: { schema: cfg.DB_SCHEMA } } : undefined);
   } catch (e) {

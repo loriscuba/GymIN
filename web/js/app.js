@@ -12,6 +12,8 @@ const euro = (n) => '€ ' + Math.round(n).toLocaleString('it-IT');
 const redact = (v) => String(v ?? '').replace(/[^\s@]+@[^\s@]+\.[^\s@]+/g, '[email]').replace(/\+?\d[\d\s.-]{7,}\d/g, '[tel]');
 const errMsg = (err) => redact(err?.message || err);
 const fmtDate = (d) => new Date(d).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' });
+// Escape HTML: ogni dato (soci, piani, log, email) inserito con innerHTML passa da qui.
+const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const initials = (n) => n.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase();
 const AV = ['#f4511e', '#2563eb', '#0d9488', '#7c3aed', '#db2777', '#0891b2', '#ca8a04', '#4f46e5'];
 
@@ -65,7 +67,7 @@ function recomputePlans() {
 function toast(msg, kind = 'ok') {
   const t = document.createElement('div');
   t.className = 'toast ' + kind;
-  t.innerHTML = `<span class="ti">${kind === 'warn' ? ic.alert : kind === 'mail' ? ic.mail : ic.check}</span><span>${msg}</span>`;
+  t.innerHTML = `<span class="ti">${kind === 'warn' ? ic.alert : kind === 'mail' ? ic.mail : ic.check}</span><span>${esc(msg)}</span>`;
   $('#toasts').appendChild(t);
   setTimeout(() => { t.classList.add('out'); setTimeout(() => t.remove(), 300); }, 3200);
 }
@@ -99,6 +101,11 @@ function showTip(el) {
   tipEl.style.top = (below ? r.bottom + 8 : r.top - 8) + 'px';
 }
 const hideTip = () => { tipEl.hidden = true; };
+// logo: se l'immagine non si carica resta il simbolo SVG (al posto di onerror inline, bloccato dalla CSP)
+document.querySelectorAll('.mark.logo img').forEach((img) => {
+  const ko = () => img.parentNode.classList.remove('logo');
+  if (img.complete && !img.naturalWidth) ko(); else img.addEventListener('error', ko);
+});
 document.addEventListener('mouseover', (e) => { const el = e.target.closest('[data-tip]'); if (el) showTip(el); });
 document.addEventListener('mouseout', (e) => { const el = e.target.closest('[data-tip]'); if (el && !el.contains(e.relatedTarget)) hideTip(); });
 document.addEventListener('click', hideTip, true);
@@ -118,7 +125,7 @@ function kpi(label, icon, bg, col, val, trend, tclass, spark) {
 const tagFor = (s) => s === 'Attivo' ? '<span class="tag g">Attivo</span>' : s === 'In scadenza' ? '<span class="tag w">In scadenza</span>' : s === 'Senza abbonamento' ? '<span class="tag n">Senza abbonamento</span>' : '<span class="tag b">Scaduto</span>';
 // badge "UP": anagrafica toccata dall'import abbonamenti (soci.aggiornato_da_import)
 const upBadge = (m) => (m && m.importUp ? ' <span class="tag g up" data-tip="Aggiornato da import">UP</span>' : '');
-const who = (m) => `<div class="who" data-member="${m.sid}" role="button" tabindex="0" data-tip="Apri scheda socio"><div class="av" style="background:${m.av}">${initials(m.nome)}</div><div><b>${m.nome}${upBadge(m)}</b><span>${m.id}</span></div></div>`;
+const who = (m) => `<div class="who" data-member="${m.sid}" role="button" tabindex="0" data-tip="Apri scheda socio"><div class="av" style="background:${m.av}">${esc(initials(m.nome))}</div><div><b>${esc(m.nome)}${upBadge(m)}</b><span>${esc(m.id)}</span></div></div>`;
 const zapSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8z"/></svg>';
 const refreshSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v6h-6"/></svg>';
 const mailSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg>';
@@ -151,7 +158,7 @@ function renderDashboard() {
   $('#exp-title').textContent = `In scadenza ${expBandLabel(expWindow)}`;
   $('#exp-sub').textContent = `${expAll.length} ${expAll.length === 1 ? 'socio' : 'soci'} · da contattare per il rinnovo`;
   document.querySelectorAll('#exp-filters .chip').forEach((c) => c.classList.toggle('active', +c.dataset.w === expWindow));
-  $('#expiring tbody').innerHTML = exp.map((m) => `<tr><td>${who(m)}</td><td><span class="plan-pill">${m.plan.name}</span></td><td class="mono">${fmtDate(m.end)} <span style="color:var(--warn);font-weight:600">· ${m.dleft}gg</span></td><td class="mono">${euro(m.plan.price)}</td>${actionsCell(m)}</tr>`).join('') || `<tr><td colspan="5" style="text-align:center;color:var(--ink-3);padding:20px">Nessun socio in scadenza ${expBandLabel(expWindow)}</td></tr>`;
+  $('#expiring tbody').innerHTML = exp.map((m) => `<tr><td>${who(m)}</td><td><span class="plan-pill">${esc(m.plan.name)}</span></td><td class="mono">${fmtDate(m.end)} <span style="color:var(--warn);font-weight:600">· ${m.dleft}gg</span></td><td class="mono">${euro(m.plan.price)}</td>${actionsCell(m)}</tr>`).join('') || `<tr><td colspan="5" style="text-align:center;color:var(--ink-3);padding:20px">Nessun socio in scadenza ${expBandLabel(expWindow)}</td></tr>`;
 }
 
 function renderMembers() {
@@ -175,7 +182,7 @@ function renderMembers() {
   const pages = Math.max(1, Math.ceil(list.length / memState.PER));
   if (memState.page > pages) memState.page = pages;
   const slice = list.slice((memState.page - 1) * memState.PER, memState.page * memState.PER);
-  $('#memtable tbody').innerHTML = slice.map((m) => `<tr><td>${who(m)}</td><td class="mono">${m.id}</td><td><span class="plan-pill">${m.plan.name}</span></td><td class="mono">${fmtDate(m.start)}</td><td class="mono">${scadCell(m)}</td><td>${tagFor(m.stato)}</td>${actionsCell(m)}</tr>`).join('') || '<tr><td colspan="7" style="text-align:center;color:var(--ink-3);padding:28px">Nessun socio trovato</td></tr>';
+  $('#memtable tbody').innerHTML = slice.map((m) => `<tr><td>${who(m)}</td><td class="mono">${esc(m.id)}</td><td><span class="plan-pill">${esc(m.plan.name)}</span></td><td class="mono">${fmtDate(m.start)}</td><td class="mono">${scadCell(m)}</td><td>${tagFor(m.stato)}</td>${actionsCell(m)}</tr>`).join('') || '<tr><td colspan="7" style="text-align:center;color:var(--ink-3);padding:28px">Nessun socio trovato</td></tr>';
   $('#memcount').textContent = `${list.length} soci · pagina ${memState.page} di ${pages}`;
   let pg = `<button ${memState.page === 1 ? 'disabled' : ''} data-p="prev">‹</button>`;
   for (let i = 1; i <= pages && i <= 6; i++) pg += `<button class="${i === memState.page ? 'active' : ''}" data-p="${i}">${i}</button>`;
@@ -192,7 +199,7 @@ function renderPlans() {
   });
 
   $('#plans').innerHTML = list.map((p) => `<div class="plancard${p.name === 'Annuale' ? ' feat' : ''}">${p.name === 'Annuale' ? '<div class="ribbon">Più venduto</div>' : ''}
-    <h3>${p.name}</h3><div class="price num">${euro(p.price)}</div>
+    <h3>${esc(p.name)}</h3><div class="price num">${euro(p.price)}</div>
     <div class="sub-metric"><span>Soci attivi</span><b class="num">${p.active} / ${p.count}</b></div>
     <div class="sub-metric"><span>Durata</span><b>${p.dur} ${p.dur === 1 ? 'mese' : 'mesi'}</b></div>
     ${p.entrate ? `<div class="sub-metric"><span>Entrate</span><b>${p.entrate} ticket</b></div>` : ''}
@@ -203,16 +210,16 @@ function renderPlans() {
   const mrr = plans.filter((p) => planFilter === 'all' || (planFilter === 'attivo' ? p.attivo !== false : p.attivo === false ? false : true)).map((p) => ({ p, v: p.active * p.mcost }));
   const tot = mrr.reduce((a, b) => a + b.v, 0), mx = Math.max(...mrr.map((m) => m.v), 1);
   $('#mrr-tot').textContent = 'MRR totale: ' + euro(tot);
-  $('#mrrchart').innerHTML = mrr.map((m) => `<div class="distrow"><span class="dl">${m.p.name}</span><div class="track"><div class="fill" style="width:${(m.v / mx * 100).toFixed(0)}%;background:${m.p.color}"></div></div><span class="dv">${euro(m.v)}</span></div>`).join('') || '<div style="padding:14px 0;color:var(--ink-3)">Nessun dato per il filtro attuale.</div>';
+  $('#mrrchart').innerHTML = mrr.map((m) => `<div class="distrow"><span class="dl">${esc(m.p.name)}</span><div class="track"><div class="fill" style="width:${(m.v / mx * 100).toFixed(0)}%;background:${m.p.color}"></div></div><span class="dv">${euro(m.v)}</span></div>`).join('') || '<div style="padding:14px 0;color:var(--ink-3)">Nessun dato per il filtro attuale.</div>';
 }
 
 function renderAccessi() {
-  $('#acctable tbody').innerHTML = DATA.accessi.map((a) => `<tr><td class="mono" style="font-weight:600">${a.time}</td><td><div class="who"><div class="av" style="background:${a.av}">${initials(a.nome)}</div><div><b>${a.nome}${upBadge(a)}</b><span>${a.id}</span></div></div></td><td><span class="plan-pill">${a.plan}</span></td><td class="mono">${a.ing}</td><td>${a.ok ? (a.warnScad ? '<span class="tag w">Valido · in scadenza</span>' : '<span class="tag g">Valido</span>') : '<span class="tag b">Negato</span>'}</td></tr>`).join('') || '<tr><td colspan="5" style="text-align:center;color:var(--ink-3);padding:24px">Nessun ingresso registrato</td></tr>';
+  $('#acctable tbody').innerHTML = DATA.accessi.map((a) => `<tr><td class="mono" style="font-weight:600">${esc(a.time)}</td><td><div class="who"><div class="av" style="background:${a.av}">${esc(initials(a.nome))}</div><div><b>${esc(a.nome)}${upBadge(a)}</b><span>${esc(a.id)}</span></div></div></td><td><span class="plan-pill">${esc(a.plan)}</span></td><td class="mono">${esc(a.ing)}</td><td>${a.ok ? (a.warnScad ? '<span class="tag w">Valido · in scadenza</span>' : '<span class="tag g">Valido</span>') : '<span class="tag b">Negato</span>'}</td></tr>`).join('') || '<tr><td colspan="5" style="text-align:center;color:var(--ink-3);padding:24px">Nessun ingresso registrato</td></tr>';
 }
 
 function renderPosta() {
   $('#c-posta').textContent = MAILBOX.length || '';
-  $('#posta tbody').innerHTML = MAILBOX.map((m, i) => `<tr data-i="${i}" style="cursor:pointer"><td class="mono">${m.when.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}</td><td><span class="plan-pill">${m.tipoLabel}</span></td><td><b>${m.nome}</b><br><span style="color:var(--ink-3);font-size:12px">${m.destinatario}</span></td><td>${m.subject}</td><td>${m.channel === 'real' ? '<span class="tag g">Reale</span>' : m.channel === 'mailpit' ? '<span class="tag g">Mailpit</span>' : '<span class="tag w">Anteprima</span>'}</td></tr>`).join('') || '<tr><td colspan="5" style="text-align:center;color:var(--ink-3);padding:28px">Nessuna mail inviata. Aggiungi un socio o invia i promemoria di rinnovo.</td></tr>';
+  $('#posta tbody').innerHTML = MAILBOX.map((m, i) => `<tr data-i="${i}" style="cursor:pointer"><td class="mono">${m.when.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}</td><td><span class="plan-pill">${esc(m.tipoLabel)}</span></td><td><b>${esc(m.nome)}</b><br><span style="color:var(--ink-3);font-size:12px">${esc(m.destinatario)}</span></td><td>${esc(m.subject)}</td><td>${m.channel === 'real' ? '<span class="tag g">Reale</span>' : m.channel === 'mailpit' ? '<span class="tag g">Mailpit</span>' : '<span class="tag w">Anteprima</span>'}</td></tr>`).join('') || '<tr><td colspan="5" style="text-align:center;color:var(--ink-3);padding:28px">Nessuna mail inviata. Aggiungi un socio o invia i promemoria di rinnovo.</td></tr>';
 }
 
 async function canManagePlans() {
@@ -335,7 +342,11 @@ async function sendRealMail() {
   if (!mail) { toast('Nessuna mail in coda da inviare.', 'warn'); return; }
 
   try {
-    const headers = buildMailerHeaders(cfg);
+    // la funzione send-mail accetta solo lo staff autenticato: si invia il token della sessione
+    const supa = await getSupa();
+    const { data: { session } = {} } = supa ? await supa.auth.getSession() : {};
+    if (!session?.access_token) throw new Error('Sessione scaduta: rientra per inviare email reali.');
+    const headers = buildMailerHeaders(cfg, session.access_token);
     const r = await fetch(url.replace(/\/$/, ''), {
       method: 'POST',
       headers,
@@ -368,7 +379,7 @@ function openMailPreview(i) {
 async function sendReminderTo(sid) {
   const m = DATA.members.find((x) => x.sid === sid); if (!m) return;
   if (!m.email) { toast('Il socio non ha un indirizzo email', 'warn'); return; }
-  if (!(await askConfirm(`Inviare 1 mail di promemoria a <b>${m.nome}</b> (${m.email})?`, 'Invia'))) return;
+  if (!(await askConfirm(`Inviare 1 mail di promemoria a <b>${esc(m.nome)}</b> (${esc(m.email)})?`, 'Invia'))) return;
   const { subject, html } = templates.rinnovo(m, Math.max(0, m.dleft));
   const mail = await sendMail({ tipo: 'rinnovo', tipoLabel: 'Rinnovo', member: m, subject, html });
   reminded.add(m.sid);
@@ -400,7 +411,7 @@ function openSocioModal(mode = 'new', sid = null) {
   $('#socioform').reset();
   socioError('');
   $('#socio-dup').hidden = true;
-  $('#f-piano').innerHTML = activePlans().map((p) => `<option value="${p.name}">${p.name} — ${euro(p.price)} · ${p.dur} mese/i</option>`).join('');
+  $('#f-piano').innerHTML = activePlans().map((p) => `<option value="${esc(p.name)}">${esc(p.name)} — ${euro(p.price)} · ${p.dur} mese/i</option>`).join('');
   const isNew = mode === 'new';
   $('#socio-title').textContent = isNew ? 'Nuovo socio' : 'Modifica socio';
   $('#socio-sub').textContent = isNew ? 'Anagrafica + primo abbonamento' : 'Aggiorna i dati anagrafici';
@@ -508,7 +519,6 @@ async function insertAbbonamento(supa, socioId, plan, start, end, metodo = 'cont
 }
 
 // ---------- validazione + controllo duplicati anagrafica ----------
-const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 // confronto "morbido": minuscolo, senza accenti/apostrofi, spazi compattati
 const normName = (v) => String(v || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
 const normTel = (v) => String(v || '').replace(/\D/g, '').replace(/^(0039|39)(?=3\d{8,9}$)/, '');
@@ -770,7 +780,7 @@ function openRinnovoModal(sid) {
   renewSid = sid;
   closeModal('modal-scheda');
   $('#r-socio').textContent = `${m.nome} · ${m.id}`;
-  $('#r-piano').innerHTML = activePlans().map((p) => `<option value="${p.name}"${p.name === m.plan.name ? ' selected' : ''}>${p.name} — ${euro(p.price)} · ${p.dur} mese/i</option>`).join('');
+  $('#r-piano').innerHTML = activePlans().map((p) => `<option value="${esc(p.name)}"${p.name === m.plan.name ? ' selected' : ''}>${esc(p.name)} — ${euro(p.price)} · ${p.dur} mese/i</option>`).join('');
   $('#r-old').textContent = fmtDate(m.end);
   $('#r-metodo').value = 'contanti';
   updateRinnovoPreview();
@@ -852,12 +862,12 @@ let schedaSid = null;
 function openScheda(sid) {
   const m = DATA.members.find((x) => x.sid === sid); if (!m) return;
   schedaSid = sid;
-  const row = (label, val) => `<div><span>${label}</span><b>${val || '—'}</b></div>`;
+  const row = (label, val) => `<div><span>${label}</span><b>${esc(val || '—')}</b></div>`;
   const indirizzo = [m.indirizzo, [m.cap, m.citta].filter(Boolean).join(' ')].filter(Boolean).join(', ');
   $('#modal-scheda .modal').innerHTML = `
     <div class="mhead"><div style="display:flex;align-items:center;gap:12px">
-      <div class="av" style="width:46px;height:46px;background:${m.av};border-radius:50%;display:grid;place-items:center;color:#fff;font-weight:700;font-size:15px">${initials(m.nome)}</div>
-      <div><h3>${m.nome}${upBadge(m)}</h3><div class="msub">${m.id} · ${m.plan.name}</div></div></div>
+      <div class="av" style="width:46px;height:46px;background:${m.av};border-radius:50%;display:grid;place-items:center;color:#fff;font-weight:700;font-size:15px">${esc(initials(m.nome))}</div>
+      <div><h3>${esc(m.nome)}${upBadge(m)}</h3><div class="msub">${esc(m.id)} · ${esc(m.plan.name)}</div></div></div>
       <button type="button" class="xbtn" data-close="modal-scheda">×</button></div>
     <div class="mbody">
       <div class="scheda-cols"><div>
@@ -877,7 +887,7 @@ function openScheda(sid) {
         ? row('Entrate residue', `${m.entrateResidue} / ${m.plan.entrate}`)
         : row('Scadenza', `${fmtDate(m.end)} · ${m.dleft >= 0 ? m.dleft + 'gg' : 'scaduto'}`)}
       </div>
-      ${m.note ? `<div class="scheda-grid" style="grid-template-columns:1fr;margin-top:12px"><div><span>Note</span><b style="font-weight:500">${m.note}</b></div></div>` : ''}
+      ${m.note ? `<div class="scheda-grid" style="grid-template-columns:1fr;margin-top:12px"><div><span>Note</span><b style="font-weight:500">${esc(m.note)}</b></div></div>` : ''}
       </div>
       <div id="scheda-privacy">${schedaPrivacyHtml(m, null)}</div></div>
     </div>
@@ -948,7 +958,7 @@ async function submitPrivacySocio(e) {
 }
 async function revocaMarketing(sid) {
   const m = DATA.members.find((x) => x.sid === sid); if (!m || !m.marketing?.consent) return;
-  if (!(await askConfirm(`Registrare la revoca del consenso marketing email di <b>${m.nome}</b>?`, 'Revoca', ic.alert))) return;
+  if (!(await askConfirm(`Registrare la revoca del consenso marketing email di <b>${esc(m.nome)}</b>?`, 'Revoca', ic.alert))) return;
   try {
     const supa = await getSupa();
     await registraEventi(supa, sid, [eventoRevoca()]);
@@ -1757,7 +1767,7 @@ async function deletePlan(id) {
   }
   const plan = DATA.plans.find((p) => (p.id || p.name) === id) || DATA.plans.find((p) => p.name === id);
   if (!plan) return;
-  const ok = await askConfirm(`Eliminare il piano <b>${plan.name}</b>?`, 'Elimina', ic.alert);
+  const ok = await askConfirm(`Eliminare il piano <b>${esc(plan.name)}</b>?`, 'Elimina', ic.alert);
   if (!ok) return;
   try {
     await deletePlanFromSupabase(plan.id || plan.name);

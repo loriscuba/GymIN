@@ -2,6 +2,7 @@
 // Usati per l'anteprima nella sezione Posta e per l'invio opzionale a Mailpit.
 const ACCENT = '#f4511e', INK = '#161b22', MUTED = '#6b7280';
 const euro = (n) => '€ ' + Number(n).toLocaleString('it-IT');
+const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const dataIt = (d) => new Date(d).toLocaleDateString('it-IT', { day: '2-digit', month: 'long', year: 'numeric' });
 
 function layout({ titolo, corpo, cta }) {
@@ -23,16 +24,16 @@ export const templates = {
   benvenuto: (m) => ({
     subject: 'Benvenuto in GymIN! 💪',
     html: layout({
-      titolo: `Ciao ${m.nome.split(' ')[0]}, benvenuto!`,
-      corpo: `Il tuo profilo è attivo. Ti aspettiamo in sala: presenta la tessera <b>${m.id}</b> alla reception per il primo accesso.<br><br>Orari: Lun–Ven 7:00–22:00 · Sab–Dom 9:00–19:00.`,
+      titolo: `Ciao ${esc(m.nome.split(' ')[0])}, benvenuto!`,
+      corpo: `Il tuo profilo è attivo. Ti aspettiamo in sala: presenta la tessera <b>${esc(m.id)}</b> alla reception per il primo accesso.<br><br>Orari: Lun–Ven 7:00–22:00 · Sab–Dom 9:00–19:00.`,
       cta: { href: '#', label: 'Vai alla tua area' },
     }),
   }),
   rinnovo: (m, giorni) => ({
     subject: `Il tuo abbonamento scade tra ${giorni} ${giorni === 1 ? 'giorno' : 'giorni'}`,
     html: layout({
-      titolo: `${m.nome.split(' ')[0]}, è ora di rinnovare`,
-      corpo: `Il tuo abbonamento <b>${m.plan.name}</b> scade il <b>${dataIt(m.end)}</b>.<br><br>Per rinnovare <b>passa in palestra alla reception</b>: ti aspettiamo per continuare ad allenarti senza interruzioni!`,
+      titolo: `${esc(m.nome.split(' ')[0])}, è ora di rinnovare`,
+      corpo: `Il tuo abbonamento <b>${esc(m.plan.name)}</b> scade il <b>${dataIt(m.end)}</b>.<br><br>Per rinnovare <b>passa in palestra alla reception</b>: ti aspettiamo per continuare ad allenarti senza interruzioni!`,
     }),
   }),
   // p (opzionale): { voce, importo, scadenza } — scadenza null = pagamento senza abbonamento attivato
@@ -42,7 +43,7 @@ export const templates = {
       titolo: 'Grazie, pagamento registrato',
       corpo: `Abbiamo registrato il tuo pagamento.<br><br>
         <table cellpadding="0" cellspacing="0" style="font-size:15px">
-        <tr><td style="padding:3px 18px 3px 0;color:${MUTED}">Voce</td><td><b>${voce}</b></td></tr>
+        <tr><td style="padding:3px 18px 3px 0;color:${MUTED}">Voce</td><td><b>${esc(voce)}</b></td></tr>
         <tr><td style="padding:3px 18px 3px 0;color:${MUTED}">Importo</td><td><b>${euro(importo)}</b></td></tr>
         ${scadenza ? `<tr><td style="padding:3px 18px 3px 0;color:${MUTED}">Valido fino al</td><td><b>${dataIt(scadenza)}</b></td></tr>` : ''}</table>`,
     }),

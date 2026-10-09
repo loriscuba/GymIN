@@ -8,6 +8,10 @@ const MUTED = '#6b7280';
 function euro(n) {
   return '€ ' + Number(n).toLocaleString('it-IT');
 }
+// Escape HTML dei dati del socio inseriti nel template.
+function esc(v) {
+  return String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
 function dataIt(d) {
   return new Date(d).toLocaleDateString('it-IT', { day: '2-digit', month: 'long', year: 'numeric' });
 }
@@ -48,9 +52,9 @@ export const templates = {
     return {
       subject: 'Benvenuto in GymIN! 💪',
       html: layout({
-        titolo: `Ciao ${socio.nome}, benvenuto!`,
+        titolo: `Ciao ${esc(socio.nome)}, benvenuto!`,
         corpo: `Il tuo profilo è attivo. Ti aspettiamo in sala: presenta la tua tessera
-                <b>${socio.tessera || ''}</b> alla reception per il primo accesso.<br><br>
+                <b>${esc(socio.tessera)}</b> alla reception per il primo accesso.<br><br>
                 Orari: Lun–Ven 7:00–22:00 · Sab–Dom 9:00–19:00.`,
         cta: { href: 'https://gymin.local/area-iscritto', label: 'Vai alla tua area' },
       }),
@@ -64,7 +68,7 @@ export const templates = {
         titolo: 'Grazie, pagamento registrato',
         corpo: `Abbiamo registrato il pagamento del tuo abbonamento.<br><br>
                 <table cellpadding="0" cellspacing="0" style="font-size:15px">
-                  <tr><td style="padding:3px 18px 3px 0;color:${MUTED}">Piano</td><td><b>${piano}</b></td></tr>
+                  <tr><td style="padding:3px 18px 3px 0;color:${MUTED}">Piano</td><td><b>${esc(piano)}</b></td></tr>
                   <tr><td style="padding:3px 18px 3px 0;color:${MUTED}">Importo</td><td><b>${euro(importo)}</b></td></tr>
                   <tr><td style="padding:3px 18px 3px 0;color:${MUTED}">Valido fino al</td><td><b>${dataIt(scadenza)}</b></td></tr>
                 </table>`,
@@ -76,8 +80,8 @@ export const templates = {
     return {
       subject: `Il tuo abbonamento scade tra ${giorni} ${giorni === 1 ? 'giorno' : 'giorni'}`,
       html: layout({
-        titolo: `${socio.nome}, è ora di rinnovare`,
-        corpo: `Il tuo abbonamento <b>${piano}</b> scade il <b>${dataIt(scadenza)}</b>.<br><br>
+        titolo: `${esc(socio.nome)}, è ora di rinnovare`,
+        corpo: `Il tuo abbonamento <b>${esc(piano)}</b> scade il <b>${dataIt(scadenza)}</b>.<br><br>
                 Per rinnovare <b>passa in palestra alla reception</b>: ti aspettiamo per continuare i tuoi allenamenti senza interruzioni!`,
       }),
     };
@@ -87,8 +91,8 @@ export const templates = {
     return {
       subject: 'Il tuo abbonamento GymIN è scaduto',
       html: layout({
-        titolo: `${socio.nome}, il tuo abbonamento è scaduto`,
-        corpo: `Il tuo abbonamento <b>${piano}</b> è scaduto il <b>${dataIt(scadenza)}</b>.<br><br>
+        titolo: `${esc(socio.nome)}, il tuo abbonamento è scaduto`,
+        corpo: `Il tuo abbonamento <b>${esc(piano)}</b> è scaduto il <b>${dataIt(scadenza)}</b>.<br><br>
                 Ci piacerebbe rivederti: <b>passa in palestra alla reception</b> per rinnovare quando vuoi, ti aspettiamo!`,
       }),
     };

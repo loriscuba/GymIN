@@ -198,6 +198,28 @@ sudo systemctl restart gymin-mailer   # solo se hai toccato il mailer
 
 ---
 
+## 7 · Sicurezza prima di mettere dati reali
+
+Già fatto nel codice e nel database (migration `20261009120000_sicurezza_permessi.sql`):
+la chiave `anon` (pubblica) non legge più nulla e può chiamare solo le funzioni
+`terminale_*` del terminale d'ingresso; la funzione `send-mail` invia solo per lo staff
+loggato; escape dei dati nelle pagine; CSP; supabase-js e font serviti in locale.
+
+Da fare a mano nella dashboard Supabase (non si possono fare da codice):
+1. **Authentication → Sign In / Providers → Email**: *Allow new users to sign up* = **OFF**
+   (la RLS dà accesso completo a qualunque utente autenticato: con la registrazione aperta
+   chiunque potrebbe crearsi un account).
+2. **Authentication → Multi-Factor**: abilita **TOTP** e attivalo per ogni operatore.
+3. **Authentication → Attack Protection**: *Leaked password protection* ON (piano Pro)
+   e password di almeno 12 caratteri.
+4. **Edge Functions → Secrets**: se il sito non è su `https://loriscuba.github.io`,
+   imposta `ALLOWED_ORIGINS` (es. `https://gestionale.tuodominio.it`).
+5. **Advisors → Security Advisor**: devono restare solo gli avvisi sulle funzioni
+   `terminale_*` (pubbliche per progetto, protette dal token del terminale) e su quelle `staff_*`.
+
+Backup cifrati fuori da Supabase: `deploy/backup-db.sh` (istruzioni in testa al file),
+da pianificare con cron e da **provare con un ripristino** almeno una volta.
+
 ## Verifica finale
 - **Test**: URL Pages → login staff → Dashboard con numeri reali dal DB TEST.
 - **Prod**: `http://<IP>` → login staff → dati reali; badge “demo” assente.

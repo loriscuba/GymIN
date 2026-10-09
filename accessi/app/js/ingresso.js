@@ -95,6 +95,12 @@ aggiornaMeteo();
 setInterval(aggiornaMeteo, 30 * 60 * 1000);
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+// logo: se l'immagine non si carica si nasconde il riquadro (al posto di onerror inline, bloccato dalla CSP)
+{
+  const img = document.querySelector('.logo-box img');
+  const ko = () => { img.parentNode.hidden = true; };
+  if (img) { if (img.complete && !img.naturalWidth) ko(); else img.addEventListener('error', ko); }
+}
 const offline = () => !!data && data.online === false;
 const inCoda = () => sync?.stato.inCoda || 0;
 const accessiDaSync = (n) => `${n} ${n === 1 ? 'accesso' : 'accessi'} da sincronizzare`;

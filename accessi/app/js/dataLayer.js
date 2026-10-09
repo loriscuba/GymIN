@@ -264,9 +264,20 @@ export const remotoConfigurato = (config = {}) => !!(config.SUPABASE_URL && conf
 // ---------------------------------------------------------------------------
 // GESTIONE (staff autenticato, sessione Supabase condivisa con GymIN)
 // ---------------------------------------------------------------------------
+// supabase-js servito dal nostro dominio (vendor/, versione fissata): niente CDN di terze parti.
+function caricaSupabaseJs() {
+  if (window.supabase?.createClient) return Promise.resolve(window.supabase);
+  return new Promise((ok, ko) => {
+    const s = document.createElement('script');
+    s.src = new URL('../vendor/supabase.js', import.meta.url).href;
+    s.onload = () => (window.supabase?.createClient ? ok(window.supabase) : ko(new Error('supabase-js non valido')));
+    s.onerror = () => ko(new Error('supabase-js non caricato'));
+    document.head.append(s);
+  });
+}
 export async function creaClientSupabase(config = {}) {
   if (!remotoConfigurato(config)) return null;
-  const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
+  const { createClient } = await caricaSupabaseJs();
   return createClient(config.SUPABASE_URL, config.SUPABASE_ANON_KEY, config.DB_SCHEMA ? { db: { schema: config.DB_SCHEMA } } : undefined);
 }
 

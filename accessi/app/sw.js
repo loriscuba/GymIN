@@ -7,13 +7,16 @@ const VERSIONE = '__BUILD__';
 // produzione (/accessi/) e test (/test/accessi/) sono sullo stesso dominio: cache separate per scope
 const PREFISSO = `gymin-accessi:${self.registration.scope}`;
 const CACHE = `${PREFISSO}:${VERSIONE}`;
-const CACHE_FONT = `${PREFISSO}:font`;
 const FILE = [
   './', 'ingresso/', 'gestione/', 'config.js', 'manifest.webmanifest',
   'css/base.css', 'css/terminale.css', 'css/gestione.css',
   'js/esito.js', 'js/lettore.js', 'js/suoni.js', 'js/dataLayer.js', 'js/demo.js', 'js/archivio.js', 'js/sync.js',
   'js/ingresso.js', 'js/gestione.js', 'js/meteo.js',
   'img/logo.png', 'img/icon-192.png', 'img/icon-512.png', 'img/icon-maskable-512.png',
+  'vendor/supabase.js', 'fonts/fonts.css',
+  'fonts/archivo-latin-600-normal.woff2', 'fonts/archivo-latin-700-normal.woff2', 'fonts/archivo-latin-800-normal.woff2',
+  'fonts/ibm-plex-sans-latin-400-normal.woff2', 'fonts/ibm-plex-sans-latin-500-normal.woff2',
+  'fonts/ibm-plex-sans-latin-600-normal.woff2', 'fonts/ibm-plex-sans-latin-700-normal.woff2',
 ];
 
 self.addEventListener('install', (e) => {
@@ -22,7 +25,7 @@ self.addEventListener('install', (e) => {
 
 self.addEventListener('activate', (e) => {
   e.waitUntil(caches.keys()
-    .then((chiavi) => Promise.all(chiavi.filter((k) => k.startsWith(PREFISSO) && k !== CACHE && k !== CACHE_FONT).map((k) => caches.delete(k))))
+    .then((chiavi) => Promise.all(chiavi.filter((k) => k.startsWith(PREFISSO) && k !== CACHE).map((k) => caches.delete(k))))
     .then(() => self.clients.claim()));
 });
 
@@ -31,15 +34,6 @@ self.addEventListener('fetch', (e) => {
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
 
-  // font di Google: dalla cache se ci sono, aggiornati in background
-  if (url.hostname === 'fonts.googleapis.com' || url.hostname === 'fonts.gstatic.com') {
-    e.respondWith(caches.open(CACHE_FONT).then(async (c) => {
-      const inCache = await c.match(req);
-      const rete = fetch(req).then((r) => { if (r.ok || r.type === 'opaque') c.put(req, r.clone()); return r; }).catch(() => inCache);
-      return inCache || rete;
-    }));
-    return;
-  }
   // solo i file dell'app (stessa origine e dentro lo scope); il resto (Supabase, CDN) va in rete
   if (url.origin !== location.origin || !req.url.startsWith(self.registration.scope)) return;
 

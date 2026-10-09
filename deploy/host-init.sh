@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Infra · preparazione UNA TANTUM della VM (Ubuntu, Oracle Cloud).
-# Installa Nginx, Git, Certbot, rsync e apre le porte 80/443.
+# Installa Nginx, Git, Certbot, rsync, apre le porte 80/443 e applica la sicurezza di base
+# (aggiornamenti automatici, fail2ban, SSH solo con chiave).
 # Da eseguire una sola volta per VM.
 #   bash deploy/host-init.sh            # base
 #   bash deploy/host-init.sh --node     # installa anche Node.js 20 (per i backend)
@@ -37,11 +38,30 @@ if command -v iptables >/dev/null 2>&1; then
     || sudo bash -c 'iptables-save > /etc/iptables/rules.v4' 2>/dev/null || true
 fi
 
+step "Sicurezza di base: aggiornamenti automatici, fail2ban, SSH solo con chiave"
+sudo DEBIAN_FRONTEND=noninteractive apt-get install -y unattended-upgrades fail2ban
+sudo dpkg-reconfigure -f noninteractive unattended-upgrades
+sudo systemctl enable --now fail2ban >/dev/null 2>&1 || true
+# SSH: niente password né login di root (si entra solo con la chiave, come su OCI)
+if [ -n "$(ls ~/.ssh/authorized_keys 2>/dev/null)" ] && [ -s ~/.ssh/authorized_keys ]; then
+  sudo tee /etc/ssh/sshd_config.d/90-gymin-hardening.conf >/dev/null <<'SSHD'
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+PermitRootLogin no
+MaxAuthTries 3
+SSHD
+  sudo systemctl reload ssh 2>/dev/null || sudo systemctl reload sshd 2>/dev/null || true
+  echo "  SSH: solo chiave, root disabilitato"
+else
+  echo "  ATTENZIONE: ~/.ssh/authorized_keys vuoto, SSH non modificato (per non chiuderti fuori)"
+fi
+
 sudo mkdir -p /opt/sites /var/www
 sudo rm -f /etc/nginx/sites-enabled/default
 sudo systemctl enable --now nginx >/dev/null 2>&1 || true
 
 step "VM pronta ✔"
-echo "  Ricorda: apri 80/443 anche nella Security List della VCN (console OCI)."
+echo "  Ricorda: apri 80/443 anche nella Security List della VCN (console OCI)"
+echo "  e limita la porta 22 al tuo IP."
 echo "  Ora pubblica i progetti con:"
 echo "    sudo bash deploy/site.sh <nome> <sottodominio> --repo <giturl>"

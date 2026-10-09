@@ -57,6 +57,14 @@ server {
     server_name $SERVER_NAME;
     root $WEB_ROOT;
     index index.html;
+    server_tokens off;
+    # header di sicurezza (la CSP è nei <meta> delle pagine, così vale anche su GitHub Pages)
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()" always;
+    # file nascosti (.env, .git, ...) mai serviti
+    location ~ /\. { deny all; }
     location / { try_files \$uri \$uri/ /index.html; }
 }
 NGINX
@@ -66,5 +74,6 @@ sudo systemctl reload nginx
 
 step "Pubblicato ✔"
 echo "  $NAME → http://$SERVER_NAME"
-echo "  HTTPS (dopo aver puntato il DNS):  sudo certbot --nginx -d $SERVER_NAME"
+echo "  HTTPS (OBBLIGATORIO con dati reali, dopo aver puntato il DNS):"
+echo "    sudo certbot --nginx -d $SERVER_NAME --redirect --hsts"
 echo "  Aggiornare dopo un push:           sudo bash deploy/site-update.sh $NAME${WEBDIR:+ --webdir $WEBDIR}"

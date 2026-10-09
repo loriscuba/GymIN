@@ -31,9 +31,16 @@ if (mode === 'test') {
 
 if (mode === 'api' || mode === 'manual') {
   const port = Number(process.env.MAILER_PORT || 3001);
+  // Di default ascolta solo in locale: chi raggiunge questa API può inviare email a nome della palestra.
+  // Per esporla (es. dietro Nginx su un'altra macchina) imposta MAILER_HOST e obbligatoriamente MAILER_API_KEY.
+  const host = process.env.MAILER_HOST || '127.0.0.1';
+  if (!['127.0.0.1', 'localhost', '::1'].includes(host) && !process.env.MAILER_API_KEY) {
+    console.error('✖ MAILER_API_KEY obbligatoria se la Mailer API non ascolta solo in locale (MAILER_HOST).');
+    process.exit(1);
+  }
   const server = http.createServer(createManualSendHandler({ sendMail: (m) => inviaMail({ ...m, rethrow: true }) }));
-  server.listen(port, () => {
-    console.log(`Mailer API pronto su http://localhost:${port}/api/send`);
+  server.listen(port, host, () => {
+    console.log(`Mailer API pronto su http://${host}:${port}/api/send`);
     console.log('Invio reale manuale: POST con { to, subject, html }');
     console.log(`SMTP: ${process.env.SMTP_HOST || 'localhost'}:${process.env.SMTP_PORT || 1025} · from: ${MAIL_FROM}`);
   });
