@@ -11,7 +11,7 @@ const FILE = [
   './', 'ingresso/', 'gestione/', 'config.js', 'manifest.webmanifest',
   'css/base.css', 'css/terminale.css', 'css/gestione.css',
   'js/esito.js', 'js/lettore.js', 'js/suoni.js', 'js/dataLayer.js', 'js/demo.js', 'js/archivio.js', 'js/sync.js',
-  'js/ingresso.js', 'js/gestione.js', 'js/meteo.js',
+  'js/ingresso.js', 'js/gestione.js', 'js/meteo.js', 'js/porta.js',
   'img/logo.png', 'img/icon-192.png', 'img/icon-512.png', 'img/icon-maskable-512.png',
   'vendor/supabase.js', 'fonts/fonts.css',
   'fonts/archivo-latin-600-normal.woff2', 'fonts/archivo-latin-700-normal.woff2', 'fonts/archivo-latin-800-normal.woff2',

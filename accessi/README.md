@@ -23,12 +23,13 @@ accessi/
 │  ├─ js/sync.js           # sincronizzazione: coda a lotti, ricarica cache, stato, retry con backoff
 │  ├─ js/lettore.js        # listener globale per il lettore RFID in emulazione tastiera
 │  ├─ js/suoni.js          # suoni con la Web Audio API
+│  ├─ js/porta.js          # apriporta: comando al relè Shelly quando l'esito è verde
 │  ├─ js/demo.js           # dati demo in memoria per la simulazione
 │  ├─ sw.js                # service worker (PWA): la pagina funziona anche senza internet
 │  └─ manifest.webmanifest
 ├─ kiosk/                  # PC del cliente: script .bat di avvio kiosk + LEGGIMI.txt (installazione)
 ├─ sql/seed-dev.sql        # dati demo per il DB di SVILUPPO (mai in produzione)
-├─ scripts/                # dev-server, build, test-db, seed-dev (nessuna dipendenza esterna)
+├─ scripts/                # dev-server, build, test-db, seed-dev, shelly-finto (nessuna dipendenza esterna)
 └─ test/                   # test unitari (node:test) e test SQL su Postgres vero (test/db)
 supabase/migrations/20261006120000_accessi_terminale.sql   # fase 1 (solo aggiunte)
 supabase/migrations/20261007120000_accessi_offline.sql     # fase 2 (solo aggiunte)
@@ -150,6 +151,69 @@ Il lettore USB 125 kHz EM4100 lavora in emulazione tastiera: digita il codice in
 - Il codice viene messo in maiuscolo e ripulito dagli spazi. Lunghezza e formato sono liberi e gli **zeri iniziali vengono conservati**.
 - Il codice letto può essere diverso dal numero stampato sulla tessera, quindi **le tessere si associano sempre passandole sul lettore**.
 - **Prova lettore** (/gestione → Tessere) mostra, per ogni tessera passata, il codice letto, quanti caratteri, quanto tempo ha impiegato il lettore e l'intervallo massimo tra due tasti. Dice anche se la lettura sarebbe stata scartata perché troppo lenta, e se la tessera è associata o a chi; se non lo è, si associa con un clic. Non modifica nulla da sola: serve a verificare un lettore nuovo. Se un lettore risulta "troppo lento", alza `LETTORE_MAX_GAP_MS` (per esempio a 150).
+
+## Apertura porta (relè Shelly)
+
+Quando l'esito è **verde**, il terminale manda subito al relè Shelly il comando che sblocca la porta. Il codice è in `app/js/porta.js` (senza DOM, testato in `test/porta.test.js`).
+
+- **Solo con esito verde.** Con rosso, doppia lettura, errore o "non sincronizzato" non parte nessun comando.
+- **Il comando va in LAN, non su internet.** La porta si apre anche col terminale **offline**: la decisione locale (`esito.js`) basta.
+- **Comando**: un impulso. Il relè si chiude per `PORTA_IMPULSO_S` secondi (default 1) e poi si riapre da solo, per sbloccare una serratura elettrica:
+  - Gen2, Gen3 e Gen4 (Plus, Pro, Mini…): `GET http://IP/rpc/Switch.Set?id=0&on=true&toggle_after=1`
+  - Gen1 (`SHELLY_GEN=1`): `GET http://IP/relay/0?turn=on&timer=1`
+- **Non blocca mai l'ingresso.** Schermo e suono non aspettano il relè. Se lo Shelly non risponde entro `PORTA_TIMEOUT_MS` (1,5 s) o dà errore, l'ingresso resta registrato e sul verde compare **"Porta non aperta: rivolgiti alla reception"**. L'errore va anche nella console.
+- **Due letture ravvicinate** condividono lo stesso comando: nessun doppio impulso.
+
+### Configurazione
+
+| Variabile (`.env`) | Default | Cosa |
+|---|---|---|
+| `SHELLY_URL` | vuoto = spento | Indirizzo dello Shelly, **con l'IP** (es. `http://192.168.1.50`) |
+| `SHELLY_GEN` | `2` | `2` per Gen2, Gen3 e Gen4 · `1` per Gen1 |
+| `SHELLY_CANALE` | `0` | Numero del relè |
+| `PORTA_IMPULSO_S` | `1` | Secondi di relè chiuso |
+| `PORTA_TIMEOUT_MS` | `1500` | Oltre questo tempo il comando è considerato fallito |
+| `PORTA_TIPO` | automatico | `sim` = simulato senza rete |
+
+L'IP dello Shelly dipende dalla rete della palestra, mentre il build su GitHub Pages è uno solo. Per questo l'indirizzo si imposta di solito **sul PC dell'ingresso**: apri una volta `/accessi/ingresso/?shelly=http://192.168.1.50`. Come per il token, viene salvato nel browser e tolto dall'indirizzo. Con `?shelly=off` lo togli. L'indirizzo salvato sul PC vince su `SHELLY_URL`.
+
+In `?sim=1` e `?demo=1`, senza Shelly configurato, la porta è **simulata**. Il pannello **SIM** mostra l'ultimo comando con l'esito e il tempo di risposta, e ha il pulsante **"Apri porta (prova)"**.
+
+### Sviluppare e provare senza hardware: lo Shelly finto
+
+`scripts/shelly-finto.mjs` è un server locale che risponde come uno Shelly vero: Gen2 RPC (GET e POST `/rpc`) e Gen1 `/relay/0`, con l'impulso che si richiude da solo.
+
+```bash
+cd accessi
+npm run shelly:finto        # http://localhost:8089 → pagina con la porta CHIUSA / APERTA in tempo reale
+npm run dev                 # in un altro terminale
+# apri http://localhost:5174/ingresso/?demo=1&shelly=http://localhost:8089
+```
+
+Metti le due finestre affiancate e passa **Tessera di test 1**: lo schermo diventa verde e la pagina dello Shelly finto diventa **APERTA** per 1 secondo. Con la tessera 3 (scaduta) resta CHIUSA.
+
+Per provare i guasti:
+
+- `npm run shelly:finto -- --ritardo=3000` → risposta lenta, scatta il timeout;
+- `npm run shelly:finto -- --errore` → HTTP 500;
+- server spento → Shelly non raggiungibile.
+
+In tutti e tre i casi deve comparire "Porta non aperta". `npm test` fa le stesse prove in automatico contro lo Shelly finto.
+
+### Quando arriva lo Shelly: checklist
+
+1. **Modello**: un relè a contatto pulito, per esempio Shelly 1 Gen3/Gen4 o Shelly Plus 1. Verifica con chi installa la serratura tensione e tipo: elettroserratura a impulso o a mantenimento, NO/NC.
+2. **IP fisso**: prenotazione DHCP sul router, oppure IP statico nell'app Shelly.
+3. **Prova da un PC della stessa rete**:
+   ```bash
+   curl "http://192.168.1.50/rpc/Switch.Set?id=0&on=true&toggle_after=1"
+   ```
+   Il relè deve scattare.
+4. Sul PC dell'ingresso apri una volta `/accessi/ingresso/?shelly=http://192.168.1.50&sim=1`. Usa **"Apri porta (prova)"** nel pannello SIM, poi passa una tessera vera.
+5. **Chrome e la rete locale**: la pagina arriva da GitHub Pages (https) e lo Shelly parla http in LAN. Chrome lo permette verso un **IP privato**, ma chiede una volta il permesso **"Accesso alla rete locale"** (Local Network Access): va concesso nel profilo del kiosk. In alternativa si pre-autorizza con il criterio di Chrome `LocalNetworkAccessAllowedForUrls`. Se nel pannello SIM compare "Shelly non raggiungibile" ma `curl` funziona, il blocco è qui: controlla la console di Chrome (F12).
+6. **Sicurezza**: chi raggiunge lo Shelly in rete può aprire la porta. Tienilo sulla rete del PC dell'ingresso, **non sul Wi-Fi ospiti**. Disattiva l'accesso cloud se non serve.
+
+> Da verificare col dispositivo vero: se lo Shelly ha la **password** attiva (autenticazione digest), il browser non può inviargli il comando direttamente. Le opzioni sono due: lasciarlo senza password su una rete isolata, oppure aggiungere un piccolo ponte locale sul PC.
 
 ## Sviluppo
 

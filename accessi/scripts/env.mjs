@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 export const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
-const CHIAVI = ['SUPABASE_URL', 'SUPABASE_ANON_KEY', 'DB_SCHEMA', 'TIMEOUT_ONLINE_MS', 'RITARDO_SUONI_MS', 'DURATA_ESITO_MS', 'CACHE_MAX_ORE', 'SYNC_INTERVALLO_MS', 'LETTORE_MAX_GAP_MS', 'METEO_LAT', 'METEO_LON', 'METEO_LUOGO', 'PORT', 'DEV_DATABASE_URL'];
+const CHIAVI = ['SUPABASE_URL', 'SUPABASE_ANON_KEY', 'DB_SCHEMA', 'TIMEOUT_ONLINE_MS', 'RITARDO_SUONI_MS', 'DURATA_ESITO_MS', 'CACHE_MAX_ORE', 'SYNC_INTERVALLO_MS', 'LETTORE_MAX_GAP_MS', 'METEO_LAT', 'METEO_LON', 'METEO_LUOGO', 'SHELLY_URL', 'SHELLY_GEN', 'SHELLY_CANALE', 'PORTA_TIPO', 'PORTA_IMPULSO_S', 'PORTA_TIMEOUT_MS', 'PORT', 'DEV_DATABASE_URL'];
 
 export function leggiEnv() {
   const env = {};
@@ -37,6 +37,13 @@ export function configJs(env) {
     METEO_LAT: env.METEO_LAT ?? '44.2697',
     METEO_LON: env.METEO_LON ?? '8.4361',
     METEO_LUOGO: env.METEO_LUOGO ?? 'Vado Ligure',
+    // apriporta (relè Shelly in LAN); SHELLY_URL vuoto = spento. Sul PC si può impostare con ?shelly=
+    PORTA_TIPO: env.PORTA_TIPO || '',
+    SHELLY_URL: env.SHELLY_URL || '',
+    SHELLY_GEN: num(env.SHELLY_GEN, 2),
+    SHELLY_CANALE: num(env.SHELLY_CANALE, 0),
+    PORTA_IMPULSO_S: num(env.PORTA_IMPULSO_S, 1),
+    PORTA_TIMEOUT_MS: num(env.PORTA_TIMEOUT_MS, 1500),
   };
   return `// generato automaticamente: non modificare\nwindow.ACCESSI_CONFIG = ${JSON.stringify(cfg, null, 2)};\n`;
 }
