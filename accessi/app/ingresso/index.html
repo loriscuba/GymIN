@@ -8,8 +8,9 @@
 <link rel="manifest" href="../manifest.webmanifest">
 <link rel="icon" type="image/png" sizes="192x192" href="../img/icon-192.png">
 <!-- Content Security Policy: solo script/stili/font dal nostro dominio, dati solo da Supabase.
-     Limita i danni di un eventuale XSS (niente script esterni né invio dati altrove). -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.open-meteo.com; frame-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
+     Limita i danni di un eventuale XSS (niente script esterni né invio dati altrove).
+     http: serve per il relè Shelly della porta, raggiunto in LAN via IP (SHELLY_URL). -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.open-meteo.com http:; frame-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
 <meta name="referrer" content="strict-origin-when-cross-origin">
 <link rel="stylesheet" href="../fonts/fonts.css?v=__BUILD__">
 <link rel="stylesheet" href="../css/base.css?v=__BUILD__">
