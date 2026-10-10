@@ -80,14 +80,19 @@ export async function abbonamentiDaDbf(files) {
   const leggi = async (n, want) => (by[n] ? readDbf(await by[n].arrayBuffer(), want) : null);
 
   const tess = await leggi('tessere.dbf', ['COD_CLI', 'SERVIZIO', 'TIPO_SERV', 'G_INIZIO', 'G_FINE', 'DISABLED', 'SCATTISING']);
-  const anag = await leggi('anagraf.dbf', ['COD_CLI', 'NOME', 'COGNOME']);
+  const anag = await leggi('anagraf.dbf', ['COD_CLI', 'NOME', 'COGNOME', 'DATA_NASC', 'CF', 'CELLULARE', 'TELEFONO', 'EMAIL', 'CITTA']);
   const contatore = tess.length > 0 && 'SCATTISING' in tess[0];
   const cnt = !contatore && await leggi('cnt_bank.dbf', ['CAUSALE', 'BANCA', 'DATA_MOV']);
   const acc = cnt && await leggi('accessi.dbf', ['SERVIZIO', 'COMMENTO', 'COD_CLI']);
 
   const generico = (r) => r.COGNOME.trim().toUpperCase() === 'CLIENTE' && r.NOME.toUpperCase().includes('GENERICO');
   const valid = anag && new Set(anag.filter((r) => !generico(r)).map((r) => r.COD_CLI.trim()));
-  const nomi = new Map((anag || []).map((r) => [r.COD_CLI.trim(), `${r.COGNOME.trim()} ${r.NOME.trim()}`.trim()]));
+  // dati anagrafici del vecchio gestionale, per riconoscere i soci non collegati in GymIN
+  const t = (v) => (v || '').trim();
+  const nomi = new Map((anag || []).map((r) => [t(r.COD_CLI), {
+    nominativo: `${t(r.COGNOME)} ${t(r.NOME)}`.trim(), v_nascita: t(r.DATA_NASC), v_cf: t(r.CF).toUpperCase(),
+    v_telefono: t(r.CELLULARE) || t(r.TELEFONO), v_email: t(r.EMAIL), v_citta: t(r.CITTA),
+  }]));
   const ric = cnt ? ricariche(cnt) : {};
   if (acc) {
     const used = consumati(acc);
@@ -102,7 +107,7 @@ export async function abbonamentiDaDbf(files) {
     if (valid && !valid.has(cod)) continue;
     if (!r.G_INIZIO && !r.G_FINE) continue;
     abb.push({
-      cod_cli: cod, nominativo: nomi.get(cod) || '', piano_nome: serv, tipo_serv: r.TIPO_SERV.trim(),
+      cod_cli: cod, nominativo: '', ...nomi.get(cod), piano_nome: serv, tipo_serv: r.TIPO_SERV.trim(),
       data_inizio: r.G_INIZIO, data_scadenza: r.G_FINE,
       open_ended: r.G_FINE >= '2900-01-01' ? 'true' : 'false',
       entrate_residue: '', scattising: r.SCATTISING, disabilitato: r.DISABLED === '1' ? 'true' : 'false',
