@@ -8,7 +8,7 @@
 //   - righe importabili una a una o in blocco, sempre dopo conferma
 import { getSupa, fetchAll } from './data.js?v=__BUILD__';
 import { abbonamentiDaDbf } from './legacydbf.js?v=__BUILD__';
-import { confronta, applica, IMPORTABILI, indiceCandidati, nomeSocio } from './importlogic.js?v=__BUILD__';
+import { confronta, applica, IMPORTABILI, indiceCandidati, nomeSocio, SENZA_SCADENZA } from './importlogic.js?v=__BUILD__';
 
 const $ = (s, r = document) => r.querySelector(s);
 const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -37,7 +37,7 @@ function parseCSV(text) {
   return rows.filter((r) => r.length > 1 || (r[0] && r[0].length))
     .map((r) => Object.fromEntries(header.map((h, i) => [h.trim(), r[i] ?? ''])));
 }
-const fmtD = (iso) => (iso ? new Date(iso).toLocaleDateString('it-IT') : '—');
+const fmtD = (iso) => (!iso ? '—' : iso >= SENZA_SCADENZA ? 'senza scadenza' : new Date(iso).toLocaleDateString('it-IT'));
 
 let deps = {};            // { toast, askConfirm, onDone }
 let csvRows = null;       // righe grezze del CSV
