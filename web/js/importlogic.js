@@ -48,14 +48,16 @@ export function confronta(csvRows, { soci, piani, abb }, { soloCorrenti = true, 
     // stessi calcoli di tools/import-legacy/import.mjs
     const inizioCsv = dz(a.data_inizio);
     const inizio = inizioCsv || today;
-    const scad = dz(a.data_scadenza) || addMonths(inizio, p.durata_mesi || 1);
-    const entrate = nz(a.entrate_residue) ? Number(a.entrate_residue) : (p.entrate > 0 ? p.entrate : null);
-    const stato = a.disabilitato === 'true' ? 'disdetto' : (scad < today ? 'scaduto' : 'attivo');
-    const nuovo = { socio_id: s.id, piano_id: p.id, data_inizio: inizio, data_scadenza: scad, entrate_residue: entrate, stato };
     const esist = abbBy.get(`${s.id}|${p.id}`) || [];
     // con data_inizio nel CSV si cerca lo stesso inizio; senza, l'ultimo abbonamento di quel piano
     const ex = inizioCsv ? esist.find((x) => x.data_inizio === inizioCsv)
       : esist.sort((x, y) => (x.data_scadenza < y.data_scadenza ? 1 : -1))[0];
+    // senza scadenza nel file (carnet "N ingressi": 3000-01-01) vale quella già in GymIN;
+    // solo per un abbonamento nuovo si calcola inizio + durata del piano
+    const scad = dz(a.data_scadenza) || ex?.data_scadenza || addMonths(inizio, p.durata_mesi || 1);
+    const entrate = nz(a.entrate_residue) ? Number(a.entrate_residue) : (p.entrate > 0 ? p.entrate : null);
+    const stato = a.disabilitato === 'true' ? 'disdetto' : (scad < today ? 'scaduto' : 'attivo');
+    const nuovo = { socio_id: s.id, piano_id: p.id, data_inizio: inizio, data_scadenza: scad, entrate_residue: entrate, stato };
     const chiave = `${s.id}|${p.id}|${inizio}`;
     r.anno = scad.slice(0, 4);
     if (!ex && visti.has(chiave)) return { ...r, stato: 'presente', nuovo, dup: true };
