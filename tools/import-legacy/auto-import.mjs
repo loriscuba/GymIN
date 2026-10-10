@@ -15,6 +15,7 @@
 // Esempi:
 //   node auto-import.mjs --dir \\172.16.0.155\Condivisa --dry-run   # solo anteprima
 //   node auto-import.mjs --dir \\172.16.0.155\Condivisa             # importa
+//   node auto-import.mjs --solo-soci   # aggiorna solo i "Soci da verificare", abbonamenti invariati
 import 'dotenv/config';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -24,6 +25,7 @@ const args = process.argv.slice(2);
 const val = (name, def) => { const i = args.indexOf(name); return i >= 0 && args[i + 1] ? args[i + 1] : def; };
 const DIR = val('--dir', process.env.GYMIN_IMPORT_DIR);
 const DRY = args.includes('--dry-run');
+const SOLO_SOCI = args.includes('--solo-soci');
 const WEB = process.env.GYMIN_WEB_URL || 'https://loriscuba.github.io/GymIN/js/';
 const log = (m) => console.log(`[${new Date().toLocaleString('it-IT')}] ${m}`);
 
@@ -117,6 +119,7 @@ async function main() {
   scriviReport(rows);
   if (!DRY) await aggiornaDaVerificare(supa, rows, soci);
 
+  if (SOLO_SOCI) { log('Solo soci da verificare: abbonamenti non toccati'); return; }
   const scelte = rows.filter((r) => IMPORTABILI.has(r.stato));
   if (DRY || !scelte.length) { log(DRY ? 'DRY-RUN: nessuna scrittura' : 'Niente da importare'); return; }
   const { ok, ko, errori } = await applica(supa, scelte);
