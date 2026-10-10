@@ -6,6 +6,10 @@
 // Solo abbonamento corrente per socio; non crea soci né piani (righe "Socio/Piano
 // mancante" restano da gestire a mano nel cruscotto).
 //
+// Le regole (legacydbf.js, importlogic.js) si scaricano a ogni avvio dall'app pubblicata
+// (GYMIN_WEB_URL, default GitHub Pages): sul PC bastano questo file e package.json.
+// Con --local si usano invece i file di web/js del repo.
+//
 // Richiede nel .env: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY (come import.mjs).
 //
 // Esempi:
@@ -15,13 +19,12 @@ import 'dotenv/config';
 import fs from 'node:fs';
 import path from 'node:path';
 import { createClient } from '@supabase/supabase-js';
-import { abbonamentiDaDbf } from '../../web/js/legacydbf.js';
-import { confronta, applica, IMPORTABILI } from '../../web/js/importlogic.js';
 
 const args = process.argv.slice(2);
 const val = (name, def) => { const i = args.indexOf(name); return i >= 0 && args[i + 1] ? args[i + 1] : def; };
 const DIR = val('--dir', process.env.GYMIN_IMPORT_DIR);
 const DRY = args.includes('--dry-run');
+const WEB = process.env.GYMIN_WEB_URL || 'https://loriscuba.github.io/GymIN/js/';
 const log = (m) => console.log(`[${new Date().toLocaleString('it-IT')}] ${m}`);
 
 async function fetchAll(supa, table, select, modify = (q) => q) {
@@ -32,6 +35,14 @@ async function fetchAll(supa, table, select, modify = (q) => q) {
     out = out.concat(data);
     if (data.length < 1000) return out;
   }
+}
+
+// modulo dell'app: dal repo con --local, altrimenti scaricato dall'app pubblicata
+async function modulo(nome) {
+  if (args.includes('--local')) return import(new URL(`../../web/js/${nome}`, import.meta.url));
+  const res = await fetch(`${WEB}${nome}?t=${Date.now()}`, { cache: 'no-store' });
+  if (!res.ok) throw new Error(`download ${WEB}${nome} fallito (HTTP ${res.status})`);
+  return import(`data:text/javascript,${encodeURIComponent(await res.text())}`);
 }
 
 // i file DBF come oggetti "File" (name + arrayBuffer), come li passa il browser
@@ -47,6 +58,7 @@ async function main() {
   const url = process.env.SUPABASE_URL, key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) throw new Error('SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY mancanti nel .env');
   const supa = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+  const [{ abbonamentiDaDbf }, { confronta, applica, IMPORTABILI }] = await Promise.all([modulo('legacydbf.js'), modulo('importlogic.js')]);
 
   const files = ['tessere.dbf', 'anagraf.dbf'].map(fileDbf).filter(Boolean);
   const { rows: csvRows, info } = await abbonamentiDaDbf(files);

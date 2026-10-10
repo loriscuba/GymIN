@@ -133,9 +133,12 @@ condivisa, confronta col DB e importa **tutte** le righe *Nuovo* e *Diverso* (st
 cruscotto, codice condiviso in `web/js/importlogic.js`). Solo abbonamento corrente per socio; le righe
 *Socio mancante* / *Piano mancante* restano da gestire a mano nel cruscotto.
 
-Sul PC Win 11 (serve Node 18+ e una copia del repo):
+Sul PC Win 11 serve Node 18+ e **solo** una cartella (es. `C:\GymIN-import`) con `auto-import.mjs`,
+`auto-import.bat` e `package.json` di questa cartella: le regole (`legacydbf.js`, `importlogic.js`) lo script
+le scarica a ogni avvio dall'app pubblicata (`GYMIN_WEB_URL`, default `https://loriscuba.github.io/GymIN/js/`),
+quindi sono sempre quelle del cruscotto online. Dal repo si può usare `--local` per i file di `web/js`.
 
-1. `cd tools\import-legacy` e `npm install`
+1. nella cartella: `npm install`
 2. `.env` in questa cartella:
    ```
    SUPABASE_URL=https://xxxx.supabase.co
@@ -147,7 +150,7 @@ Sul PC Win 11 (serve Node 18+ e una copia del repo):
 3. Prova: `npm run auto:dry` (anteprima, nessuna scrittura), poi `npm run auto`.
 4. Pianifica `auto-import.bat` dopo la copia delle 9 (es. 9:15):
    ```
-   schtasks /create /tn "GymIN import" /tr "C:\percorso\GymIN\tools\import-legacy\auto-import.bat" /sc daily /st 09:15
+   schtasks /create /tn "GymIN import" /tr "C:\GymIN-import\auto-import.bat" /sc daily /st 09:15
    ```
    L'esito di ogni giro è in `auto-import.log` accanto allo script.
 
