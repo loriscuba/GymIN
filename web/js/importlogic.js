@@ -25,7 +25,9 @@ export function confronta(csvRows, { soci, piani, abb }, { soloCorrenti = true, 
     const p = pianoBy.get(a.piano_nome);
     // anno di scadenza per il filtro (righe non collegate: dalla data del file; senza scadenza: dall'inizio)
     const anno = (dz(a.data_scadenza) || dz(a.data_inizio) || '').slice(0, 4);
-    const r = { i, cod: a.cod_cli, piano: a.piano_nome, socio: s ? `${s.cognome} ${s.nome}` : '', anno };
+    // vecchio: nominativo da anagraf.dbf, per riconoscere i soci non collegati
+    const r = { i, cod: a.cod_cli, piano: a.piano_nome, socio: s ? `${s.cognome} ${s.nome}` : '', vecchio: a.nominativo || '',
+      inizioFile: dz(a.data_inizio), scadFile: dz(a.data_scadenza), anno };
     if (!s) return { ...r, stato: 'nosocio' };
     if (!p) return { ...r, stato: 'nopiano' };
     // stessi calcoli di tools/import-legacy/import.mjs

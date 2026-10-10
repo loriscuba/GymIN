@@ -53,6 +53,20 @@ function fileDbf(nome) {
   return { name: nome, arrayBuffer: async () => buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) };
 }
 
+// righe non importabili (socio/piano mancante) in un CSV per Excel, accanto allo script.
+// Contiene nomi di soci: resta su questo PC, non va condiviso.
+function scriviReport(rows) {
+  const motivo = { nosocio: 'Socio mancante', nopiano: 'Piano mancante' };
+  const dt = (iso) => (iso ? iso.split('-').reverse().join('/') : '');
+  const cella = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  const righe = rows.filter((r) => motivo[r.stato])
+    .map((r) => [motivo[r.stato], r.cod, r.vecchio, r.socio, r.piano, dt(r.inizioFile), r.scadFile ? dt(r.scadFile) : 'senza scadenza'].map(cella).join(';'));
+  const file = new URL('./da-verificare.csv', import.meta.url);
+  const head = ['Motivo', 'Codice cliente', 'Nome vecchio gestionale', 'Socio in GymIN', 'Piano', 'Inizio', 'Scadenza'].join(';');
+  fs.writeFileSync(file, `\uFEFF${[head, ...righe].join('\r\n')}\r\n`);
+  log(`righe da verificare: ${righe.length} → ${path.basename(file.pathname)}`);
+}
+
 async function main() {
   if (!DIR) throw new Error('cartella mancante: usa --dir <cartella> oppure GYMIN_IMPORT_DIR nel .env');
   const url = process.env.SUPABASE_URL, key = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -72,6 +86,8 @@ async function main() {
   const rows = confronta(csvRows, { soci, piani, abb });
   const conta = (s) => rows.filter((r) => r.stato === s).length;
   log(`nuovi ${conta('nuovo')} · diversi ${conta('diverso')} · già presenti ${conta('presente')} · socio mancante ${conta('nosocio')} · piano mancante ${conta('nopiano')}`);
+
+  scriviReport(rows);
 
   const scelte = rows.filter((r) => IMPORTABILI.has(r.stato));
   if (DRY || !scelte.length) { log(DRY ? 'DRY-RUN: nessuna scrittura' : 'Niente da importare'); return; }
