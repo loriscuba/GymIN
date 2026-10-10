@@ -6,4 +6,5 @@ data/
 *.cdx
 *.csv
 .env
+*.log
 node_modules/
