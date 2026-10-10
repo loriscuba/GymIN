@@ -58,7 +58,9 @@ export function confronta(csvRows, { soci, piani, abb }, { soloCorrenti = true, 
     // (anche se in GymIN ne hanno una calcolata); gli altri piani tengono quella di GymIN o inizio + durata
     const scad = dz(a.data_scadenza) || (p.entrate > 0 ? SENZA_SCADENZA : ex?.data_scadenza || addMonths(inizio, p.durata_mesi || 1));
     const entrate = nz(a.entrate_residue) ? Number(a.entrate_residue) : (p.entrate > 0 ? p.entrate : null);
-    const stato = a.disabilitato === 'true' ? 'disdetto' : (scad < today ? 'scaduto' : 'attivo');
+    // carnet: scaduto anche quando ha finito gli ingressi (senza scadenza la data non basta)
+    const esaurito = p.entrate > 0 && entrate != null && entrate <= 0;
+    const stato = a.disabilitato === 'true' ? 'disdetto' : (scad < today || esaurito ? 'scaduto' : 'attivo');
     const nuovo = { socio_id: s.id, piano_id: p.id, data_inizio: inizio, data_scadenza: scad, entrate_residue: entrate, stato };
     const chiave = `${s.id}|${p.id}|${inizio}`;
     r.anno = (scad < SENZA_SCADENZA ? scad : inizio).slice(0, 4);
