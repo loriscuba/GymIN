@@ -2,6 +2,8 @@
 // e tools/import-legacy/auto-import.mjs (import automatico pianificato): stesso confronto,
 // stesse scritture. Scrive solo su abbonamenti e su soci.aggiornato_da_import.
 export const IMPORTABILI = new Set(['nuovo', 'diverso']);
+// data_scadenza dei carnet importati senza scadenza (data_scadenza è obbligatoria)
+export const SENZA_SCADENZA = '2999-12-31';
 const CHUNK = 500;
 
 const nz = (v) => (v && v.trim() !== '' ? v.trim() : null);
@@ -48,16 +50,18 @@ export function confronta(csvRows, { soci, piani, abb }, { soloCorrenti = true, 
     // stessi calcoli di tools/import-legacy/import.mjs
     const inizioCsv = dz(a.data_inizio);
     const inizio = inizioCsv || today;
-    const scad = dz(a.data_scadenza) || addMonths(inizio, p.durata_mesi || 1);
-    const entrate = nz(a.entrate_residue) ? Number(a.entrate_residue) : (p.entrate > 0 ? p.entrate : null);
-    const stato = a.disabilitato === 'true' ? 'disdetto' : (scad < today ? 'scaduto' : 'attivo');
-    const nuovo = { socio_id: s.id, piano_id: p.id, data_inizio: inizio, data_scadenza: scad, entrate_residue: entrate, stato };
     const esist = abbBy.get(`${s.id}|${p.id}`) || [];
     // con data_inizio nel CSV si cerca lo stesso inizio; senza, l'ultimo abbonamento di quel piano
     const ex = inizioCsv ? esist.find((x) => x.data_inizio === inizioCsv)
       : esist.sort((x, y) => (x.data_scadenza < y.data_scadenza ? 1 : -1))[0];
+    // senza scadenza nel file (carnet "N ingressi": 3000-01-01) vale quella già in GymIN; per un abbonamento
+    // nuovo: carnet senza scadenza come nel vecchio gestionale, altrimenti inizio + durata del piano
+    const scad = dz(a.data_scadenza) || ex?.data_scadenza || (p.entrate > 0 ? SENZA_SCADENZA : addMonths(inizio, p.durata_mesi || 1));
+    const entrate = nz(a.entrate_residue) ? Number(a.entrate_residue) : (p.entrate > 0 ? p.entrate : null);
+    const stato = a.disabilitato === 'true' ? 'disdetto' : (scad < today ? 'scaduto' : 'attivo');
+    const nuovo = { socio_id: s.id, piano_id: p.id, data_inizio: inizio, data_scadenza: scad, entrate_residue: entrate, stato };
     const chiave = `${s.id}|${p.id}|${inizio}`;
-    r.anno = scad.slice(0, 4);
+    r.anno = (scad < SENZA_SCADENZA ? scad : inizio).slice(0, 4);
     if (!ex && visti.has(chiave)) return { ...r, stato: 'presente', nuovo, dup: true };
     visti.add(chiave);
     if (!ex) return { ...r, stato: 'nuovo', nuovo };

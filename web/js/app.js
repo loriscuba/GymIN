@@ -774,7 +774,8 @@ function endNotAfterCurrent(m, end) {
   toast(`La nuova scadenza deve essere successiva a quella attuale (${fmtDate(m.end)})`, 'warn');
   return true;
 }
-function renewBase(m) { const t = new Date(); t.setHours(0, 0, 0, 0); return new Date(m.end) >= t ? new Date(m.end) : t; }
+// i carnet importati senza scadenza (31/12/2999) si rinnovano da oggi
+function renewBase(m) { const t = new Date(); t.setHours(0, 0, 0, 0); return new Date(m.end) >= t && new Date(m.end).getFullYear() < 2900 ? new Date(m.end) : t; }
 function openRinnovoModal(sid) {
   const m = DATA.members.find((x) => x.sid === sid); if (!m) return;
   renewSid = sid;
