@@ -53,7 +53,7 @@
   .brand small{display:block;color:#6f7889;font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;margin-top:3px}
   .navlabel{font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:#5c6576;padding:14px 12px 6px}
   .nav{display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:10px;color:var(--sidebar-ink);background:none;border:0;width:100%;text-align:left;font-size:14.5px;font-weight:500;cursor:pointer}
-  .nav[hidden]{display:none}
+  .nav[hidden],.panel[hidden]{display:none}
   .nav svg{width:18px;height:18px;flex:none;opacity:.85}.nav:hover{background:rgba(255,255,255,.05);color:#fff}
   .nav.active{background:rgba(244,81,30,.16);color:#fff}.nav.active svg{opacity:1;color:var(--accent)}
   .nav .count{margin-left:auto;font-size:12px;font-variant-numeric:tabular-nums;background:rgba(255,255,255,.08);padding:1px 8px;border-radius:20px;color:#cdd4e0}
@@ -365,7 +365,7 @@
           <button class="btn-sm" id="btn-reminders"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg> Invia promemoria</button>
         </div></div>
         <div class="scroll"><table id="expiring"><thead><tr><th>Socio</th><th>Abbonamento</th><th>Scadenza</th><th>Quota</th><th>Azioni</th></tr></thead><tbody></tbody></table></div></div>
-      <div class="panel"><div class="phead"><div><h3>Ultimi 10 ingressi</h3><div class="psub">Accessi registrati più recenti</div></div></div>
+      <div class="panel" id="panel-ingressi"><div class="phead"><div><h3>Ultimi 10 ingressi</h3><div class="psub">Accessi registrati più recenti</div></div></div>
         <div class="scroll"><table id="acctable"><thead><tr><th>Data e ora</th><th>Socio</th><th>Abbonamento</th><th>Ingresso</th><th>Esito</th></tr></thead><tbody></tbody></table></div></div>
     </section>
 
@@ -455,6 +455,11 @@
       <div class="field"><label for="s-mailer-api-url">Mailer API URL</label><input id="s-mailer-api-url" placeholder="http://localhost:3001/api/send"></div>
       <div class="field"><label for="s-mailer-api-key">Mailer API key</label><input id="s-mailer-api-key" type="password" placeholder="opzionale"></div>
       <div class="field"><label for="s-contatti">Recapiti obbligatori per un nuovo socio</label><select id="s-contatti"><option value="uno">Almeno uno tra telefono ed email</option><option value="email">Email obbligatoria</option><option value="telefono">Telefono obbligatorio</option><option value="entrambi">Email e telefono obbligatori</option><option value="nessuno">Nessuno obbligatorio</option></select></div>
+      <fieldset id="s-sezioni-box" hidden style="border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin:14px 0 0">
+        <legend style="font-size:13px;font-weight:600;padding:0 6px">Sezioni visibili agli altri utenti</legend>
+        <div class="fhint"><span class="k">Valgono per tutti i PC. Tu, come amministratore, vedi sempre tutto.</span></div>
+        <div id="s-sezioni" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:6px 16px;margin-top:8px"></div>
+      </fieldset>
       <div class="fhint" style="margin-top:8px"><span class="k">Supabase URL e anon key sono già configurate in config.js: qui puoi gestire posta e recapiti obbligatori.</span></div>
       <div class="mfoot" style="padding:16px 0 0;border-top:0;justify-content:flex-end;gap:8px">
         <button type="button" class="btn-ghost" id="settings-reset">Ripristina default</button>

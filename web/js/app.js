@@ -42,6 +42,8 @@ const ic = {
 };
 
 // ---------- helpers di stato ----------
+let isAdmin = false;          // utente amministratore (vedi setupUser)
+let sezioniNascoste = [];     // sezioni nascoste agli altri utenti (vedi caricaSezioni)
 const addMonths = (d, m) => { const x = new Date(d); x.setMonth(x.getMonth() + m); return x; };
 const giorniTo = (d) => { const t = new Date(); t.setHours(0, 0, 0, 0); return Math.round((new Date(d) - t) / 86400000); };
 const statoDa = (dleft) => (dleft < 0 ? 'Scaduto' : dleft <= 7 ? 'In scadenza' : 'Attivo');
@@ -276,9 +278,12 @@ function populateSettingsForm() {
 }
 function openSettingsModal() {
   populateSettingsForm();
+  $('#s-sezioni-box').hidden = !isAdmin;
+  $('#s-sezioni').innerHTML = SEZIONI.map(([k, t]) => `<label style="display:flex;align-items:center;gap:8px;font-size:13.5px;cursor:pointer">
+    <input type="checkbox" data-sez="${k}" ${sezioniNascoste.includes(k) ? '' : 'checked'}> ${t}</label>`).join('');
   openModal('modal-settings');
 }
-function saveSettingsFromModal(e) {
+async function saveSettingsFromModal(e) {
   e.preventDefault();
   const form = {
     MAILPIT_URL: $('#s-mailpit-url').value.trim(),
@@ -287,9 +292,10 @@ function saveSettingsFromModal(e) {
     CONTATTI_OBBLIGATORI: $('#s-contatti').value,
   };
   saveSettingsToStorage(form);
+  if (isAdmin && !(await salvaSezioni())) return;
   closeModal('modal-settings');
   applyContattiRule();
-  toast('Impostazioni salvate nel browser', 'mail');
+  toast(isAdmin ? 'Impostazioni salvate' : 'Impostazioni salvate nel browser', 'mail');
 }
 
 applyStoredConfig();
@@ -1332,6 +1338,8 @@ const titles = {
   tessere: ['Tessere', 'Tessere RFID, terminale ingresso e storico accessi'],
 };
 function go(view) {
+  if (!view) return;                                // es. #btn-settings: ha classe .nav ma apre una modale
+  if (sezioneNascosta(view)) view = 'dashboard';   // sezione nascosta dall'amministratore
   document.querySelectorAll('.view').forEach((v) => (v.hidden = true));
   $('#view-' + view).hidden = false;
   document.querySelectorAll('.nav').forEach((n) => n.classList.toggle('active', n.dataset.view === view));
@@ -1468,6 +1476,7 @@ async function controllaNuoviIngressi() {
     renderAll();
     caricaContaTessere().catch(() => {});
     caricaContaImport().catch(() => {});
+    caricaSezioni().catch(() => {});
     if (!$('#modal-scheda').hidden && schedaSid) openScheda(schedaSid);   // scheda aperta: mostra i dati nuovi
   } catch (err) {
     console.error(errMsg(err));
@@ -1790,11 +1799,43 @@ async function deletePlan(id) {
 
 // il Log attività è visibile solo all'amministratore (la stessa regola è applicata dal database)
 const LOG_ADMIN = 'loriscuba@gmail.com';
+
+// ---------- sezioni visibili agli altri utenti ----------
+// Le sceglie l'amministratore da Impostazioni; condivise da tutti i PC (tabella app_impostazioni,
+// chiave sezioni_staff). L'amministratore vede sempre tutto. Nasconde solo l'interfaccia.
+const SEZIONI = [
+  ['anagrafiche', 'Anagrafiche'], ['abbonamenti', 'Abbonamenti'], ['pagamenti', 'Pagamenti'], ['tessere', 'Tessere'],
+  ['posta', 'Posta'], ['importa', 'Import abbonamenti'], ['ingressi', 'Dashboard · Ultimi 10 ingressi'],
+];
+const sezioneNascosta = (k) => !isAdmin && sezioniNascoste.includes(k);
+async function caricaSezioni() {
+  const supa = await getSupa();
+  const { data, error } = await supa.from('app_impostazioni').select('valore').eq('chiave', 'sezioni_staff').maybeSingle();
+  sezioniNascoste = !error && Array.isArray(data?.valore?.nascoste) ? data.valore.nascoste : [];   // tabella assente: tutto visibile
+  applicaSezioni();
+}
+function applicaSezioni() {
+  SEZIONI.forEach(([k]) => { const n = document.querySelector(`.nav[data-view="${k}"]`); if (n) n.hidden = sezioneNascosta(k); });
+  $('#panel-ingressi').hidden = sezioneNascosta('ingressi');
+  const attiva = document.querySelector('.nav.active')?.dataset.view;
+  if (attiva && sezioneNascosta(attiva)) go('dashboard');
+}
+async function salvaSezioni() {
+  const nascoste = [...document.querySelectorAll('#s-sezioni input[data-sez]')].filter((c) => !c.checked).map((c) => c.dataset.sez);
+  const supa = await getSupa();
+  const { error } = await supa.from('app_impostazioni')
+    .upsert({ chiave: 'sezioni_staff', valore: { nascoste }, aggiornato_il: new Date().toISOString() });
+  if (error) { toast(`Sezioni visibili non salvate: ${error.message}`, 'warn'); return false; }
+  sezioniNascoste = nascoste;
+  applicaSezioni();
+  return true;
+}
 async function setupUser() {
   const supa = await getSupa();
   const { data: { user } } = await supa.auth.getUser();
   const email = (user?.email || '').toLowerCase();
   const admin = email === LOG_ADMIN;
+  isAdmin = admin;
   $('.nav[data-view="log"]').hidden = !admin;
   $('#u-name').textContent = admin ? 'Admin' : (email.split('@')[0] || 'Utente');
   $('#u-role').textContent = admin ? 'Amministratore' : 'Staff';
@@ -1805,6 +1846,7 @@ async function boot() {
   const ok = await ensureAuth();
   if (!ok) return;
   try { await setupUser(); } catch (err) { console.error(errMsg(err)); }
+  caricaSezioni().catch((err) => console.error(errMsg(err)));
   caricaContaTessere().catch(() => {});
   caricaContaImport().catch(() => {});
 
