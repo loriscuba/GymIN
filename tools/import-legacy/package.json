@@ -11,7 +11,8 @@
     "import:all": "node import.mjs --dir ./data/out --all-history",
     "import:replace": "node import.mjs --dir ./data/out --replace",
     "auto": "node auto-import.mjs",
-    "auto:dry": "node auto-import.mjs --dry-run"
+    "auto:dry": "node auto-import.mjs --dry-run",
+    "auto:soci": "node auto-import.mjs --solo-soci"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",

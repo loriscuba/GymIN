@@ -148,6 +148,7 @@ quindi sono sempre quelle del cruscotto online. Dal repo si può usare `--local`
    Meglio il percorso di rete che `Z:`: le attività pianificate non vedono le unità collegate.
    Le credenziali della condivisione vanno salvate una volta: `cmdkey /add:172.16.0.155 /user:172.16.0.155\utente /pass:...`
 3. Prova: `npm run auto:dry` (anteprima, nessuna scrittura), poi `npm run auto`.
+   `npm run auto:soci` aggiorna solo i *Soci da verificare* senza toccare gli abbonamenti.
 4. Pianifica `auto-import.bat` dopo la copia delle 9 (es. 9:15):
    ```
    schtasks /create /tn "GymIN import" /tr "C:\GymIN-import\auto-import.bat" /sc daily /st 09:15
