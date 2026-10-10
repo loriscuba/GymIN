@@ -4,7 +4,7 @@ import {
   loadInformative, informativaAttiva, loadEventi, registraEventi, eventiDaModulo, eventoRevoca,
   schedaPrivacyHtml, storicoHtml, informativaHtml, moduloSocioHtml, privacyFromRow,
 } from './privacy.js?v=__BUILD__';
-import { initImporta, renderImporta } from './importa.js?v=__BUILD__';
+import { initImporta, renderImporta, contaDaVerificare } from './importa.js?v=__BUILD__';
 
 const $ = (s, r = document) => r.querySelector(s);
 const euro = (n) => '€ ' + Math.round(n).toLocaleString('it-IT');
@@ -1354,6 +1354,13 @@ function mostraContaTessere(n) {
 window.addEventListener('message', (e) => {
   if (e.origin === location.origin && e.data?.tipo === 'gymin-tessere') mostraContaTessere(e.data.daVerificare);
 });
+// contatore rosso "soci da verificare" sulla voce Import abbonamenti (import automatico di ogni mattina)
+function mostraContaImport(n) {
+  const c = $('#c-importa');
+  c.hidden = !n;
+  c.textContent = n || '';
+}
+async function caricaContaImport() { mostraContaImport(await contaDaVerificare()); }
 async function caricaContaTessere() {
   const supa = await getSupa();
   const { count, error } = await supa.from('accessi_log').select('id', { count: 'exact', head: true })
@@ -1459,6 +1466,7 @@ async function controllaNuoviIngressi() {
     DATA = await loadData();
     renderAll();
     caricaContaTessere().catch(() => {});
+    caricaContaImport().catch(() => {});
     if (!$('#modal-scheda').hidden && schedaSid) openScheda(schedaSid);   // scheda aperta: mostra i dati nuovi
   } catch (err) {
     console.error(errMsg(err));
@@ -1797,6 +1805,7 @@ async function boot() {
   if (!ok) return;
   try { await setupUser(); } catch (err) { console.error(errMsg(err)); }
   caricaContaTessere().catch(() => {});
+  caricaContaImport().catch(() => {});
 
   try {
     DATA = await loadData();
@@ -1811,7 +1820,7 @@ async function boot() {
 
 wireEvents();
 initImporta({
-  toast, askConfirm: (m, ok) => askConfirm(m, ok, ic.alert),
+  toast, askConfirm: (m, ok) => askConfirm(m, ok, ic.alert), onConta: mostraContaImport,
   onDone: async () => { try { DATA = await loadData(); renderAll(); } catch (err) { console.error(errMsg(err)); } },
 });
 boot();

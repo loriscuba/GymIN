@@ -70,6 +70,30 @@ function scriviReport(rows) {
   log(`righe da verificare: ${righe.length} → ${path.basename(file.pathname)}`);
 }
 
+// soci del vecchio gestionale non presenti in GymIN → soci_da_importare (sezione "Soci da verificare"
+// in Import abbonamenti). Si aggiornano anagrafica e abbonamento; lo stato scelto dallo staff resta.
+async function aggiornaDaVerificare(supa, rows, soci) {
+  const now = new Date().toISOString();
+  const per = new Map(rows.filter((r) => r.stato === 'nosocio' && r.riga?.anagrafica).map(({ riga: a }) => [String(a.cod_cli).trim(), {
+    cod_cli: String(a.cod_cli).trim(), dati: a.anagrafica, aggiornato_il: now,
+    abbonamento: { piano_nome: a.piano_nome, data_inizio: a.data_inizio, data_scadenza: a.data_scadenza,
+      entrate_residue: a.entrate_residue, disabilitato: a.disabilitato },
+  }]));
+  const righe = [...per.values()];
+  for (let k = 0; k < righe.length; k += 500) {
+    const { error } = await supa.from('soci_da_importare').upsert(righe.slice(k, k + 500), { onConflict: 'cod_cli' });
+    if (error) { log(`soci da verificare non aggiornati (manca la migration soci_da_importare?): ${error.message}`); return; }
+  }
+  // quelli ormai presenti in GymIN (creati o collegati a mano) non sono più da verificare
+  const cods = soci.filter((s) => s.cod_cli).map((s) => String(s.cod_cli).trim());
+  for (let k = 0; k < cods.length; k += 500) {
+    const { error } = await supa.from('soci_da_importare').update({ stato: 'importato', gestito_il: now })
+      .eq('stato', 'da_verificare').in('cod_cli', cods.slice(k, k + 500));
+    if (error) log(`errore: ${error.message}`);
+  }
+  log(`soci da verificare aggiornati: ${righe.length}`);
+}
+
 async function main() {
   if (!DIR) throw new Error('cartella mancante: usa --dir <cartella> oppure GYMIN_IMPORT_DIR nel .env');
   const url = process.env.SUPABASE_URL, key = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -91,6 +115,7 @@ async function main() {
   log(`nuovi ${conta('nuovo')} · diversi ${conta('diverso')} · già presenti ${conta('presente')} · socio mancante ${conta('nosocio')} · piano mancante ${conta('nopiano')}`);
 
   scriviReport(rows);
+  if (!DRY) await aggiornaDaVerificare(supa, rows, soci);
 
   const scelte = rows.filter((r) => IMPORTABILI.has(r.stato));
   if (DRY || !scelte.length) { log(DRY ? 'DRY-RUN: nessuna scrittura' : 'Niente da importare'); return; }

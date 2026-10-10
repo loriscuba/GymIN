@@ -80,7 +80,8 @@ export async function abbonamentiDaDbf(files) {
   const leggi = async (n, want) => (by[n] ? readDbf(await by[n].arrayBuffer(), want) : null);
 
   const tess = await leggi('tessere.dbf', ['COD_CLI', 'SERVIZIO', 'TIPO_SERV', 'G_INIZIO', 'G_FINE', 'DISABLED', 'SCATTISING']);
-  const anag = await leggi('anagraf.dbf', ['COD_CLI', 'NOME', 'COGNOME', 'DATA_NASC', 'CF', 'CELLULARE', 'TELEFONO', 'EMAIL', 'CITTA']);
+  const anag = await leggi('anagraf.dbf', ['COD_CLI', 'NOME', 'COGNOME', 'DATA_NASC', 'CF', 'CELLULARE', 'TELEFONO', 'EMAIL',
+    'SESSO', 'INDIRIZZO', 'CITTA', 'CAP', 'PROVINCIA', 'L675_MSG']);
   const contatore = tess.length > 0 && 'SCATTISING' in tess[0];
   const cnt = !contatore && await leggi('cnt_bank.dbf', ['CAUSALE', 'BANCA', 'DATA_MOV']);
   const acc = cnt && await leggi('accessi.dbf', ['SERVIZIO', 'COMMENTO', 'COD_CLI']);
@@ -92,6 +93,14 @@ export async function abbonamentiDaDbf(files) {
   const nomi = new Map((anag || []).map((r) => [t(r.COD_CLI), {
     nominativo: `${t(r.COGNOME)} ${t(r.NOME)}`.trim(), v_nascita: t(r.DATA_NASC), v_cf: t(r.CF).toUpperCase(),
     v_telefono: t(r.CELLULARE) || t(r.TELEFONO), v_email: t(r.EMAIL), v_citta: t(r.CITTA),
+    // anagrafica completa nel formato della tabella soci (stesse regole di dbf_to_csv.py), per importare il socio
+    anagrafica: {
+      nome: t(r.NOME) || '—', cognome: t(r.COGNOME) || '—', email: t(r.EMAIL).toLowerCase() || null,
+      telefono: t(r.CELLULARE) || t(r.TELEFONO) || null, data_nascita: t(r.DATA_NASC) || null,
+      sesso: ['M', 'F'].includes(t(r.SESSO).toUpperCase()) ? t(r.SESSO).toUpperCase() : null,
+      codice_fiscale: t(r.CF).toUpperCase() || null, indirizzo: t(r.INDIRIZZO) || null, citta: t(r.CITTA) || null,
+      cap: t(r.CAP) || null, provincia: t(r.PROVINCIA).toUpperCase() || null, consenso_mail: r.L675_MSG === '1',
+    },
   }]));
   const ric = cnt ? ricariche(cnt) : {};
   if (acc) {
