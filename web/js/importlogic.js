@@ -8,17 +8,21 @@ const nz = (v) => (v && v.trim() !== '' ? v.trim() : null);
 const dz = (v) => { const s = nz(v); return s && s >= '1900-01-01' && s < '2900-01-01' ? s : null; };
 const addMonths = (iso, m) => { const d = new Date(iso); d.setMonth(d.getMonth() + (m || 1)); return d.toISOString().slice(0, 10); };
 
+// per i soci non collegati: possibile socio GymIN con lo stesso codice fiscale o cognome+nome
+// (es. già presente ma senza codice cliente). Ritorna (riga) => socio | undefined
+const nomeKey = (v) => String(v || '').toLowerCase().replace(/\s+/g, ' ').trim();
+export const nomeSocio = (s) => `${s.cognome} ${s.nome}`.replace(/\s+/g, ' ').trim();
+export function indiceCandidati(soci) {
+  const byCf = new Map(soci.filter((s) => s.codice_fiscale).map((s) => [s.codice_fiscale.trim().toUpperCase(), s]));
+  const byNome = new Map(soci.map((s) => [nomeKey(nomeSocio(s)), s]));
+  return ({ cf, nominativo }) => (cf && byCf.get(String(cf).toUpperCase())) || (nominativo && byNome.get(nomeKey(nominativo))) || undefined;
+}
+const descrivi = (s) => (s ? `${nomeSocio(s)} (${s.cod_cli ? `cod. ${s.cod_cli}` : 'senza codice cliente'})` : '');
+
 // confronta le righe di abbonamenti.csv (o da DBF) con soci/piani/abbonamenti del DB (solo calcoli)
 export function confronta(csvRows, { soci, piani, abb }, { soloCorrenti = true, today = new Date().toISOString().slice(0, 10) } = {}) {
   const socioBy = new Map(soci.filter((s) => s.cod_cli).map((s) => [String(s.cod_cli).trim(), s]));
-  // per i soci non collegati: possibile corrispondenza in GymIN per codice fiscale o cognome+nome
-  const byCf = new Map(soci.filter((s) => s.codice_fiscale).map((s) => [s.codice_fiscale.trim().toUpperCase(), s]));
-  const nomeKey = (v) => String(v || '').toLowerCase().replace(/\s+/g, ' ').trim();
-  const byNome = new Map(soci.map((s) => [nomeKey(`${s.cognome} ${s.nome}`), s]));
-  const candidato = (a) => {
-    const s = (a.v_cf && byCf.get(a.v_cf)) || (a.nominativo && byNome.get(nomeKey(a.nominativo)));
-    return s ? `${`${s.cognome} ${s.nome}`.replace(/\s+/g, ' ').trim()} (${s.cod_cli ? `cod. ${s.cod_cli}` : 'senza codice cliente'})` : '';
-  };
+  const candidato = indiceCandidati(soci);
   const pianoBy = new Map(piani.map((p) => [p.nome, p]));
   const abbBy = new Map();   // socio|piano -> abbonamenti esistenti
   for (const a of abb) {
@@ -38,7 +42,7 @@ export function confronta(csvRows, { soci, piani, abb }, { soloCorrenti = true, 
       inizioFile: dz(a.data_inizio), scadFile: dz(a.data_scadenza), anno };
     if (!s) {
       const anag = { nascita: dz(a.v_nascita), cf: a.v_cf || '', telefono: a.v_telefono || '', email: a.v_email || '', citta: a.v_citta || '' };
-      return { ...r, stato: 'nosocio', anag, candidato: candidato(a) };
+      return { ...r, stato: 'nosocio', anag, candidato: descrivi(candidato({ cf: a.v_cf, nominativo: a.nominativo })), riga: a };
     }
     if (!p) return { ...r, stato: 'nopiano' };
     // stessi calcoli di tools/import-legacy/import.mjs

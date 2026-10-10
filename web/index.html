@@ -57,6 +57,10 @@
   .nav svg{width:18px;height:18px;flex:none;opacity:.85}.nav:hover{background:rgba(255,255,255,.05);color:#fff}
   .nav.active{background:rgba(244,81,30,.16);color:#fff}.nav.active svg{opacity:1;color:var(--accent)}
   .nav .count{margin-left:auto;font-size:12px;font-variant-numeric:tabular-nums;background:rgba(255,255,255,.08);padding:1px 8px;border-radius:20px;color:#cdd4e0}
+  /* contatore "da gestire" stile iPhone (rosso); con la sidebar a icone resta come bollino sull'icona */
+  .nav{position:relative}
+  .nav .count.alert{background:#ff3b30;color:#fff;font-weight:700;min-width:20px;text-align:center;padding:1px 6px}
+  .nav .count.alert[hidden]{display:none!important}
   /* se il menu non sta in altezza resta scorribile, ma senza barra di scorrimento visibile */
   .sidebar{scrollbar-width:none}.sidebar::-webkit-scrollbar{display:none}
   @media (max-height:860px){.nav{padding-top:8px;padding-bottom:8px}.navlabel{padding:10px 12px 4px}.brand{padding-bottom:12px}}
@@ -78,6 +82,7 @@
     .app.collapsed .sidebar:not(:hover) .nav-label,.app.collapsed .sidebar:not(:hover) .nav .count{display:none}
     .app.collapsed .sidebar:not(:hover) .sidebar-foot{justify-content:center}
     .app.collapsed .sidebar:not(:hover) .foot-txt{display:none}
+    .app.collapsed .sidebar:not(:hover) .nav .count.alert{display:block;position:absolute;top:3px;left:calc(50% + 3px);font-size:10px;line-height:16px;min-width:16px;padding:0 4px}
   }
   /* tablet touch (es. iPad orizzontale): niente espansione "hover" appiccicosa, resta a sole icone */
   @media (min-width:921px) and (hover:none){
@@ -87,6 +92,7 @@
     .app.collapsed .sidebar .navlabel{opacity:0;height:10px;padding:0;overflow:hidden}
     .app.collapsed .sidebar .nav{justify-content:center;padding-left:0;padding-right:0;gap:0}
     .app.collapsed .sidebar .sidebar-foot{justify-content:center}
+    .app.collapsed .sidebar .nav .count.alert{display:block;position:absolute;top:3px;left:calc(50% + 3px);font-size:10px;line-height:16px;min-width:16px;padding:0 4px}
   }
   @media (max-width:920px){.desktop-only{display:none!important}}
   .main{min-width:0;display:flex;flex-direction:column}
@@ -335,7 +341,7 @@
     <button class="nav" data-view="tessere" data-tip="Tessere"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M2.5 9.5h19M6.5 15h4"/></svg> <span class="nav-label">Tessere</span> <span class="count" id="c-tessere" hidden title="Accessi offline da verificare"></span></button>
     <button class="nav" data-view="posta" data-tip="Posta"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg> <span class="nav-label">Posta</span> <span class="count" id="c-posta"></span></button>
     <button class="nav" data-view="log" hidden data-tip="Log attività"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/></svg> <span class="nav-label">Log attività</span></button>
-    <button class="nav" data-view="importa" data-tip="Import abbonamenti"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg> <span class="nav-label">Import abbonamenti</span></button>
+    <button class="nav" data-view="importa" data-tip="Import abbonamenti"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg> <span class="nav-label">Import abbonamenti</span> <span class="count alert" id="c-importa" hidden title="Soci da verificare"></span></button>
     <button class="nav" id="btn-settings" data-tip="Impostazioni"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.86l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06A1.7 1.7 0 0 0 15.8 19.4a1.7 1.7 0 0 0-1 .97 1.7 1.7 0 0 0-.2 1.06V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-.2-1.06 1.7 1.7 0 0 0-1-.97 1.7 1.7 0 0 0-1.86.34l-.06.06A2 2 0 1 1 4.7 17.7l.06-.06A1.7 1.7 0 0 0 4.6 15.8a1.7 1.7 0 0 0-1.06-.2H3.4a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.06-.2 1.7 1.7 0 0 0 .97-1 1.7 1.7 0 0 0-.34-1.86l-.06-.06A2 2 0 1 1 8.3 4.7l.06.06A1.7 1.7 0 0 0 8.2 4.6a1.7 1.7 0 0 0 .97-1 .97.97 0 0 0-.2-1.06V2.4a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 .2 1.06 1.7 1.7 0 0 0 .97 1 1.7 1.7 0 0 0 1.86-.34l.06-.06A2 2 0 1 1 19.3 8.3l-.06.06A1.7 1.7 0 0 0 19.4 8.2a1.7 1.7 0 0 0 1.06.2h.1a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.06.2 1.7 1.7 0 0 0-.97 1Z"/></svg> <span class="nav-label">Impostazioni</span></button>
     <button class="nav" id="btn-logout" data-tip="Esci"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></svg> <span class="nav-label">Esci</span></button>
     <div class="sidebar-foot"><div class="avatar" id="u-avatar">—</div><div class="foot-txt"><b id="u-name">—</b><span id="u-role"></span></div></div>
@@ -415,6 +421,8 @@
     </section>
 
     <section class="view" id="view-importa" hidden>
+      <div class="tablewrap" id="ver-box" hidden style="margin-bottom:18px"><div class="phead" style="padding:16px 18px 0;align-items:center"><div><h3 style="font-size:15.5px;font-weight:700">Soci da verificare <span class="tag b" id="ver-n"></span></h3><div class="psub" style="font-size:12.5px;color:var(--ink-3);margin:4px 0 12px">Nel vecchio gestionale ma non in GymIN, rilevati dall'import automatico di ogni mattina: importali con i loro dati, collegali al socio già presente oppure ignorali</div></div></div>
+        <div class="scroll"><table id="ver-table"><thead><tr><th>Cod. cliente</th><th>Socio (vecchio gestionale)</th><th>Dati</th><th>Abbonamento</th><th>In GymIN</th><th></th></tr></thead><tbody></tbody></table></div></div>
       <div class="toolbar">
         <label class="btn-primary" style="cursor:pointer"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg> Scegli file (DBF o CSV)<input type="file" id="imp-file" accept=".dbf,.csv" multiple hidden></label>
         <span class="msub" id="imp-nomefile"></span>

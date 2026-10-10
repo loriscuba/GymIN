@@ -8,7 +8,7 @@
 //   - righe importabili una a una o in blocco, sempre dopo conferma
 import { getSupa, fetchAll } from './data.js?v=__BUILD__';
 import { abbonamentiDaDbf } from './legacydbf.js?v=__BUILD__';
-import { confronta, applica, IMPORTABILI } from './importlogic.js?v=__BUILD__';
+import { confronta, applica, IMPORTABILI, indiceCandidati, nomeSocio } from './importlogic.js?v=__BUILD__';
 
 const $ = (s, r = document) => r.querySelector(s);
 const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -87,6 +87,9 @@ export function initImporta(d) {
     const b = e.target.closest('button[data-one]'); if (b) importa([+b.dataset.one]);
   });
   $('#imp-go').addEventListener('click', () => importa([...sel]));
+  $('#ver-table tbody').addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-ver]'); if (b) gestisci(b.dataset.ver, daVer[+b.dataset.i]);
+  });
 }
 
 // confronta il CSV col DB (solo letture)
@@ -192,4 +195,108 @@ async function importa(ids) {
   deps.onDone?.();
 }
 
-export function renderImporta() { render(); }
+export function renderImporta() { render(); caricaDaVerificare().catch((err) => console.error(err.message || err)); }
+
+// ---- Soci da verificare: tabella soci_da_importare, riempita ogni mattina da auto-import.mjs ----
+// Soci del vecchio gestionale senza corrispondenza in GymIN (soci.cod_cli). Lo staff li importa
+// con l'anagrafica del vecchio gestionale, li collega al socio GymIN già presente o li ignora.
+let daVer = [];      // righe ancora da verificare
+let verSoci = [];    // soci GymIN, per proporre il collegamento (stesso CF o cognome+nome)
+
+// numero di soci da verificare (contatore sul menu); 0 se la migration non è applicata
+export async function contaDaVerificare() {
+  const supa = await getSupa();
+  const { count, error } = await supa.from('soci_da_importare').select('cod_cli', { count: 'exact', head: true }).eq('stato', 'da_verificare');
+  return error ? 0 : count || 0;
+}
+
+async function caricaDaVerificare() {
+  const supa = await getSupa();
+  const { data, error } = await supa.from('soci_da_importare').select('cod_cli,dati,abbonamento,rilevato_il')
+    .eq('stato', 'da_verificare').order('rilevato_il').order('cod_cli');
+  if (error) { $('#ver-box').hidden = true; return; }   // tabella assente (migration non applicata)
+  verSoci = data.length ? await fetchAll(supa, 'soci', 'id,cod_cli,nome,cognome,codice_fiscale') : [];
+  daVer = data;
+  renderDaVerificare();
+  deps.onConta?.(data.length);
+}
+
+const candidatoDi = (v) => indiceCandidati(verSoci)({ cf: v.dati.codice_fiscale, nominativo: nomeSocio(v.dati) });
+const scadenza = (a) => (a.data_scadenza && a.data_scadenza < '2900-01-01' ? fmtD(a.data_scadenza) : 'senza scadenza');
+
+function renderDaVerificare() {
+  $('#ver-box').hidden = !daVer.length;
+  $('#ver-n').textContent = daVer.length;
+  const grigio = (t) => `<span style="font-size:12px;color:var(--ink-3)">${t}</span>`;
+  $('#ver-table tbody').innerHTML = daVer.map((v, i) => {
+    const d = v.dati, a = v.abbonamento || {}, c = candidatoDi(v);
+    const luogo = [d.indirizzo, d.cap, d.citta, d.provincia && `(${d.provincia})`].filter(Boolean).join(' ');
+    const dati = [d.data_nascita && `nato/a il ${fmtD(d.data_nascita)}`, d.codice_fiscale && `CF ${d.codice_fiscale}`,
+      d.telefono && `tel. ${d.telefono}`, d.email, luogo].filter(Boolean).map(esc).join('<br>');
+    const abb = a.piano_nome ? `<span class="plan-pill">${esc(a.piano_nome)}</span>${a.data_inizio ? `<br>${fmtD(a.data_inizio)} → ${scadenza(a)}` : ''}` : '—';
+    const gym = c ? `${esc(nomeSocio(c))}<br>${grigio(c.cod_cli ? `già collegato al cod. ${esc(c.cod_cli)}` : 'senza codice cliente')}` : grigio('Nessuna corrispondenza');
+    const btn = (az, t) => `<button class="btn-ghost btn-xs" data-ver="${az}" data-i="${i}">${t}</button>`;
+    return `<tr><td class="mono">${esc(v.cod_cli)}</td><td><b>${esc(nomeSocio(d))}</b><br>${grigio(`rilevato il ${fmtD(v.rilevato_il)}`)}</td>
+      <td style="font-size:12.5px">${dati || '—'}</td><td style="font-size:12.5px">${abb}</td><td style="font-size:12.5px">${gym}</td>
+      <td style="white-space:nowrap">${c && !c.cod_cli ? `${btn('collega', 'Collega')} ` : ''}${btn('importa', 'Importa')} ${btn('ignora', 'Ignora')}</td></tr>`;
+  }).join('');
+}
+
+async function gestisci(azione, v) {
+  if (!v) return;
+  const d = v.dati, c = candidatoDi(v), nome = `<b>${esc(nomeSocio(d))}</b>`;
+  const conAbb = v.abbonamento?.piano_nome ? ' e il suo abbonamento' : '';
+  const testo = {
+    importa: `Creare il socio ${nome} (cod. ${esc(v.cod_cli)}) con i dati del vecchio gestionale${conAbb}?`
+      + (c ? `<br><span style="font-size:12.5px">Attenzione: in GymIN c'è già <b>${esc(nomeSocio(c))}</b>, controlla che non sia un doppione.</span>` : ''),
+    collega: `Collegare <b>${esc(nomeSocio(c || d))}</b> di GymIN al codice cliente ${esc(v.cod_cli)} del vecchio gestionale${conAbb ? ` e importare il suo abbonamento` : ''}?`
+      + '<br><span style="font-size:12.5px">I dati anagrafici in GymIN non cambiano.</span>',
+    ignora: `Ignorare ${nome}? Non comparirà più tra i soci da verificare.`,
+  }[azione];
+  if (!(await deps.askConfirm(testo, { importa: 'Importa', collega: 'Collega', ignora: 'Ignora' }[azione]))) return;
+  try {
+    const supa = await getSupa();
+    let esito = `${nomeSocio(d)} ignorato`;
+    if (azione !== 'ignora') {
+      const cols = 'id,cod_cli,nome,cognome';
+      let socio, nota = '';
+      if (azione === 'collega') {
+        if (!c || c.cod_cli) return;
+        const { data, error } = await supa.from('soci').update({ cod_cli: v.cod_cli }).eq('id', c.id).select(cols).single();
+        if (error) throw error;
+        socio = data;
+      } else {
+        let { data, error } = await supa.from('soci').insert({ ...d, cod_cli: v.cod_cli }).select(cols).single();
+        if (error && d.email && /email/i.test(error.message)) {   // email già usata da un altro socio: si importa senza
+          ({ data, error } = await supa.from('soci').insert({ ...d, email: null, cod_cli: v.cod_cli }).select(cols).single());
+          nota = ' · email già usata da un altro socio, non importata';
+        }
+        if (error) throw error;
+        socio = data;
+      }
+      esito = `${nomeSocio(socio)} ${azione === 'collega' ? 'collegato' : 'importato'}${await importaAbbonamento(supa, socio, v)}${nota}`;
+    }
+    const { error } = await supa.from('soci_da_importare')
+      .update({ stato: azione === 'ignora' ? 'ignorato' : 'importato', gestito_il: new Date().toISOString() }).eq('cod_cli', v.cod_cli);
+    if (error) throw error;
+    deps.toast(esito, 'ok');
+  } catch (err) { deps.toast(`Errore: ${err.message || err}`, 'warn'); }
+  await caricaDaVerificare();
+  if (azione !== 'ignora') deps.onDone?.();
+}
+
+// abbonamento corrente del socio appena importato/collegato, con le regole dell'import
+async function importaAbbonamento(supa, socio, v) {
+  const a = v.abbonamento;
+  if (!a?.piano_nome) return '';
+  const [piani, abb] = await Promise.all([
+    fetchAll(supa, 'piani', 'id,nome,durata_mesi,entrate'),
+    fetchAll(supa, 'abbonamenti', 'id,socio_id,piano_id,data_inizio,data_scadenza,entrate_residue,stato', (q) => q.eq('socio_id', socio.id)),
+  ]);
+  const [r] = confronta([{ ...a, cod_cli: v.cod_cli, is_latest: '1' }], { soci: [socio], piani, abb });
+  if (r.stato === 'nopiano') return ` · piano "${a.piano_nome}" non presente in GymIN: abbonamento non importato`;
+  if (!IMPORTABILI.has(r.stato)) return '';
+  const { ko, errori } = await applica(supa, [r]);
+  if (ko) throw new Error(`socio salvato, abbonamento no: ${errori.join('; ')}`);
+  return ' · abbonamento importato';
+}

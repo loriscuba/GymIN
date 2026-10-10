@@ -156,6 +156,24 @@ quindi sono sempre quelle del cruscotto online. Dal repo si può usare `--local`
    *Piano mancante* (codice, nome dal vecchio gestionale, piano, date) finiscono in `da-verificare.csv`,
    da aprire con Excel. Contengono dati dei soci: restano su quel PC.
 
+### Soci da verificare
+
+I soci del vecchio gestionale che non hanno corrispondenza in GymIN (nessun `soci.cod_cli` uguale)
+lo script li scrive ogni mattina nella tabella `soci_da_importare` (migration
+`20261011120000_soci_da_importare.sql`), con l'anagrafica completa di `anagraf.dbf` e l'abbonamento
+corrente. In GymIN → **Import abbonamenti** compaiono nella sezione **Soci da verificare** e la voce di
+menu mostra un contatore rosso finché ce ne sono. Per ognuno:
+
+- **Importa**: crea il socio con i dati del vecchio gestionale (se l'email è già di un altro socio,
+  senza email) e importa il suo abbonamento;
+- **Collega**: se in GymIN c'è già (stesso codice fiscale o cognome+nome) ma senza codice cliente,
+  gli assegna il codice e importa l'abbonamento; l'anagrafica GymIN non cambia;
+- **Ignora**: non viene più proposto.
+
+Se il piano non esiste in GymIN il socio viene comunque creato; l'abbonamento arriva con l'import
+automatico del giorno dopo la creazione del piano. Le anagrafiche dei soci già collegati non vengono
+mai sovrascritte.
+
 ## Idempotenza
 
 - **piani**: inseriti solo se il `nome` non esiste già.
