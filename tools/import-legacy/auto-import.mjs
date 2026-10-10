@@ -68,8 +68,12 @@ function scriviReport(rows) {
   const file = new URL('./da-verificare.csv', import.meta.url);
   const head = ['Motivo', 'Codice cliente', 'Nome vecchio gestionale', 'Data nascita', 'Codice fiscale', 'Telefono', 'Email', 'Città',
     'Socio in GymIN (o possibile corrispondenza)', 'Piano', 'Inizio', 'Scadenza'].join(';');
-  fs.writeFileSync(file, `\uFEFF${[head, ...righe].join('\r\n')}\r\n`);
-  log(`righe da verificare: ${righe.length} → ${path.basename(file.pathname)}`);
+  try {
+    fs.writeFileSync(file, `\uFEFF${[head, ...righe].join('\r\n')}\r\n`);
+    log(`righe da verificare: ${righe.length} → ${path.basename(file.pathname)}`);
+  } catch (err) {   // es. file aperto in Excel: il report salta, l'import prosegue
+    log(`righe da verificare: ${righe.length} · ${path.basename(file.pathname)} non aggiornato (${err.code || err.message}): è aperto in Excel?`);
+  }
 }
 
 // soci del vecchio gestionale non presenti in GymIN → soci_da_importare (sezione "Soci da verificare"
