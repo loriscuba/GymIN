@@ -87,6 +87,7 @@ export async function abbonamentiDaDbf(files) {
 
   const generico = (r) => r.COGNOME.trim().toUpperCase() === 'CLIENTE' && r.NOME.toUpperCase().includes('GENERICO');
   const valid = anag && new Set(anag.filter((r) => !generico(r)).map((r) => r.COD_CLI.trim()));
+  const nomi = new Map((anag || []).map((r) => [r.COD_CLI.trim(), `${r.COGNOME.trim()} ${r.NOME.trim()}`.trim()]));
   const ric = cnt ? ricariche(cnt) : {};
   if (acc) {
     const used = consumati(acc);
@@ -101,7 +102,7 @@ export async function abbonamentiDaDbf(files) {
     if (valid && !valid.has(cod)) continue;
     if (!r.G_INIZIO && !r.G_FINE) continue;
     abb.push({
-      cod_cli: cod, piano_nome: serv, tipo_serv: r.TIPO_SERV.trim(),
+      cod_cli: cod, nominativo: nomi.get(cod) || '', piano_nome: serv, tipo_serv: r.TIPO_SERV.trim(),
       data_inizio: r.G_INIZIO, data_scadenza: r.G_FINE,
       open_ended: r.G_FINE >= '2900-01-01' ? 'true' : 'false',
       entrate_residue: '', scattising: r.SCATTISING, disabilitato: r.DISABLED === '1' ? 'true' : 'false',

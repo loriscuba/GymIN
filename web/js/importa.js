@@ -120,15 +120,16 @@ function filtrate() {
   return rows.filter((r) => {
     if (!inAnno(r)) return false;
     if (state.filtro === 'importabili' ? !IMPORTABILI.has(r.stato) : state.filtro !== 'tutti' && r.stato !== state.filtro) return false;
-    return !q || `${r.cod} ${r.socio} ${r.piano}`.toLowerCase().includes(q);
+    return !q || `${r.cod} ${r.socio} ${r.vecchio} ${r.piano}`.toLowerCase().includes(q);
   });
 }
 
 const msg = (t) => `<tr><td colspan="7" style="text-align:center;color:var(--ink-3);padding:28px">${t}</td></tr>`;
 const val = (k, v) => (k === 'data_scadenza' ? fmtD(v) : v ?? '—');
 function dettaglio(r) {
-  if (r.stato === 'nosocio') return 'Nessun socio con questo codice cliente: il socio non viene creato';
-  if (r.stato === 'nopiano') return 'Piano inesistente in GymIN: crealo prima in Abbonamenti';
+  const periodo = `${fmtD(r.inizioFile)} → ${r.scadFile ? fmtD(r.scadFile) : 'senza scadenza'}`;
+  if (r.stato === 'nosocio') return `Nessun socio con questo codice cliente: il socio non viene creato<br>Vecchio gestionale: <b>${esc(r.vecchio || 'nome non disponibile')}</b> · ${periodo}`;
+  if (r.stato === 'nopiano') return `Piano inesistente in GymIN: crealo prima in Abbonamenti<br>${periodo}`;
   const n = r.nuovo;
   if (r.dup) return 'Riga doppia nel CSV: già conteggiata sopra';
   if (r.stato === 'diverso') {
@@ -152,7 +153,7 @@ function render() {
     const [lab, cls] = STATI[r.stato];
     const ok = IMPORTABILI.has(r.stato);
     return `<tr><td>${ok ? `<input type="checkbox" data-sel="${r.i}" ${sel.has(r.i) ? 'checked' : ''} aria-label="Seleziona">` : ''}</td>
-      <td class="mono">${esc(r.cod)}</td><td>${esc(r.socio || '—')}</td><td><span class="plan-pill">${esc(r.piano)}</span></td>
+      <td class="mono">${esc(r.cod)}</td><td>${r.socio ? esc(r.socio) : r.vecchio ? `<i title="Nome dal vecchio gestionale: non presente in GymIN">${esc(r.vecchio)}</i>` : '—'}</td><td><span class="plan-pill">${esc(r.piano)}</span></td>
       <td><span class="tag ${cls}">${lab}</span></td><td style="font-size:12.5px">${dettaglio(r)}</td>
       <td>${ok ? `<button class="btn-ghost btn-xs" data-one="${r.i}">${r.stato === 'nuovo' ? 'Importa' : 'Aggiorna'}</button>` : ''}</td></tr>`;
   }).join('') || msg('Nessuna riga in questa sezione');

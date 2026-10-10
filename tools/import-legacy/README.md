@@ -152,7 +152,9 @@ quindi sono sempre quelle del cruscotto online. Dal repo si può usare `--local`
    ```
    schtasks /create /tn "GymIN import" /tr "C:\GymIN-import\auto-import.bat" /sc daily /st 09:15
    ```
-   L'esito di ogni giro è in `auto-import.log` accanto allo script.
+   L'esito di ogni giro è in `auto-import.log` accanto allo script; le righe *Socio mancante* e
+   *Piano mancante* (codice, nome dal vecchio gestionale, piano, date) finiscono in `da-verificare.csv`,
+   da aprire con Excel. Contengono dati dei soci: restano su quel PC.
 
 ## Idempotenza
 
