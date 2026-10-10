@@ -126,6 +126,31 @@ Regole: scrive solo su `abbonamenti` (mai `soci`, `piani`, `pagamenti`); stesso 
 `data_inizio` = stesso abbonamento, quindi rilanciarlo non crea doppioni; gli abbonamenti
 `archiviato` non cambiano stato. Ogni scrittura finisce nel Log attività.
 
+## Import automatico ogni mattina (`auto-import.mjs`)
+
+Fa da solo quello che il cruscotto fa a mano: legge `tessere.dbf` + `anagraf.dbf` dalla cartella
+condivisa, confronta col DB e importa **tutte** le righe *Nuovo* e *Diverso* (stesse regole del
+cruscotto, codice condiviso in `web/js/importlogic.js`). Solo abbonamento corrente per socio; le righe
+*Socio mancante* / *Piano mancante* restano da gestire a mano nel cruscotto.
+
+Sul PC Win 11 (serve Node 18+ e una copia del repo):
+
+1. `cd tools\import-legacy` e `npm install`
+2. `.env` in questa cartella:
+   ```
+   SUPABASE_URL=https://xxxx.supabase.co
+   SUPABASE_SERVICE_ROLE_KEY=eyJ...
+   GYMIN_IMPORT_DIR=\\172.16.0.155\Condivisa
+   ```
+   Meglio il percorso di rete che `Z:`: le attività pianificate non vedono le unità collegate.
+   Le credenziali della condivisione vanno salvate una volta: `cmdkey /add:172.16.0.155 /user:172.16.0.155\utente /pass:...`
+3. Prova: `npm run auto:dry` (anteprima, nessuna scrittura), poi `npm run auto`.
+4. Pianifica `auto-import.bat` dopo la copia delle 9 (es. 9:15):
+   ```
+   schtasks /create /tn "GymIN import" /tr "C:\percorso\GymIN\tools\import-legacy\auto-import.bat" /sc daily /st 09:15
+   ```
+   L'esito di ogni giro è in `auto-import.log` accanto allo script.
+
 ## Idempotenza
 
 - **piani**: inseriti solo se il `nome` non esiste già.

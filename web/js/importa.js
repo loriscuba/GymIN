@@ -8,17 +8,16 @@
 //   - righe importabili una a una o in blocco, sempre dopo conferma
 import { getSupa, fetchAll } from './data.js?v=__BUILD__';
 import { abbonamentiDaDbf } from './legacydbf.js?v=__BUILD__';
+import { confronta, applica, IMPORTABILI } from './importlogic.js?v=__BUILD__';
 
 const $ = (s, r = document) => r.querySelector(s);
 const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const SHOW_MAX = 300;   // righe disegnate in tabella (la selezione vale su tutte le righe filtrate)
-const CHUNK = 500;
 
 const STATI = {
   nuovo: ['Nuovo', 'g'], diverso: ['Diverso', 'w'], presente: ['Già presente', 'n'],
   nosocio: ['Socio mancante', 'b'], nopiano: ['Piano mancante', 'b'],
 };
-const IMPORTABILI = new Set(['nuovo', 'diverso']);
 
 // ---- CSV minimale (virgolette e newline nei campi), come tools/import-legacy/import.mjs ----
 function parseCSV(text) {
@@ -38,9 +37,6 @@ function parseCSV(text) {
   return rows.filter((r) => r.length > 1 || (r[0] && r[0].length))
     .map((r) => Object.fromEntries(header.map((h, i) => [h.trim(), r[i] ?? ''])));
 }
-const nz = (v) => (v && v.trim() !== '' ? v.trim() : null);
-const dz = (v) => { const s = nz(v); return s && s >= '1900-01-01' && s < '2900-01-01' ? s : null; };
-const addMonths = (iso, m) => { const d = new Date(iso); d.setMonth(d.getMonth() + (m || 1)); return d.toISOString().slice(0, 10); };
 const fmtD = (iso) => (iso ? new Date(iso).toLocaleDateString('it-IT') : '—');
 
 let deps = {};            // { toast, askConfirm, onDone }
@@ -102,48 +98,7 @@ async function analizza() {
     fetchAll(supa, 'piani', 'id,nome,durata_mesi,entrate'),
     fetchAll(supa, 'abbonamenti', 'id,socio_id,piano_id,data_inizio,data_scadenza,entrate_residue,stato'),
   ]);
-  const socioBy = new Map(soci.map((s) => [String(s.cod_cli).trim(), s]));
-  const pianoBy = new Map(piani.map((p) => [p.nome, p]));
-  const abbBy = new Map();   // socio|piano -> abbonamenti esistenti
-  for (const a of abb) {
-    const k = `${a.socio_id}|${a.piano_id}`;
-    (abbBy.get(k) || abbBy.set(k, []).get(k)).push(a);
-  }
-  const today = new Date().toISOString().slice(0, 10);
-  const src = state.soloCorrenti ? csvRows.filter((a) => a.is_latest === '1') : csvRows;
-
-  const visti = new Set();   // righe doppie nel CSV: si importa solo la prima
-  rows = src.map((a, i) => {
-    const s = socioBy.get(String(a.cod_cli).trim());
-    const p = pianoBy.get(a.piano_nome);
-    // anno di scadenza per il filtro (righe non collegate: dalla data del file; senza scadenza: dall'inizio)
-    const anno = (dz(a.data_scadenza) || dz(a.data_inizio) || '').slice(0, 4);
-    const r = { i, cod: a.cod_cli, piano: a.piano_nome, socio: s ? `${s.cognome} ${s.nome}` : '', anno };
-    if (!s) return { ...r, stato: 'nosocio' };
-    if (!p) return { ...r, stato: 'nopiano' };
-    // stessi calcoli di tools/import-legacy/import.mjs
-    const inizioCsv = dz(a.data_inizio);
-    const inizio = inizioCsv || today;
-    const scad = dz(a.data_scadenza) || addMonths(inizio, p.durata_mesi || 1);
-    const entrate = nz(a.entrate_residue) ? Number(a.entrate_residue) : (p.entrate > 0 ? p.entrate : null);
-    const stato = a.disabilitato === 'true' ? 'disdetto' : (scad < today ? 'scaduto' : 'attivo');
-    const nuovo = { socio_id: s.id, piano_id: p.id, data_inizio: inizio, data_scadenza: scad, entrate_residue: entrate, stato };
-    const esist = abbBy.get(`${s.id}|${p.id}`) || [];
-    // con data_inizio nel CSV si cerca lo stesso inizio; senza, l'ultimo abbonamento di quel piano
-    const ex = inizioCsv ? esist.find((x) => x.data_inizio === inizioCsv)
-      : esist.sort((x, y) => (x.data_scadenza < y.data_scadenza ? 1 : -1))[0];
-    const chiave = `${s.id}|${p.id}|${inizio}`;
-    r.anno = scad.slice(0, 4);
-    if (!ex && visti.has(chiave)) return { ...r, stato: 'presente', nuovo, dup: true };
-    visti.add(chiave);
-    if (!ex) return { ...r, stato: 'nuovo', nuovo };
-    const diff = {};
-    if (ex.data_scadenza !== scad) diff.data_scadenza = scad;
-    if ((ex.entrate_residue ?? null) !== entrate) diff.entrate_residue = entrate;
-    if (ex.stato !== 'archiviato' && ex.stato !== stato) diff.stato = stato;   // gli archiviati restano archiviati
-    if (!Object.keys(diff).length) return { ...r, stato: 'presente', nuovo, ex };
-    return { ...r, stato: 'diverso', nuovo, ex, diff };
-  });
+  rows = confronta(csvRows, { soci, piani, abb }, { soloCorrenti: state.soloCorrenti });
   sel.clear();
   opzioniAnno();
   render();
@@ -222,24 +177,10 @@ async function importa(ids) {
   if (!(await deps.askConfirm(`Vuoi ${testo}?<br><span style="font-size:12.5px">I soci coinvolti vengono segnati col badge UP.</span>`, 'Importa'))) return;
   const btn = $('#imp-go'); btn.disabled = true;
   let ok = 0, ko = 0;
-  const toccati = new Set();
   try {
-    const supa = await getSupa();
-    for (let k = 0; k < nuovi.length; k += CHUNK) {
-      const part = nuovi.slice(k, k + CHUNK);
-      const { error } = await supa.from('abbonamenti').insert(part.map((r) => r.nuovo));
-      if (error) { ko += part.length; console.error(error.message); } else { ok += part.length; part.forEach((r) => toccati.add(r.nuovo.socio_id)); }
-    }
-    for (const r of agg) {
-      btn.textContent = `Aggiornamento ${ok + ko + 1}/${scelte.length}…`;
-      const { error } = await supa.from('abbonamenti').update(r.diff).eq('id', r.ex.id);
-      if (error) { ko++; console.error(error.message); } else { ok++; toccati.add(r.ex.socio_id); }
-    }
-    const ids = [...toccati], now = new Date().toISOString();
-    for (let k = 0; k < ids.length; k += CHUNK) {
-      const { error } = await supa.from('soci').update({ aggiornato_da_import: now }).in('id', ids.slice(k, k + CHUNK));
-      if (error) console.error(error.message);
-    }
+    const res = await applica(await getSupa(), scelte, (n, tot) => { btn.textContent = `Aggiornamento ${n}/${tot}…`; });
+    ({ ok, ko } = res);
+    res.errori.forEach((m) => console.error(m));
   } catch (err) { deps.toast(`Errore import: ${err.message || err}`, 'warn'); }
   deps.toast(ko ? `Importati ${ok}, errori ${ko} (dettagli in console)` : `Importati ${ok} abbonamenti`, ko ? 'warn' : 'ok');
   await analizza();      // ricalcola gli stati: le righe importate diventano "Già presente"
