@@ -60,9 +60,12 @@ function scriviReport(rows) {
   const dt = (iso) => (iso ? iso.split('-').reverse().join('/') : '');
   const cella = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
   const righe = rows.filter((r) => motivo[r.stato])
-    .map((r) => [motivo[r.stato], r.cod, r.vecchio, r.socio, r.piano, dt(r.inizioFile), r.scadFile ? dt(r.scadFile) : 'senza scadenza'].map(cella).join(';'));
+    .map((r) => { const g = r.anag || {};
+      return [motivo[r.stato], r.cod, r.vecchio, dt(g.nascita), g.cf, g.telefono, g.email, g.citta, r.socio || r.candidato || '',
+        r.piano, dt(r.inizioFile), r.scadFile ? dt(r.scadFile) : 'senza scadenza'].map(cella).join(';'); });
   const file = new URL('./da-verificare.csv', import.meta.url);
-  const head = ['Motivo', 'Codice cliente', 'Nome vecchio gestionale', 'Socio in GymIN', 'Piano', 'Inizio', 'Scadenza'].join(';');
+  const head = ['Motivo', 'Codice cliente', 'Nome vecchio gestionale', 'Data nascita', 'Codice fiscale', 'Telefono', 'Email', 'Città',
+    'Socio in GymIN (o possibile corrispondenza)', 'Piano', 'Inizio', 'Scadenza'].join(';');
   fs.writeFileSync(file, `\uFEFF${[head, ...righe].join('\r\n')}\r\n`);
   log(`righe da verificare: ${righe.length} → ${path.basename(file.pathname)}`);
 }
@@ -79,7 +82,7 @@ async function main() {
   log(`${DIR} · ${info} · ${csvRows.length} abbonamenti${DRY ? ' · DRY-RUN' : ''}`);
 
   const [soci, piani, abb] = await Promise.all([
-    fetchAll(supa, 'soci', 'id,cod_cli,nome,cognome', (q) => q.not('cod_cli', 'is', null)),
+    fetchAll(supa, 'soci', 'id,cod_cli,nome,cognome,codice_fiscale'),
     fetchAll(supa, 'piani', 'id,nome,durata_mesi,entrate'),
     fetchAll(supa, 'abbonamenti', 'id,socio_id,piano_id,data_inizio,data_scadenza,entrate_residue,stato'),
   ]);

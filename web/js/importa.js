@@ -94,7 +94,7 @@ async function analizza() {
   $('#imp-table tbody').innerHTML = msg('Confronto col database in corso…');
   const supa = await getSupa();
   const [soci, piani, abb] = await Promise.all([
-    fetchAll(supa, 'soci', 'id,cod_cli,nome,cognome', (q) => q.not('cod_cli', 'is', null)),
+    fetchAll(supa, 'soci', 'id,cod_cli,nome,cognome,codice_fiscale'),
     fetchAll(supa, 'piani', 'id,nome,durata_mesi,entrate'),
     fetchAll(supa, 'abbonamenti', 'id,socio_id,piano_id,data_inizio,data_scadenza,entrate_residue,stato'),
   ]);
@@ -120,7 +120,7 @@ function filtrate() {
   return rows.filter((r) => {
     if (!inAnno(r)) return false;
     if (state.filtro === 'importabili' ? !IMPORTABILI.has(r.stato) : state.filtro !== 'tutti' && r.stato !== state.filtro) return false;
-    return !q || `${r.cod} ${r.socio} ${r.vecchio} ${r.piano}`.toLowerCase().includes(q);
+    return !q || `${r.cod} ${r.socio} ${r.vecchio} ${r.anag?.cf || ''} ${r.piano}`.toLowerCase().includes(q);
   });
 }
 
@@ -128,7 +128,11 @@ const msg = (t) => `<tr><td colspan="7" style="text-align:center;color:var(--ink
 const val = (k, v) => (k === 'data_scadenza' ? fmtD(v) : v ?? '—');
 function dettaglio(r) {
   const periodo = `${fmtD(r.inizioFile)} → ${r.scadFile ? fmtD(r.scadFile) : 'senza scadenza'}`;
-  if (r.stato === 'nosocio') return `Nessun socio con questo codice cliente: il socio non viene creato<br>Vecchio gestionale: <b>${esc(r.vecchio || 'nome non disponibile')}</b> · ${periodo}`;
+  if (r.stato === 'nosocio') {
+    const g = r.anag, dati = [g.nascita && `nato/a il ${fmtD(g.nascita)}`, g.cf && `CF ${g.cf}`, g.telefono && `tel. ${g.telefono}`, g.email, g.citta].filter(Boolean).map(esc).join(' · ');
+    return `Nessun socio con questo codice cliente: il socio non viene creato<br>Vecchio gestionale: <b>${esc(r.vecchio || 'nome non disponibile')}</b>${dati ? ` · ${dati}` : ''} · ${periodo}`
+      + (r.candidato ? `<br>Possibile socio in GymIN: <b>${esc(r.candidato)}</b>` : '');
+  }
   if (r.stato === 'nopiano') return `Piano inesistente in GymIN: crealo prima in Abbonamenti<br>${periodo}`;
   const n = r.nuovo;
   if (r.dup) return 'Riga doppia nel CSV: già conteggiata sopra';
