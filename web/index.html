@@ -423,6 +423,14 @@
     <section class="view" id="view-importa" hidden>
       <div class="tablewrap" id="ver-box" hidden style="margin-bottom:18px"><div class="phead" style="padding:16px 18px 0;align-items:center"><div><h3 style="font-size:15.5px;font-weight:700">Soci da verificare <span class="tag b" id="ver-n"></span></h3><div class="psub" style="font-size:12.5px;color:var(--ink-3);margin:4px 0 12px">Nel vecchio gestionale ma non in GymIN, rilevati dall'import automatico di ogni mattina: importali con i loro dati, collegali al socio già presente oppure ignorali</div></div></div>
         <div class="scroll"><table id="ver-table"><thead><tr><th>Cod. cliente</th><th>Socio (vecchio gestionale)</th><th>Dati</th><th>Abbonamento</th><th>In GymIN</th><th></th></tr></thead><tbody></tbody></table></div></div>
+      <div class="tablewrap" id="reg-box" hidden style="margin-bottom:18px"><div class="phead" style="padding:16px 18px 0;align-items:center;flex-wrap:wrap;gap:10px"><div><h3 style="font-size:15.5px;font-weight:700">Importazioni</h3><div class="psub" id="reg-sub" style="font-size:12.5px;color:var(--ink-3);margin:4px 0 12px">Cosa ha scritto ogni import, automatico o dal cruscotto</div></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px">
+          <select id="reg-periodo" class="logtab" aria-label="Periodo"><option value="ultimo">Ultimo import</option><option value="oggi">Oggi</option><option value="ieri">Ieri</option><option value="7">Ultimi 7 giorni</option><option value="30">Ultimi 30 giorni</option><option value="custom">Dal … al …</option></select>
+          <input type="date" id="reg-da" class="logtab" hidden aria-label="Dal"><input type="date" id="reg-a" class="logtab" hidden aria-label="Al">
+          <div class="filters" id="reg-azioni"><button class="chip active" data-a="">Tutti<span></span></button><button class="chip" data-a="nuovo">Nuovi<span></span></button><button class="chip" data-a="aggiornato">Aggiornati<span></span></button><button class="chip" data-a="socio">Soci<span></span></button></div>
+        </div></div>
+        <div class="scroll" style="max-height:440px"><table id="reg-table"><thead><tr><th>Data e ora</th><th>Fonte</th><th>Socio</th><th>Piano</th><th>Esito</th><th>Dettaglio</th></tr></thead><tbody></tbody></table></div>
+        <div class="tfoot"><span id="reg-count"></span></div></div>
       <div class="toolbar">
         <label class="btn-primary" style="cursor:pointer"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg> Scegli file (DBF o CSV)<input type="file" id="imp-file" accept=".dbf,.csv" multiple hidden></label>
         <span class="msub" id="imp-nomefile"></span>

@@ -8,7 +8,7 @@
 //   - righe importabili una a una o in blocco, sempre dopo conferma
 import { getSupa, fetchAll } from './data.js?v=__BUILD__';
 import { abbonamentiDaDbf } from './legacydbf.js?v=__BUILD__';
-import { confronta, applica, IMPORTABILI, indiceCandidati, nomeSocio, SENZA_SCADENZA } from './importlogic.js?v=__BUILD__';
+import { confronta, applica, registra, IMPORTABILI, indiceCandidati, nomeSocio, SENZA_SCADENZA } from './importlogic.js?v=__BUILD__';
 
 const $ = (s, r = document) => r.querySelector(s);
 const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -87,6 +87,16 @@ export function initImporta(d) {
     const b = e.target.closest('button[data-one]'); if (b) importa([+b.dataset.one]);
   });
   $('#imp-go').addEventListener('click', () => importa([...sel]));
+  $('#reg-periodo').addEventListener('change', (e) => {
+    reg.periodo = e.target.value;
+    $('#reg-da').hidden = $('#reg-a').hidden = reg.periodo !== 'custom';
+    caricaRegistro();
+  });
+  ['#reg-da', '#reg-a'].forEach((id) => $(id).addEventListener('change', () => caricaRegistro()));
+  $('#reg-azioni').addEventListener('click', (e) => {
+    const c = e.target.closest('.chip'); if (!c) return;
+    reg.azione = c.dataset.a; renderRegistro();
+  });
   $('#ver-table tbody').addEventListener('click', (e) => {
     const b = e.target.closest('button[data-ver]'); if (b) gestisci(b.dataset.ver, daVer[+b.dataset.i]);
   });
@@ -192,10 +202,81 @@ async function importa(ids) {
   } catch (err) { deps.toast(`Errore import: ${err.message || err}`, 'warn'); }
   deps.toast(ko ? `Importati ${ok}, errori ${ko} (dettagli in console)` : `Importati ${ok} abbonamenti`, ko ? 'warn' : 'ok');
   await analizza();      // ricalcola gli stati: le righe importate diventano "Già presente"
+  caricaRegistro().catch(() => {});
   deps.onDone?.();
 }
 
-export function renderImporta() { render(); caricaDaVerificare().catch((err) => console.error(err.message || err)); }
+export function renderImporta() {
+  render();
+  caricaDaVerificare().catch((err) => console.error(err.message || err));
+  caricaRegistro().catch((err) => console.error(err.message || err));
+}
+
+// ---- Registro delle importazioni (tabella import_log, scritta da importlogic.js) ----
+const reg = { periodo: 'ultimo', azione: '', righe: [] };
+const giorno = (d) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; };
+const piuGiorni = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
+function intervallo() {   // [da, a) in ISO; null = nessun limite
+  const oggi = giorno(new Date());
+  if (reg.periodo === 'oggi') return [oggi, null];
+  if (reg.periodo === 'ieri') return [piuGiorni(oggi, -1), oggi];
+  if (reg.periodo === '7' || reg.periodo === '30') return [piuGiorni(oggi, 1 - Number(reg.periodo)), null];
+  const da = $('#reg-da').value, a = $('#reg-a').value;   // 'custom': date incluse
+  return [da ? giorno(da) : null, a ? piuGiorni(giorno(a), 1) : null];
+}
+async function caricaRegistro() {
+  const supa = await getSupa();
+  let q = supa.from('import_log').select('creato_il,import_id,fonte,azione,cod_cli,socio,piano,prima,dopo');
+  if (reg.periodo === 'ultimo') {
+    const { data, error } = await supa.from('import_log').select('import_id').order('creato_il', { ascending: false }).limit(1);
+    if (error) { $('#reg-box').hidden = true; return; }   // tabella assente (migration non applicata)
+    q = q.eq('import_id', data[0]?.import_id ?? '');
+  } else {
+    const [da, a] = intervallo();
+    if (da) q = q.gte('creato_il', da.toISOString());
+    if (a) q = q.lt('creato_il', a.toISOString());
+  }
+  const { data, error } = await q.order('creato_il', { ascending: false }).order('id', { ascending: false }).limit(3000);
+  if (error) { $('#reg-box').hidden = true; return; }
+  $('#reg-box').hidden = false;
+  reg.righe = data;
+  renderRegistro();
+}
+const AZIONI = {
+  nuovo: ['Nuovo', 'g'], aggiornato: ['Aggiornato', 'w'], socio_importato: ['Socio importato', 'g'], socio_collegato: ['Socio collegato', 'n'],
+};
+const regFiltro = (r) => !reg.azione || (reg.azione === 'socio' ? r.azione.startsWith('socio') : r.azione === reg.azione);
+function dettaglioReg(r) {
+  const lab = { data_scadenza: 'Scadenza', entrate_residue: 'Entrate', stato: 'Stato', data_inizio: 'Inizio' };
+  const v = (k, x) => esc(k === 'data_scadenza' || k === 'data_inizio' ? fmtD(x) : x ?? '—');
+  if (r.azione === 'aggiornato') return Object.keys(r.dopo || {}).map((k) => `${lab[k] || k}: ${v(k, r.prima?.[k])} → <b>${v(k, r.dopo[k])}</b>`).join('<br>');
+  if (r.azione === 'nuovo' && r.dopo) {
+    const d = r.dopo;
+    return `${fmtD(d.data_inizio)} → ${fmtD(d.data_scadenza)}${d.entrate_residue != null ? ` · ${esc(d.entrate_residue)} entrate` : ''} · ${esc(d.stato)}`;
+  }
+  if (r.azione === 'socio_importato') return 'Creato con i dati del vecchio gestionale';
+  if (r.azione === 'socio_collegato') return 'Codice cliente assegnato al socio già presente';
+  return '';
+}
+function renderRegistro() {
+  const tutte = reg.righe;
+  document.querySelectorAll('#reg-azioni .chip').forEach((c) => {
+    c.classList.toggle('active', c.dataset.a === reg.azione);
+    const a = c.dataset.a;
+    c.querySelector('span').textContent = ` ${tutte.filter((r) => !a || (a === 'socio' ? r.azione.startsWith('socio') : r.azione === a)).length}`;
+  });
+  const list = tutte.filter(regFiltro);
+  const ora = (iso) => new Date(iso).toLocaleString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  $('#reg-table tbody').innerHTML = list.slice(0, SHOW_MAX).map((r) => {
+    const [lab, cls] = AZIONI[r.azione] || [r.azione, 'n'];
+    return `<tr><td class="mono" style="white-space:nowrap">${ora(r.creato_il)}</td><td>${r.fonte === 'automatico' ? 'Automatico' : 'Manuale'}</td>
+      <td>${esc(r.socio || '—')}<br><span style="font-size:12px;color:var(--ink-3)">cod. ${esc(r.cod_cli || '—')}</span></td>
+      <td>${r.piano ? `<span class="plan-pill">${esc(r.piano)}</span>` : '—'}</td><td><span class="tag ${cls}">${lab}</span></td>
+      <td style="font-size:12.5px">${dettaglioReg(r)}</td></tr>`;
+  }).join('') || msg('Nessuna importazione in questo periodo');
+  const quando = reg.periodo === 'ultimo' && tutte[0] ? ` · ultimo import del ${ora(tutte.at(-1).creato_il)} (${tutte[0].fonte})` : '';
+  $('#reg-count').textContent = `${list.length} righe${quando}${list.length > SHOW_MAX ? ` · mostrate le prime ${SHOW_MAX}` : ''}`;
+}
 
 // ---- Soci da verificare: tabella soci_da_importare, riempita ogni mattina da auto-import.mjs ----
 // Soci del vecchio gestionale senza corrispondenza in GymIN (soci.cod_cli). Lo staff li importa
@@ -279,9 +360,14 @@ async function gestisci(azione, v) {
     const { error } = await supa.from('soci_da_importare')
       .update({ stato: azione === 'ignora' ? 'ignorato' : 'importato', gestito_il: new Date().toISOString() }).eq('cod_cli', v.cod_cli);
     if (error) throw error;
+    if (azione !== 'ignora') {
+      await registra(supa, [{ azione: azione === 'collega' ? 'socio_collegato' : 'socio_importato', cod_cli: v.cod_cli,
+        socio: nomeSocio(azione === 'collega' ? c : d), piano: v.abbonamento?.piano_nome || null }]);
+    }
     deps.toast(esito, 'ok');
   } catch (err) { deps.toast(`Errore: ${err.message || err}`, 'warn'); }
   await caricaDaVerificare();
+  caricaRegistro().catch(() => {});
   if (azione !== 'ignora') deps.onDone?.();
 }
 
