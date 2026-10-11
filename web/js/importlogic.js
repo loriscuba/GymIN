@@ -76,27 +76,44 @@ export function confronta(csvRows, { soci, piani, abb }, { soloCorrenti = true, 
   });
 }
 
-// scrive le righe scelte (nuove → insert, diverse → update) e segna i soci col badge UP
+// scrive le righe scelte (nuove → insert, diverse → update), segna i soci col badge UP
+// e registra ogni scrittura in import_log (fonte: automatico dallo script Node, manuale dal browser)
 export async function applica(supa, scelte, onProgress = () => {}) {
   const nuovi = scelte.filter((r) => r.stato === 'nuovo');
   const agg = scelte.filter((r) => r.stato === 'diverso');
   let ok = 0, ko = 0;
   const errori = [];
   const toccati = new Set();
+  const fatti = [];
   for (let k = 0; k < nuovi.length; k += CHUNK) {
     const part = nuovi.slice(k, k + CHUNK);
     const { error } = await supa.from('abbonamenti').insert(part.map((r) => r.nuovo));
-    if (error) { ko += part.length; errori.push(error.message); } else { ok += part.length; part.forEach((r) => toccati.add(r.nuovo.socio_id)); }
+    if (error) { ko += part.length; errori.push(error.message); } else { ok += part.length; part.forEach((r) => { toccati.add(r.nuovo.socio_id); fatti.push(r); }); }
   }
   for (const r of agg) {
     onProgress(ok + ko + 1, scelte.length);
     const { error } = await supa.from('abbonamenti').update(r.diff).eq('id', r.ex.id);
-    if (error) { ko++; errori.push(error.message); } else { ok++; toccati.add(r.ex.socio_id); }
+    if (error) { ko++; errori.push(error.message); } else { ok++; toccati.add(r.ex.socio_id); fatti.push(r); }
   }
   const ids = [...toccati], now = new Date().toISOString();
   for (let k = 0; k < ids.length; k += CHUNK) {
     const { error } = await supa.from('soci').update({ aggiornato_da_import: now }).in('id', ids.slice(k, k + CHUNK));
     if (error) errori.push(error.message);
   }
+  await registra(supa, fatti.map((r) => (r.stato === 'nuovo'
+    ? { azione: 'nuovo', socio_id: r.nuovo.socio_id, cod_cli: r.cod, socio: r.socio, piano: r.piano, dopo: r.nuovo }
+    : { azione: 'aggiornato', socio_id: r.ex.socio_id, cod_cli: r.cod, socio: r.socio, piano: r.piano,
+      prima: Object.fromEntries(Object.keys(r.diff).map((k) => [k, r.ex[k] ?? null])), dopo: r.diff })));
   return { ok, ko, errori };
+}
+
+// registro delle importazioni (tabella import_log): righe di uno stesso giro con lo stesso import_id.
+// Se la tabella manca (migration non applicata) l'import prosegue comunque.
+export async function registra(supa, righe, fonte = typeof window === 'undefined' ? 'automatico' : 'manuale') {
+  if (!righe.length) return;
+  const import_id = `${fonte}-${new Date().toISOString()}`;
+  for (let k = 0; k < righe.length; k += CHUNK) {
+    const { error } = await supa.from('import_log').insert(righe.slice(k, k + CHUNK).map((r) => ({ import_id, fonte, ...r })));
+    if (error) { console.error(`registro importazioni non aggiornato: ${error.message}`); return; }
+  }
 }
