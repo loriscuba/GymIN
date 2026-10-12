@@ -9,6 +9,7 @@
 - [ ] **Configurare Bitwarden**
   - Creare l'account e salvare la `BACKUP_PASSPHRASE` (e le altre credenziali del progetto)
   - Conservare anche una copia cartacea della passphrase in un luogo sicuro
+- [ ] **Configurare Cloudflare**
 
 ## Fatto
 
