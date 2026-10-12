@@ -29,8 +29,9 @@ let expWindow = 7;   // fascia "in scadenza" della dashboard
 const EXP_BANDS = { 7: [0, 7] };
 const inExpBand = (dleft, w) => { const [lo, hi] = EXP_BANDS[w]; return dleft >= lo && dleft <= hi; };
 const expBandLabel = (w) => { const [lo, hi] = EXP_BANDS[w]; return lo ? `tra ${lo} e ${hi} giorni` : `entro ${hi} giorni`; };
-// soci con abbonamento a tempo nella fascia expWindow (esclude i carnet, che sono a consumo)
-const expiringList = () => DATA.members.filter((m) => m.end && !m.plan.entrate && inExpBand(m.dleft, expWindow)).sort((a, b) => a.dleft - b.dleft);
+// soci in scadenza: abbonamenti a tempo nella fascia expWindow + carnet con ingressi quasi esauriti (in fondo)
+const expiringList = () => DATA.members.filter((m) => m.end && (m.plan.entrate ? m.stato === 'In scadenza' : inExpBand(m.dleft, expWindow)))
+  .sort((a, b) => (!!a.plan.entrate - !!b.plan.entrate) || (a.dleft - b.dleft));
 
 const ic = {
   euro: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 7a7 7 0 1 0 0 10M5 10h8M5 14h8"/></svg>',
@@ -160,7 +161,7 @@ function renderDashboard() {
   $('#exp-title').textContent = `In scadenza ${expBandLabel(expWindow)}`;
   $('#exp-sub').textContent = `${expAll.length} ${expAll.length === 1 ? 'socio' : 'soci'} · da contattare per il rinnovo`;
   document.querySelectorAll('#exp-filters .chip').forEach((c) => c.classList.toggle('active', +c.dataset.w === expWindow));
-  $('#expiring tbody').innerHTML = exp.map((m) => `<tr><td>${who(m)}</td><td><span class="plan-pill">${esc(m.plan.name)}</span></td><td class="mono">${fmtDate(m.end)} <span style="color:var(--warn);font-weight:600">· ${m.dleft}gg</span></td><td class="mono">${euro(m.plan.price)}</td>${actionsCell(m)}</tr>`).join('') || `<tr><td colspan="5" style="text-align:center;color:var(--ink-3);padding:20px">Nessun socio in scadenza ${expBandLabel(expWindow)}</td></tr>`;
+  $('#expiring tbody').innerHTML = exp.map((m) => `<tr><td>${who(m)}</td><td><span class="plan-pill">${esc(m.plan.name)}</span></td><td class="mono">${m.plan.entrate ? scadCell(m) : `${fmtDate(m.end)} <span style="color:var(--warn);font-weight:600">· ${m.dleft}gg</span>`}</td><td class="mono">${euro(m.plan.price)}</td>${actionsCell(m)}</tr>`).join('') || `<tr><td colspan="5" style="text-align:center;color:var(--ink-3);padding:20px">Nessun socio in scadenza ${expBandLabel(expWindow)}</td></tr>`;
 }
 
 function renderMembers() {
