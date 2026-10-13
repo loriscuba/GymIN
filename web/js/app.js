@@ -1449,9 +1449,10 @@ async function cercaPerTessera(codice) {
   openScheda(m.sid);
 }
 
-// ---------- aggiornamento automatico dopo gli ingressi dal terminale ----------
+// ---------- aggiornamento automatico dopo gli ingressi dal terminale e gli import ----------
 // Ogni 20 s (e quando la scheda del browser torna in primo piano) controlla l'ultimo id di
-// accessi_log: se è cambiato ricarica i dati, così residui e scadenze restano allineati.
+// accessi_log e di import_log: se è cambiato ricarica i dati, così residui e scadenze restano
+// allineati anche dopo l'import automatico del mattino.
 const AGGIORNA_MS = 20000;
 let ultimoLogId = null;
 let aggiornando = false;
@@ -1467,9 +1468,12 @@ async function controllaNuoviIngressi() {
   aggiornando = true;
   try {
     const supa = await getSupa(); if (!supa) return;
-    const { data, error } = await supa.from('accessi_log').select('id').order('id', { ascending: false }).limit(1);
-    if (error) return;                                   // tabella assente o non leggibile: nessun aggiornamento
-    const id = data[0]?.id ?? 0;
+    const ultimoId = async (tab) => {                    // tabella assente o non leggibile: 0, nessun aggiornamento
+      const { data, error } = await supa.from(tab).select('id').order('id', { ascending: false }).limit(1);
+      return error ? 0 : (data[0]?.id ?? 0);
+    };
+    const [acc, imp] = await Promise.all([ultimoId('accessi_log'), ultimoId('import_log')]);
+    const id = `${acc}|${imp}`;
     const cambiato = ultimoLogId !== null && id !== ultimoLogId;
     ultimoLogId = id;
     if (!cambiato) return;
