@@ -1,14 +1,15 @@
 // Cruscotto "Import abbonamenti" (visibile a tutti gli utenti staff).
 // Legge i file DBF del vecchio gestionale (scelti da Esplora risorse, vedi legacydbf.js)
 // oppure abbonamenti.csv prodotto da tools/import-legacy/dbf_to_csv.py, e li confronta col DB.
-// Scrive sulla tabella abbonamenti: non crea soci, piani o pagamenti. Sui soci toccati
+// Scrive sulla tabella abbonamenti: non crea soci o piani; per gli abbonamenti nuovi e recenti
+// crea un pagamento "da verificare" al prezzo del piano (vedi importlogic.js). Sui soci toccati
 // valorizza solo soci.aggiornato_da_import (badge "UP" nelle anagrafiche).
 //   - socio collegato via soci.cod_cli, piano via piani.nome
 //   - stesso socio + piano + data_inizio = stesso abbonamento (niente doppioni)
 //   - righe importabili una a una o in blocco, sempre dopo conferma
 import { getSupa, fetchAll } from './data.js?v=__BUILD__';
 import { abbonamentiDaDbf } from './legacydbf.js?v=__BUILD__';
-import { confronta, applica, registra, IMPORTABILI, indiceCandidati, nomeSocio, SENZA_SCADENZA } from './importlogic.js?v=__BUILD__';
+import { confronta, applica, registra, IMPORTABILI, indiceCandidati, nomeSocio, SENZA_SCADENZA, GIORNI_PAGAMENTO } from './importlogic.js?v=__BUILD__';
 
 const $ = (s, r = document) => r.querySelector(s);
 const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -192,15 +193,15 @@ async function importa(ids) {
   const agg = scelte.filter((r) => r.stato === 'diverso');
   const testo = [nuovi.length && `inserire <b>${nuovi.length}</b> ${nuovi.length === 1 ? 'abbonamento nuovo' : 'abbonamenti nuovi'}`,
     agg.length && `aggiornare <b>${agg.length}</b> ${agg.length === 1 ? 'abbonamento esistente' : 'abbonamenti esistenti'}`].filter(Boolean).join(' e ');
-  if (!(await deps.askConfirm(`Vuoi ${testo}?<br><span style="font-size:12.5px">I soci coinvolti vengono segnati col badge UP.</span>`, 'Importa'))) return;
+  if (!(await deps.askConfirm(`Vuoi ${testo}?<br><span style="font-size:12.5px">I soci coinvolti vengono segnati col badge UP.${nuovi.length ? `<br>Per gli abbonamenti nuovi iniziati negli ultimi ${GIORNI_PAGAMENTO} giorni viene creato un pagamento <b>da verificare</b> al prezzo del piano.` : ''}</span>`, 'Importa'))) return;
   const btn = $('#imp-go'); btn.disabled = true;
-  let ok = 0, ko = 0;
+  let ok = 0, ko = 0, pag = 0;
   try {
     const res = await applica(await getSupa(), scelte, (n, tot) => { btn.textContent = `Aggiornamento ${n}/${tot}…`; });
-    ({ ok, ko } = res);
+    ({ ok, ko } = res); pag = res.pagamenti;
     res.errori.forEach((m) => console.error(m));
   } catch (err) { deps.toast(`Errore import: ${err.message || err}`, 'warn'); }
-  deps.toast(ko ? `Importati ${ok}, errori ${ko} (dettagli in console)` : `Importati ${ok} abbonamenti`, ko ? 'warn' : 'ok');
+  deps.toast(ko ? `Importati ${ok}, errori ${ko} (dettagli in console)` : `Importati ${ok} abbonamenti${pag ? ` · ${pag} ${pag === 1 ? 'pagamento' : 'pagamenti'} da verificare` : ''}`, ko ? 'warn' : 'ok');
   await analizza();      // ricalcola gli stati: le righe importate diventano "Già presente"
   caricaRegistro().catch(() => {});
   deps.onDone?.();
@@ -382,7 +383,7 @@ async function importaAbbonamento(supa, socio, v) {
   const [r] = confronta([{ ...a, cod_cli: v.cod_cli, is_latest: '1' }], { soci: [socio], piani, abb });
   if (r.stato === 'nopiano') return ` · piano "${a.piano_nome}" non presente in GymIN: abbonamento non importato`;
   if (!IMPORTABILI.has(r.stato)) return '';
-  const { ko, errori } = await applica(supa, [r]);
+  const { ko, errori, pagamenti } = await applica(supa, [r]);
   if (ko) throw new Error(`socio salvato, abbonamento no: ${errori.join('; ')}`);
-  return ' · abbonamento importato';
+  return ` · abbonamento importato${pagamenti ? ' · pagamento da verificare' : ''}`;
 }
