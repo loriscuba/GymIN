@@ -1,23 +1,27 @@
 // Simulazione scadenza licenza (solo ambiente di test).
-// Dalla data SCADENZA (inclusa, ora locale del PC) blocca l'app con un popup non chiudibile
-// finché non viene inserita la chiave. Prima di quella data l'app funziona normalmente.
-// Per un nuovo periodo basta cambiare SCADENZA: lo sblocco precedente non vale più.
+// La data/ora di scadenza la imposta l'amministratore da Impostazioni (app_impostazioni,
+// chiave licenza_test) e app.js la passa qui con window.gyminLicenza(email, scadenza).
+// Dalla scadenza blocca l'app con un popup non chiudibile, solo per l'utente LICENZA_UTENTE,
+// finché non viene inserita la chiave. Una nuova scadenza annulla lo sblocco precedente.
 // La chiave non è nel codice: si confronta solo il suo hash SHA-256.
 (function () {
   var cfg = window.GYMIN_CONFIG || {};
   if (cfg.ENV !== 'test') return;
 
+  var LICENZA_UTENTE = 'admin@gymin.local';
   var KEY_HASH = '64e9688148dd4571f4fb46d64b7b80091f04b698e9fb2838ae0921de3610059f';
-  var SCADENZA = '2026-10-26'; // AAAA-MM-GG: primo giorno di blocco
   var STORAGE_KEY = 'gymin_licenza_test';
-  var SBLOCCO = KEY_HASH + '|' + SCADENZA;
+  var stato = { email: '', scadenza: null };
+  var ov = null;
 
+  function sbloccoCorrente() { return KEY_HASH + '|' + stato.scadenza; }
   function sbloccata() {
-    try { return localStorage.getItem(STORAGE_KEY) === SBLOCCO; } catch (e) { return false; }
+    try { return localStorage.getItem(STORAGE_KEY) === sbloccoCorrente(); } catch (e) { return false; }
   }
-  function scaduta() {
-    var p = SCADENZA.split('-');
-    return new Date() >= new Date(+p[0], +p[1] - 1, +p[2]);
+  function bloccare() {
+    if (stato.email !== LICENZA_UTENTE || !stato.scadenza) return false;
+    var t = new Date(stato.scadenza).getTime();
+    return !isNaN(t) && Date.now() >= t && !sbloccata();
   }
 
   function sha256(text) {
@@ -26,8 +30,11 @@
     });
   }
 
+  // impedisce di chiudere il popup con Esc
+  function blocca(ev) { if (ev.key === 'Escape') { ev.stopPropagation(); ev.preventDefault(); } }
+
   function mostra() {
-    var ov = document.createElement('div');
+    ov = document.createElement('div');
     ov.setAttribute('role', 'dialog');
     ov.setAttribute('aria-modal', 'true');
     ov.style.cssText = 'position:fixed;inset:0;z-index:100000;background:rgba(15,23,42,.85);display:flex;align-items:center;justify-content:center;padding:16px;font-family:system-ui,sans-serif';
@@ -39,36 +46,39 @@
       '<div class="lic-err" style="color:#b91c1c;font-size:13px;min-height:18px;margin:6px 0"></div>' +
       '<button type="submit" style="width:100%;padding:10px;font-size:15px;font-weight:600;border:0;border-radius:8px;background:#2563eb;color:#fff;cursor:pointer">Attiva</button>' +
       '</form>';
-    var form = ov.querySelector('form');
     var input = ov.querySelector('input');
     var err = ov.querySelector('.lic-err');
-    form.addEventListener('submit', function (ev) {
+    ov.querySelector('form').addEventListener('submit', function (ev) {
       ev.preventDefault();
       sha256(input.value).then(function (h) {
         if (h !== KEY_HASH) { err.textContent = 'Chiave non valida.'; input.select(); return; }
-        try { localStorage.setItem(STORAGE_KEY, SBLOCCO); } catch (e) {}
-        ov.remove();
-        document.removeEventListener('keydown', blocca, true);
+        try { localStorage.setItem(STORAGE_KEY, sbloccoCorrente()); } catch (e) {}
+        nascondi();
       });
     });
-    // impedisce di chiudere il popup con Esc o di interagire con l'app sotto
-    function blocca(ev) { if (ev.key === 'Escape') { ev.stopPropagation(); ev.preventDefault(); } }
     document.addEventListener('keydown', blocca, true);
     document.body.appendChild(ov);
     input.focus();
-    // se qualcuno rimuove il popup dal DOM, lo rimette
-    new MutationObserver(function () {
-      if (!sbloccata() && !document.body.contains(ov)) document.body.appendChild(ov);
-    }).observe(document.body, { childList: true });
+  }
+  function nascondi() {
+    if (!ov) return;
+    ov.remove();
+    ov = null;
+    document.removeEventListener('keydown', blocca, true);
   }
 
-  var mostrato = false;
   function controlla() {
-    if (mostrato || sbloccata() || !scaduta()) return;
-    mostrato = true;
-    mostra();
+    if (bloccare()) { if (!ov) mostra(); else if (!document.body.contains(ov)) document.body.appendChild(ov); }
+    else nascondi();
   }
-  if (document.body) controlla(); else document.addEventListener('DOMContentLoaded', controlla);
-  // l'app può restare aperta per giorni: ricontrolla ogni minuto
-  setInterval(controlla, 60000);
+
+  window.gyminLicenza = function (email, scadenza) {
+    stato = { email: (email || '').toLowerCase(), scadenza: scadenza || null };
+    controlla();
+  };
+  // se qualcuno rimuove il popup dal DOM, lo rimette
+  new MutationObserver(function () { if (ov && !document.body.contains(ov)) controlla(); })
+    .observe(document.documentElement, { childList: true, subtree: true });
+  // l'app può restare aperta per giorni: ricontrolla l'ora ogni 15 secondi
+  setInterval(controlla, 15000);
 })();
