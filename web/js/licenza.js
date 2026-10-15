@@ -41,8 +41,8 @@
     ov.style.cssText = 'position:fixed;inset:0;z-index:100000;background:rgba(15,23,42,.85);display:flex;align-items:center;justify-content:center;padding:16px;font-family:system-ui,sans-serif';
     ov.innerHTML =
       '<form style="background:#fff;color:#111;max-width:380px;width:100%;border-radius:12px;padding:24px;box-shadow:0 10px 40px rgba(0,0,0,.4)">' +
-      '<h2 style="margin:0 0 8px;font-size:20px">Licenza scaduta</h2>' +
-      '<p style="margin:0 0 16px;font-size:14px;color:#444">La licenza di GymIN è scaduta. Inserisci la chiave di licenza per continuare.</p>' +
+      '<h2 style="margin:0 0 8px;font-size:20px">Licenza DB + Web scaduta</h2>' +
+      '<p style="margin:0 0 16px;font-size:14px;color:#444">La licenza DB + Web è scaduta. Inserisci la chiave di licenza per continuare.</p>' +
       '<input type="password" autocomplete="off" placeholder="Chiave di licenza" required style="width:100%;box-sizing:border-box;padding:10px;font-size:15px;border:1px solid #ccc;border-radius:8px">' +
       '<div class="lic-err" style="color:#b91c1c;font-size:13px;min-height:18px;margin:6px 0"></div>' +
       '<button type="submit" style="width:100%;padding:10px;font-size:15px;font-weight:600;border:0;border-radius:8px;background:#2563eb;color:#fff;cursor:pointer">Attiva</button>' +
