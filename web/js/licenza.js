@@ -1,13 +1,24 @@
 // Simulazione scadenza licenza (solo ambiente di test).
-// Blocca l'app con un popup non chiudibile finché non viene inserita la chiave.
+// Dalla data SCADENZA (inclusa, ora locale del PC) blocca l'app con un popup non chiudibile
+// finché non viene inserita la chiave. Prima di quella data l'app funziona normalmente.
+// Per un nuovo periodo basta cambiare SCADENZA: lo sblocco precedente non vale più.
 // La chiave non è nel codice: si confronta solo il suo hash SHA-256.
 (function () {
   var cfg = window.GYMIN_CONFIG || {};
   if (cfg.ENV !== 'test') return;
 
   var KEY_HASH = '64e9688148dd4571f4fb46d64b7b80091f04b698e9fb2838ae0921de3610059f';
+  var SCADENZA = '2026-10-26'; // AAAA-MM-GG: primo giorno di blocco
   var STORAGE_KEY = 'gymin_licenza_test';
-  try { if (localStorage.getItem(STORAGE_KEY) === KEY_HASH) return; } catch (e) {}
+  var SBLOCCO = KEY_HASH + '|' + SCADENZA;
+
+  function sbloccata() {
+    try { return localStorage.getItem(STORAGE_KEY) === SBLOCCO; } catch (e) { return false; }
+  }
+  function scaduta() {
+    var p = SCADENZA.split('-');
+    return new Date() >= new Date(+p[0], +p[1] - 1, +p[2]);
+  }
 
   function sha256(text) {
     return crypto.subtle.digest('SHA-256', new TextEncoder().encode(text)).then(function (buf) {
@@ -35,7 +46,7 @@
       ev.preventDefault();
       sha256(input.value).then(function (h) {
         if (h !== KEY_HASH) { err.textContent = 'Chiave non valida.'; input.select(); return; }
-        try { localStorage.setItem(STORAGE_KEY, KEY_HASH); } catch (e) {}
+        try { localStorage.setItem(STORAGE_KEY, SBLOCCO); } catch (e) {}
         ov.remove();
         document.removeEventListener('keydown', blocca, true);
       });
@@ -47,11 +58,17 @@
     input.focus();
     // se qualcuno rimuove il popup dal DOM, lo rimette
     new MutationObserver(function () {
-      var ok = false;
-      try { ok = localStorage.getItem(STORAGE_KEY) === KEY_HASH; } catch (e) {}
-      if (!ok && !document.body.contains(ov)) document.body.appendChild(ov);
+      if (!sbloccata() && !document.body.contains(ov)) document.body.appendChild(ov);
     }).observe(document.body, { childList: true });
   }
 
-  if (document.body) mostra(); else document.addEventListener('DOMContentLoaded', mostra);
+  var mostrato = false;
+  function controlla() {
+    if (mostrato || sbloccata() || !scaduta()) return;
+    mostrato = true;
+    mostra();
+  }
+  if (document.body) controlla(); else document.addEventListener('DOMContentLoaded', controlla);
+  // l'app può restare aperta per giorni: ricontrolla ogni minuto
+  setInterval(controlla, 60000);
 })();
