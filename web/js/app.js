@@ -1858,7 +1858,29 @@ async function caricaLicenza() {
   const { data, error } = await supa.from('app_impostazioni').select('valore').eq('chiave', 'licenza_test').maybeSingle();
   if (error) return;
   licenzaScadenza = data?.valore?.scadenza || null;
-  window.gyminLicenza?.(utenteEmail, licenzaScadenza);
+  window.gyminLicenza?.(utenteEmail, licenzaScadenza, avvisaSblocco);
+}
+// email a LOG_ADMIN quando viene inserita la chiave. In test MAILER_API_URL è vuoto
+// (niente email ai soci), quindi si chiama direttamente la funzione send-mail del progetto.
+async function avvisaSblocco(email, scadenza) {
+  const cfg = window.GYMIN_CONFIG || {};
+  const url = cfg.MAILER_API_URL || (cfg.SUPABASE_URL ? cfg.SUPABASE_URL.replace(/\/$/, '') + '/functions/v1/send-mail' : '');
+  try {
+    const supa = await getSupa();
+    const { data: { session } = {} } = await supa.auth.getSession();
+    if (!url || !session?.access_token) throw new Error('sessione o indirizzo della funzione mancanti');
+    const quando = new Date().toLocaleString('it-IT');
+    const scad = scadenza ? new Date(scadenza).toLocaleString('it-IT') : '—';
+    const html = `<p>La chiave di licenza è stata inserita.</p><ul><li>Utente: <b>${esc(email)}</b></li>`
+      + `<li>Data e ora: ${quando}</li><li>Scadenza impostata: ${scad}</li><li>Ambiente: ${IS_TEST ? 'test' : 'produzione'}</li></ul>`;
+    const r = await fetch(url, {
+      method: 'POST', headers: buildMailerHeaders(cfg, session.access_token),
+      body: JSON.stringify({ to: LOG_ADMIN, subject: `GymIN · licenza attivata da ${email}`, html, tipo: 'licenza', rif: `licenza:${Date.now()}` }),
+    });
+    if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || `HTTP ${r.status}`);
+  } catch (err) {
+    console.error('Avviso licenza non inviato:', errMsg(err));
+  }
 }
 async function salvaLicenza() {
   const v = $('#s-licenza').value;

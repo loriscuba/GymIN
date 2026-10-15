@@ -12,6 +12,7 @@
   var KEY_HASH = '64e9688148dd4571f4fb46d64b7b80091f04b698e9fb2838ae0921de3610059f';
   var STORAGE_KEY = 'gymin_licenza_test';
   var stato = { email: '', scadenza: null };
+  var onSblocco = null;   // avviso a chi gestisce la licenza (app.js manda una email)
   var ov = null;
 
   function sbloccoCorrente() { return KEY_HASH + '|' + stato.scadenza; }
@@ -54,6 +55,7 @@
         if (h !== KEY_HASH) { err.textContent = 'Chiave non valida.'; input.select(); return; }
         try { localStorage.setItem(STORAGE_KEY, sbloccoCorrente()); } catch (e) {}
         nascondi();
+        if (onSblocco) { try { onSblocco(stato.email, stato.scadenza); } catch (e) {} }
       });
     });
     document.addEventListener('keydown', blocca, true);
@@ -72,7 +74,8 @@
     else nascondi();
   }
 
-  window.gyminLicenza = function (email, scadenza) {
+  window.gyminLicenza = function (email, scadenza, avviso) {
+    if (avviso) onSblocco = avviso;
     stato = { email: (email || '').toLowerCase(), scadenza: scadenza || null };
     controlla();
   };
