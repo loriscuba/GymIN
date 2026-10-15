@@ -280,6 +280,8 @@ function populateSettingsForm() {
 function openSettingsModal() {
   populateSettingsForm();
   $('#s-sezioni-box').hidden = !isAdmin;
+  $('#s-licenza-box').hidden = !(isAdmin && IS_TEST);
+  $('#s-licenza').value = isoToLocalInput(licenzaScadenza);
   $('#s-sezioni').innerHTML = SEZIONI.map(([k, t]) => `<label style="display:flex;align-items:center;gap:8px;font-size:13.5px;cursor:pointer">
     <input type="checkbox" data-sez="${k}" ${sezioniNascoste.includes(k) ? '' : 'checked'}> ${t}</label>`).join('');
   openModal('modal-settings');
@@ -294,6 +296,7 @@ async function saveSettingsFromModal(e) {
   };
   saveSettingsToStorage(form);
   if (isAdmin && !(await salvaSezioni())) return;
+  if (isAdmin && IS_TEST && !(await salvaLicenza())) return;
   closeModal('modal-settings');
   applyContattiRule();
   toast(isAdmin ? 'Impostazioni salvate' : 'Impostazioni salvate nel browser', 'mail');
@@ -1837,12 +1840,43 @@ async function salvaSezioni() {
   applicaSezioni();
   return true;
 }
+// ---------- simulazione scadenza licenza (solo ambiente di test) ----------
+// L'amministratore imposta data/ora da Impostazioni (app_impostazioni, chiave licenza_test);
+// il blocco vero e proprio è in licenza.js e vale solo per l'utente indicato lì.
+const IS_TEST = (window.GYMIN_CONFIG || {}).ENV === 'test';
+let licenzaScadenza = null;   // ISO, null = nessun blocco
+let utenteEmail = '';
+const pad2 = (n) => String(n).padStart(2, '0');
+function isoToLocalInput(iso) {
+  const d = iso ? new Date(iso) : null;
+  if (!d || isNaN(d)) return '';
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+}
+async function caricaLicenza() {
+  if (!IS_TEST) return;
+  const supa = await getSupa();
+  const { data, error } = await supa.from('app_impostazioni').select('valore').eq('chiave', 'licenza_test').maybeSingle();
+  if (error) return;
+  licenzaScadenza = data?.valore?.scadenza || null;
+  window.gyminLicenza?.(utenteEmail, licenzaScadenza);
+}
+async function salvaLicenza() {
+  const v = $('#s-licenza').value;
+  const scadenza = v ? new Date(v).toISOString() : null;
+  const supa = await getSupa();
+  const { error } = await supa.from('app_impostazioni')
+    .upsert({ chiave: 'licenza_test', valore: { scadenza }, aggiornato_il: new Date().toISOString() });
+  if (error) { toast(`Scadenza licenza non salvata: ${error.message}`, 'warn'); return false; }
+  licenzaScadenza = scadenza;
+  return true;
+}
 async function setupUser() {
   const supa = await getSupa();
   const { data: { user } } = await supa.auth.getUser();
   const email = (user?.email || '').toLowerCase();
   const admin = email === LOG_ADMIN;
   isAdmin = admin;
+  utenteEmail = email;
   $('.nav[data-view="log"]').hidden = !admin;
   $('#u-name').textContent = admin ? 'Admin' : (email.split('@')[0] || 'Utente');
   $('#u-role').textContent = admin ? 'Amministratore' : 'Staff';
@@ -1854,6 +1888,10 @@ async function boot() {
   if (!ok) return;
   try { await setupUser(); } catch (err) { console.error(errMsg(err)); }
   caricaSezioni().catch((err) => console.error(errMsg(err)));
+  if (IS_TEST) {
+    caricaLicenza().catch((err) => console.error(errMsg(err)));
+    setInterval(() => caricaLicenza().catch(() => {}), 60000);   // nuova scadenza senza ricaricare
+  }
   caricaContaTessere().catch(() => {});
   caricaContaImport().catch(() => {});
 

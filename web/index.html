@@ -468,6 +468,11 @@
         <div class="fhint"><span class="k">Valgono per tutti i PC. Tu, come amministratore, vedi sempre tutto.</span></div>
         <div id="s-sezioni" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:6px 16px;margin-top:8px"></div>
       </fieldset>
+      <fieldset id="s-licenza-box" hidden style="border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin:14px 0 0">
+        <legend style="font-size:13px;font-weight:600;padding:0 6px">Scadenza licenza (test)</legend>
+        <div class="fhint"><span class="k">Da questa data e ora l'utente admin@gymin.local vede il popup di licenza scaduta. Vuoto = nessun blocco.</span></div>
+        <div class="field" style="margin-top:8px"><label for="s-licenza">Scade il</label><input id="s-licenza" type="datetime-local"></div>
+      </fieldset>
       <div class="fhint" style="margin-top:8px"><span class="k">Supabase URL e anon key sono già configurate in config.js: qui puoi gestire posta e recapiti obbligatori.</span></div>
       <div class="mfoot" style="padding:16px 0 0;border-top:0;justify-content:flex-end;gap:8px">
         <button type="button" class="btn-ghost" id="settings-reset">Ripristina default</button>
