@@ -1,16 +1,13 @@
-// Simulazione scadenza licenza (solo ambiente di test).
+// Scadenza licenza.
 // La data/ora di scadenza la imposta l'amministratore da Impostazioni (app_impostazioni,
-// chiave licenza_test) e app.js la passa qui con window.gyminLicenza(email, scadenza).
+// chiave licenza) e app.js la passa qui con window.gyminLicenza(email, scadenza).
 // Dalla scadenza blocca l'app con un popup non chiudibile, solo per l'utente LICENZA_UTENTE,
 // finché non viene inserita la chiave. Una nuova scadenza annulla lo sblocco precedente.
 // La chiave non è nel codice: si confronta solo il suo hash SHA-256.
 (function () {
-  var cfg = window.GYMIN_CONFIG || {};
-  if (cfg.ENV !== 'test') return;
-
   var LICENZA_UTENTE = 'admin@gymin.local';
   var KEY_HASH = '64e9688148dd4571f4fb46d64b7b80091f04b698e9fb2838ae0921de3610059f';
-  var STORAGE_KEY = 'gymin_licenza_test';
+  var STORAGE_KEY = 'gymin_licenza';
   var stato = { email: '', scadenza: null };
   var onSblocco = null;   // avviso a chi gestisce la licenza (app.js manda una email)
   var ov = null;
