@@ -2,11 +2,11 @@
 //
 // La chiama solo pg_cron (funzione report_serale_cron, vedi migration report_serale) alle 20
 // ora italiana, dopo aver salvato il report in report_serali. Nessun utente: l'accesso è
-// protetto dall'header x-report-token, che deve coincidere con il segreto REPORT_TOKEN.
+// protetto dall'header x-report-token, che deve coincidere con report_config.token (generato
+// dal database, leggibile solo con la service_role).
 //
-// Segreti (Project Settings → Edge Functions → Secrets): REPORT_TOKEN (valore casuale lungo,
-// lo stesso salvato in Vault come "report_token"), BREVO_API_KEY e MAIL_FROM (già usati da
-// send-mail), opzionale REPORT_TO (default loriscuba@gmail.com).
+// Segreti (Project Settings → Edge Functions → Secrets): BREVO_API_KEY e MAIL_FROM (già usati
+// da send-mail), opzionale REPORT_TO (default loriscuba@gmail.com).
 // SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY sono forniti da Supabase.
 // Deploy: supabase functions deploy report-serale --no-verify-jwt
 
@@ -41,12 +41,14 @@ function html(giorno: string, r: Record<string, any>): string {
 
 Deno.serve(async (req) => {
   if (req.method !== "POST") return new Response("Method Not Allowed", { status: 405 });
-  const token = Deno.env.get("REPORT_TOKEN");
-  if (!token || req.headers.get("x-report-token") !== token) return new Response("Unauthorized", { status: 401 });
-
   const url = Deno.env.get("SUPABASE_URL")!;
   const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const db = { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json" };
+
+  const cfg = await fetch(`${url}/rest/v1/report_config?select=token`, { headers: db });
+  const [conf] = cfg.ok ? await cfg.json() : [];
+  const sent = req.headers.get("x-report-token") || "";
+  if (!conf?.token || sent !== conf.token) return new Response("Unauthorized", { status: 401 });
   const { giorno } = await req.json().catch(() => ({}));
   if (!/^\d{4}-\d{2}-\d{2}$/.test(String(giorno))) return new Response("giorno non valido", { status: 400 });
 

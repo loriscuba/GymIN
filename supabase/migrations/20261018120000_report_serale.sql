@@ -79,7 +79,7 @@ begin
 
   insert into report_serali(giorno, dal, al, riepilogo)
   values (p_giorno, v_dal, v_al, r)
-  on conflict (giorno) do update set dal = excluded.dal, al = excluded.al, riepilogo = excluded.riepilogo, creato_il = now(), letto_il = null;
+  on conflict (giorno) do update set dal = excluded.dal, al = excluded.al, riepilogo = excluded.riepilogo, creato_il = now(), letto_il = null, email_inviata_il = null;
   return r;
 end $$;
 revoke execute on function genera_report_serale(date) from public, anon;
@@ -96,24 +96,35 @@ begin
 end $$;
 revoke execute on function segna_report_letti() from public, anon;
 
+-- Configurazione dell'invio email: URL dell'Edge Function report-serale e token che la protegge.
+-- Il token è generato qui dal database e non esce mai dal progetto: lo leggono solo pg_cron e
+-- l'Edge Function (service_role). Nessuna policy RLS = nessun accesso dall'app.
+create table if not exists report_config (
+  id    boolean primary key default true check (id),
+  url   text,                 -- es. https://<ref>.supabase.co/functions/v1/report-serale (null = niente email)
+  token text not null default replace(gen_random_uuid()::text || gen_random_uuid()::text, '-', '')
+);
+alter table report_config enable row level security;
+revoke all on report_config from anon, authenticated;
+insert into report_config(id) values (true) on conflict do nothing;
+
 -- Job di pg_cron. pg_cron su Supabase lavora in UTC: il job gira alle 18 e alle 19 UTC e
 -- procede solo quando in Italia sono le 20 (così regge il cambio ora legale/solare).
--- Poi, se in Vault ci sono i segreti "report_url" e "report_token", chiama l'Edge Function
--- che invia l'email. Senza segreti il report compare comunque nella sezione Report.
+-- Poi, se report_config.url è impostato, chiama l'Edge Function che invia l'email.
+-- Senza URL il report compare comunque nella sezione Report.
 create or replace function report_serale_cron() returns void
 language plpgsql security definer set search_path = public as $$
 declare
   v_giorno date := (now() at time zone 'Europe/Rome')::date;
-  v_url text; v_token text;
+  c report_config;
 begin
   if extract(hour from now() at time zone 'Europe/Rome') <> 20 then return; end if;
   perform genera_report_serale(v_giorno);
-  select decrypted_secret into v_url   from vault.decrypted_secrets where name = 'report_url';
-  select decrypted_secret into v_token from vault.decrypted_secrets where name = 'report_token';
-  if v_url is not null and v_token is not null and to_regnamespace('net') is not null then
+  select * into c from report_config where id;
+  if c.url is not null and to_regnamespace('net') is not null then
     perform net.http_post(
-      url := v_url,
-      headers := jsonb_build_object('Content-Type', 'application/json', 'x-report-token', v_token),
+      url := c.url,
+      headers := jsonb_build_object('Content-Type', 'application/json', 'x-report-token', c.token),
       body := jsonb_build_object('giorno', v_giorno)
     );
   end if;
@@ -124,6 +135,5 @@ revoke execute on function report_serale_cron() from public, anon, authenticated
 --   create extension if not exists pg_cron;
 --   create extension if not exists pg_net;
 --   select cron.schedule('report-serale', '0 18,19 * * *', 'select report_serale_cron()');
--- Email (facoltativa): deploy dell'Edge Function report-serale (vedi il suo index.ts), poi
---   select vault.create_secret('https://<ref>.supabase.co/functions/v1/report-serale', 'report_url');
---   select vault.create_secret('<stesso valore di REPORT_TOKEN>', 'report_token');
+-- Email: deploy dell'Edge Function (supabase functions deploy report-serale --no-verify-jwt), poi
+--   update report_config set url = 'https://<ref>.supabase.co/functions/v1/report-serale';
