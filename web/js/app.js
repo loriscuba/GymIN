@@ -1001,9 +1001,10 @@ async function loadPayments() {
       const supa = await getSupa();
       if (!supa) throw new Error('Connessione Supabase non disponibile.');
       const from = periodStart(payState.period);
-      const rows = await fetchAll(supa, 'pagamenti', 'id,importo,metodo,data,socio_id,descrizione,abbonamento_id,abbonamento:abbonamenti(socio_id,data_scadenza,piano:piani(nome))', (q) => {
+      const rows = await fetchAll(supa, 'pagamenti', 'id,importo,metodo,data,socio_id,descrizione,abbonamento_id,da_verificare,abbonamento:abbonamenti(socio_id,data_scadenza,piano:piani(nome))', (q) => {
         if (from) q = q.gte('data', from.toISOString());
         if (payState.sid) q = q.eq('socio_id', payState.sid);
+        if (payState.period === 'verifica') q = q.eq('da_verificare', true);
         return q.order('data', { ascending: false });
       });
       if (key !== `${payState.period}|${payState.sid || ''}`) return;   // filtro cambiato nel frattempo
@@ -1033,7 +1034,7 @@ function renderPayments() {
     + Object.entries(perMetodo).sort((a, b) => b[1] - a[1]).map(([k, v]) => `<div class="pbox"><span>${esc(metodoLabel(k))}</span><b>${eur2(v)}</b></div>`).join('');
 
   const fmtDT = (d) => new Date(d).toLocaleString('it-IT', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-  $('#paytable tbody').innerHTML = list.map((p) => `<tr><td class="mono">${fmtDT(p.data)}</td><td>${p.m ? `<a role="button" style="cursor:pointer;font-weight:600" data-member="${esc(p.m.sid)}">${esc(p.nome)}</a>` : '—'}</td><td class="mono">${esc(p.tessera)}</td><td><span class="plan-pill">${esc(p.piano)}</span></td><td>${esc(metodoLabel(p.metodo))}</td><td class="mono" style="text-align:right">${eur2(p.importo)}</td><td><div class="actions-cell"><button class="ibtn edit" data-payedit="${esc(p.id)}" data-tip="Modifica pagamento" aria-label="Modifica pagamento">${editSvg}</button><button class="ibtn del" data-paydel="${esc(p.id)}" data-tip="Annulla pagamento" aria-label="Annulla pagamento">${trashSvg}</button></div></td></tr>`).join('')
+  $('#paytable tbody').innerHTML = list.map((p) => `<tr><td class="mono">${fmtDT(p.data)}</td><td>${p.m ? `<a role="button" style="cursor:pointer;font-weight:600" data-member="${esc(p.m.sid)}">${esc(p.nome)}</a>` : '—'}</td><td class="mono">${esc(p.tessera)}</td><td><span class="plan-pill">${esc(p.piano)}</span></td><td>${esc(metodoLabel(p.metodo))}</td><td class="mono" style="text-align:right">${p.da_verificare ? '<span class="tag w" title="Creato dall\'import al prezzo del piano: verifica importo e metodo">Da verificare</span> ' : ''}${eur2(p.importo)}</td><td><div class="actions-cell"><button class="ibtn edit" data-payedit="${esc(p.id)}" data-tip="Modifica pagamento" aria-label="Modifica pagamento">${editSvg}</button><button class="ibtn del" data-paydel="${esc(p.id)}" data-tip="Annulla pagamento" aria-label="Annulla pagamento">${trashSvg}</button></div></td></tr>`).join('')
     || '<tr><td colspan="7" style="text-align:center;color:var(--ink-3);padding:28px">Nessun pagamento nel periodo selezionato</td></tr>';
   $('#paycount').textContent = `${list.length} ${list.length === 1 ? 'pagamento' : 'pagamenti'}`;
 
@@ -1081,7 +1082,8 @@ async function submitPayEdit(e) {
   const giorno = $('#pe-data').value;
   if (!(importo > 0)) { toast('Inserisci un importo valido', 'warn'); return; }
   if (!giorno) { toast('Inserisci la data del pagamento', 'warn'); return; }
-  const patch = { importo, metodo: $('#pe-metodo').value, descrizione: $('#pe-descr').value.trim() || null };
+  // salvare la modifica conferma anche un pagamento "da verificare" creato dall'import
+  const patch = { importo, metodo: $('#pe-metodo').value, descrizione: $('#pe-descr').value.trim() || null, ...(p.da_verificare && { da_verificare: false }) };
   // la data cambia solo se è stato scelto un altro giorno (così resta l'orario originale)
   if (giorno !== new Date(p.data).toLocaleDateString('sv')) patch.data = new Date(giorno + 'T12:00:00').toISOString();
   const supa = await getSupa();
