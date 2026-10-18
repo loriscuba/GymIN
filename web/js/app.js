@@ -280,6 +280,8 @@ function populateSettingsForm() {
 function openSettingsModal() {
   populateSettingsForm();
   $('#s-sezioni-box').hidden = !isAdmin;
+  $('#s-licenza-box').hidden = !isAdmin;
+  $('#s-licenza').value = isoToLocalInput(licenzaScadenza);
   $('#s-sezioni').innerHTML = SEZIONI.map(([k, t]) => `<label style="display:flex;align-items:center;gap:8px;font-size:13.5px;cursor:pointer">
     <input type="checkbox" data-sez="${k}" ${sezioniNascoste.includes(k) ? '' : 'checked'}> ${t}</label>`).join('');
   openModal('modal-settings');
@@ -294,6 +296,7 @@ async function saveSettingsFromModal(e) {
   };
   saveSettingsToStorage(form);
   if (isAdmin && !(await salvaSezioni())) return;
+  if (isAdmin && !(await salvaLicenza())) return;
   closeModal('modal-settings');
   applyContattiRule();
   toast(isAdmin ? 'Impostazioni salvate' : 'Impostazioni salvate nel browser', 'mail');
@@ -1837,12 +1840,64 @@ async function salvaSezioni() {
   applicaSezioni();
   return true;
 }
+// ---------- scadenza licenza ----------
+// L'amministratore imposta data/ora da Impostazioni (app_impostazioni, chiave licenza);
+// il blocco vero e proprio è in licenza.js e vale solo per l'utente indicato lì.
+const IS_TEST = (window.GYMIN_CONFIG || {}).ENV === 'test';
+let licenzaScadenza = null;   // ISO, null = nessun blocco
+let utenteEmail = '';
+const pad2 = (n) => String(n).padStart(2, '0');
+function isoToLocalInput(iso) {
+  const d = iso ? new Date(iso) : null;
+  if (!d || isNaN(d)) return '';
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+}
+async function caricaLicenza() {
+  const supa = await getSupa();
+  const { data, error } = await supa.from('app_impostazioni').select('valore').eq('chiave', 'licenza').maybeSingle();
+  if (error) return;
+  licenzaScadenza = data?.valore?.scadenza || null;
+  window.gyminLicenza?.(utenteEmail, licenzaScadenza, avvisaSblocco);
+}
+// email a LOG_ADMIN quando viene inserita la chiave. In test MAILER_API_URL è vuoto
+// (niente email ai soci), quindi si chiama direttamente la funzione send-mail del progetto.
+async function avvisaSblocco(email, scadenza) {
+  const cfg = window.GYMIN_CONFIG || {};
+  const url = cfg.MAILER_API_URL || (cfg.SUPABASE_URL ? cfg.SUPABASE_URL.replace(/\/$/, '') + '/functions/v1/send-mail' : '');
+  try {
+    const supa = await getSupa();
+    const { data: { session } = {} } = await supa.auth.getSession();
+    if (!url || !session?.access_token) throw new Error('sessione o indirizzo della funzione mancanti');
+    const quando = new Date().toLocaleString('it-IT');
+    const scad = scadenza ? new Date(scadenza).toLocaleString('it-IT') : '—';
+    const html = `<p>La chiave di licenza è stata inserita.</p><ul><li>Utente: <b>${esc(email)}</b></li>`
+      + `<li>Data e ora: ${quando}</li><li>Scadenza impostata: ${scad}</li><li>Ambiente: ${IS_TEST ? 'test' : 'produzione'}</li></ul>`;
+    const r = await fetch(url, {
+      method: 'POST', headers: buildMailerHeaders(cfg, session.access_token),
+      body: JSON.stringify({ to: LOG_ADMIN, subject: `GymIN · licenza attivata da ${email}`, html, tipo: 'licenza', rif: `licenza:${Date.now()}` }),
+    });
+    if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || `HTTP ${r.status}`);
+  } catch (err) {
+    console.error('Avviso licenza non inviato:', errMsg(err));
+  }
+}
+async function salvaLicenza() {
+  const v = $('#s-licenza').value;
+  const scadenza = v ? new Date(v).toISOString() : null;
+  const supa = await getSupa();
+  const { error } = await supa.from('app_impostazioni')
+    .upsert({ chiave: 'licenza', valore: { scadenza }, aggiornato_il: new Date().toISOString() });
+  if (error) { toast(`Scadenza licenza non salvata: ${error.message}`, 'warn'); return false; }
+  licenzaScadenza = scadenza;
+  return true;
+}
 async function setupUser() {
   const supa = await getSupa();
   const { data: { user } } = await supa.auth.getUser();
   const email = (user?.email || '').toLowerCase();
   const admin = email === LOG_ADMIN;
   isAdmin = admin;
+  utenteEmail = email;
   $('.nav[data-view="log"]').hidden = !admin;
   $('#u-name').textContent = admin ? 'Admin' : (email.split('@')[0] || 'Utente');
   $('#u-role').textContent = admin ? 'Amministratore' : 'Staff';
@@ -1854,6 +1909,8 @@ async function boot() {
   if (!ok) return;
   try { await setupUser(); } catch (err) { console.error(errMsg(err)); }
   caricaSezioni().catch((err) => console.error(errMsg(err)));
+  caricaLicenza().catch((err) => console.error(errMsg(err)));
+  setInterval(() => caricaLicenza().catch(() => {}), 60000);   // nuova scadenza senza ricaricare
   caricaContaTessere().catch(() => {});
   caricaContaImport().catch(() => {});
 
