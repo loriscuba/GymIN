@@ -340,6 +340,7 @@
     <button class="nav" data-view="pagamenti" data-tip="Pagamenti"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 12h.01M18 12h.01"/></svg> <span class="nav-label">Pagamenti</span></button>
     <button class="nav" data-view="tessere" data-tip="Tessere"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M2.5 9.5h19M6.5 15h4"/></svg> <span class="nav-label">Tessere</span> <span class="count" id="c-tessere" hidden title="Accessi offline da verificare"></span></button>
     <button class="nav" data-view="posta" data-tip="Posta"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg> <span class="nav-label">Posta</span> <span class="count" id="c-posta"></span></button>
+    <button class="nav" data-view="report" hidden data-tip="Report"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg> <span class="nav-label">Report</span> <span class="count" id="c-report" hidden title="Report non letti"></span></button>
     <button class="nav" data-view="log" hidden data-tip="Log attività"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/></svg> <span class="nav-label">Log attività</span></button>
     <button class="nav" data-view="importa" data-tip="Import abbonamenti"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg> <span class="nav-label">Import abbonamenti</span> <span class="count alert" id="c-importa" hidden title="Soci da verificare"></span></button>
     <button class="nav" id="btn-settings" data-tip="Impostazioni"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.86l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06A1.7 1.7 0 0 0 15.8 19.4a1.7 1.7 0 0 0-1 .97 1.7 1.7 0 0 0-.2 1.06V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-.2-1.06 1.7 1.7 0 0 0-1-.97 1.7 1.7 0 0 0-1.86.34l-.06.06A2 2 0 1 1 4.7 17.7l.06-.06A1.7 1.7 0 0 0 4.6 15.8a1.7 1.7 0 0 0-1.06-.2H3.4a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.06-.2 1.7 1.7 0 0 0 .97-1 1.7 1.7 0 0 0-.34-1.86l-.06-.06A2 2 0 1 1 8.3 4.7l.06.06A1.7 1.7 0 0 0 8.2 4.6a1.7 1.7 0 0 0 .97-1 .97.97 0 0 0-.2-1.06V2.4a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 .2 1.06 1.7 1.7 0 0 0 .97 1 1.7 1.7 0 0 0 1.86-.34l.06-.06A2 2 0 1 1 19.3 8.3l-.06.06A1.7 1.7 0 0 0 19.4 8.2a1.7 1.7 0 0 0 1.06.2h.1a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.06.2 1.7 1.7 0 0 0-.97 1Z"/></svg> <span class="nav-label">Impostazioni</span></button>
@@ -402,6 +403,15 @@
       <div class="paysum" id="paysum"></div>
       <div class="tablewrap"><div class="scroll"><table id="paytable"><thead><tr><th>Data</th><th>Socio</th><th>Tessera</th><th>Abbonamento</th><th>Metodo</th><th style="text-align:right">Importo</th><th>Azioni</th></tr></thead><tbody></tbody></table></div>
         <div class="tfoot"><span id="paycount"></span></div></div>
+    </section>
+
+    <section class="view" id="view-report" hidden>
+      <div class="toolbar">
+        <span class="msub">Ogni sera alle 20 un riepilogo delle modifiche dalle 20 del giorno prima. Il dettaglio è nel Log attività.</span>
+        <button class="btn-ghost" id="btn-report-ora" style="padding:8px 13px;font-size:12.5px">Aggiorna il report di oggi</button>
+      </div>
+      <div class="tablewrap"><div class="scroll"><table id="reptable"><thead><tr><th>Giorno</th><th>Nuovi soci</th><th>Nuovi abbonamenti</th><th>Pagamenti</th><th>Modifiche</th><th>Dettaglio</th></tr></thead><tbody></tbody></table></div>
+        <div class="tfoot"><span id="repcount"></span></div></div>
     </section>
 
     <section class="view" id="view-log" hidden>
