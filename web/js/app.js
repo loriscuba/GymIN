@@ -281,6 +281,9 @@ function openSettingsModal() {
   populateSettingsForm();
   $('#s-sezioni-box').hidden = !isAdmin;
   $('#s-licenza-box').hidden = !isAdmin;
+  $('#s-report-box').hidden = !isAdmin;
+  $('#s-report-ora').required = isAdmin;
+  $('#s-report-ora').value = reportOra;
   $('#s-licenza').value = isoToLocalInput(licenzaScadenza);
   $('#s-sezioni').innerHTML = SEZIONI.map(([k, t]) => `<label style="display:flex;align-items:center;gap:8px;font-size:13.5px;cursor:pointer">
     <input type="checkbox" data-sez="${k}" ${sezioniNascoste.includes(k) ? '' : 'checked'}> ${t}</label>`).join('');
@@ -297,6 +300,7 @@ async function saveSettingsFromModal(e) {
   saveSettingsToStorage(form);
   if (isAdmin && !(await salvaSezioni())) return;
   if (isAdmin && !(await salvaLicenza())) return;
+  if (isAdmin && !(await salvaReportOra())) return;
   closeModal('modal-settings');
   applyContattiRule();
   toast(isAdmin ? 'Impostazioni salvate' : 'Impostazioni salvate nel browser', 'mail');
@@ -1808,7 +1812,7 @@ async function deletePlan(id) {
 }
 
 // ---------- report serale (solo amministratore) ----------
-// Lo genera pg_cron alle 20 (migration report_serale); qui si leggono e si segnano come letti.
+// Lo genera pg_cron all'orario scelto in Impostazioni (migrations report_serale, report_orario); qui si leggono e si segnano come letti.
 const repMsg = (html, color = 'var(--ink-3)') => `<tr><td colspan="6" style="text-align:center;color:${color};padding:28px">${html}</td></tr>`;
 async function contaReportNonLetti() {
   const supa = await getSupa();
@@ -1823,7 +1827,7 @@ async function loadReport() {
     const { data, error } = await supa.from('report_serali').select('giorno,riepilogo,letto_il,email_inviata_il').order('giorno', { ascending: false }).limit(60);
     if (error) throw error;
     $('#repcount').textContent = `${data.length} report`;
-    $('#reptable tbody').innerHTML = data.length ? data.map(renderReportRow).join('') : repMsg('Ancora nessun report: il primo arriva stasera alle 20.');
+    $('#reptable tbody').innerHTML = data.length ? data.map(renderReportRow).join('') : repMsg(`Ancora nessun report: il primo arriva alle ${reportOra}.`);
     if (data.some((r) => !r.letto_il)) { await supa.rpc('segna_report_letti'); contaReportNonLetti(); }
   } catch (err) {
     console.error(errMsg(err));
@@ -1888,6 +1892,24 @@ async function salvaSezioni() {
   applicaSezioni();
   return true;
 }
+// ---------- orario del report serale ----------
+// app_impostazioni, chiave report_ora: lo legge report_serale_cron (migration report_orario).
+let reportOra = '20:00';
+async function caricaReportOra() {
+  const supa = await getSupa();
+  const { data, error } = await supa.from('app_impostazioni').select('valore').eq('chiave', 'report_ora').maybeSingle();
+  if (!error && /^\d{2}:\d{2}$/.test(data?.valore?.ora || '')) reportOra = data.valore.ora;
+}
+async function salvaReportOra() {
+  const ora = $('#s-report-ora').value.slice(0, 5);
+  if (ora === reportOra) return true;
+  const supa = await getSupa();
+  const { error } = await supa.from('app_impostazioni')
+    .upsert({ chiave: 'report_ora', valore: { ora }, aggiornato_il: new Date().toISOString() });
+  if (error) { toast(`Orario del report non salvato: ${error.message}`, 'warn'); return false; }
+  reportOra = ora;
+  return true;
+}
 // ---------- scadenza licenza ----------
 // L'amministratore imposta data/ora da Impostazioni (app_impostazioni, chiave licenza);
 // il blocco vero e proprio è in licenza.js e vale solo per l'utente indicato lì.
@@ -1948,7 +1970,7 @@ async function setupUser() {
   utenteEmail = email;
   $('.nav[data-view="log"]').hidden = !admin;
   $('.nav[data-view="report"]').hidden = !admin;
-  if (admin) contaReportNonLetti();
+  if (admin) { contaReportNonLetti(); caricaReportOra().catch(() => {}); }
   $('#u-name').textContent = admin ? 'Admin' : (email.split('@')[0] || 'Utente');
   $('#u-role').textContent = admin ? 'Amministratore' : 'Staff';
   $('#u-avatar').textContent = admin ? 'AD' : (email.slice(0, 2).toUpperCase() || '—');

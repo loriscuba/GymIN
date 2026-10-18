@@ -407,7 +407,7 @@
 
     <section class="view" id="view-report" hidden>
       <div class="toolbar">
-        <span class="msub">Ogni sera alle 20 un riepilogo delle modifiche dalle 20 del giorno prima. Il dettaglio è nel Log attività.</span>
+        <span class="msub">Ogni giorno all'orario scelto in Impostazioni un riepilogo delle modifiche delle 24 ore precedenti. Il dettaglio è nel Log attività.</span>
         <button class="btn-ghost" id="btn-report-ora" style="padding:8px 13px;font-size:12.5px">Aggiorna il report di oggi</button>
       </div>
       <div class="tablewrap"><div class="scroll"><table id="reptable"><thead><tr><th>Giorno</th><th>Nuovi soci</th><th>Nuovi abbonamenti</th><th>Pagamenti</th><th>Modifiche</th><th>Dettaglio</th></tr></thead><tbody></tbody></table></div>
@@ -482,6 +482,11 @@
         <legend style="font-size:13px;font-weight:600;padding:0 6px">Scadenza licenza</legend>
         <div class="fhint"><span class="k">Da questa data e ora l'utente admin@gymin.local vede il popup di licenza scaduta. Vuoto = nessun blocco.</span></div>
         <div class="field" style="margin-top:8px"><label for="s-licenza">Scade il</label><input id="s-licenza" type="datetime-local"></div>
+      </fieldset>
+      <fieldset id="s-report-box" hidden style="border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin:14px 0 0">
+        <legend style="font-size:13px;font-weight:600;padding:0 6px">Report serale</legend>
+        <div class="fhint"><span class="k">Ogni giorno a quest'ora (ora italiana) viene creato il report delle modifiche dall'ora scelta del giorno prima, con email.</span></div>
+        <div class="field" style="margin-top:8px"><label for="s-report-ora">Orario</label><input id="s-report-ora" type="time" step="60" required></div>
       </fieldset>
       <div class="fhint" style="margin-top:8px"><span class="k">Supabase URL e anon key sono già configurate in config.js: qui puoi gestire posta e recapiti obbligatori.</span></div>
       <div class="mfoot" style="padding:16px 0 0;border-top:0;justify-content:flex-end;gap:8px">
