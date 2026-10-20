@@ -1,3 +1,5 @@
 # file per il PC Windows del cliente: salvati con fine riga CRLF, senza conversioni
 kiosk/*.bat -text
 kiosk/*.txt -text
+# script del Raspberry Pi: sempre fine riga LF (con CRLF bash non li esegue)
+kiosk-raspberry/*.sh text eol=lf

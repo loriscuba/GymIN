@@ -28,6 +28,7 @@ accessi/
 │  ├─ sw.js                # service worker (PWA): la pagina funziona anche senza internet
 │  └─ manifest.webmanifest
 ├─ kiosk/                  # PC del cliente: script .bat di avvio kiosk + LEGGIMI.txt (installazione)
+├─ kiosk-raspberry/        # prototipo postazione tornello su Raspberry Pi: script .sh + LEGGIMI.md
 ├─ sql/seed-dev.sql        # dati demo per il DB di SVILUPPO (mai in produzione)
 ├─ scripts/                # dev-server, build, test-db, seed-dev, shelly-finto (nessuna dipendenza esterna)
 └─ test/                   # test unitari (node:test) e test SQL su Postgres vero (test/db)
@@ -330,6 +331,10 @@ Tutto il necessario è nella cartella [`kiosk/`](kiosk/). La guida passo-passo p
 **La prima apertura deve avvenire online**: installa l'app e scarica i dati. Il token si incolla nella schermata "Configura il terminale".
 
 **Uscire dal kiosk**: tasto Windows (o Alt+Tab) → Desktop → "Ferma GymIN Ingresso". Alt+F4 chiude Chrome, ma lo script lo riapre dopo 5 s.
+
+## Postazione tornello su Raspberry Pi (prototipo)
+
+In alternativa al PC Windows, la cartella [`kiosk-raspberry/`](kiosk-raspberry/) installa lo stesso terminale su un **Raspberry Pi** (Raspberry Pi OS con desktop) con Chromium in kiosk. Gli script sono gemelli di quelli Windows: profilo dedicato, audio senza click, riavvio dopo un crash, niente doppio kiosk. `installa.sh` configura in più accesso automatico, schermo sempre acceso, fuso di Roma e il permesso di rete locale per lo Shelly. Hardware provato e passi in [`kiosk-raspberry/LEGGIMI.md`](kiosk-raspberry/LEGGIMI.md).
 
 ## Cosa resta in GymIN (non duplicato)
 
