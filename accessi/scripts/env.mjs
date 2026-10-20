@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 export const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
-const CHIAVI = ['SUPABASE_URL', 'SUPABASE_ANON_KEY', 'DB_SCHEMA', 'TIMEOUT_ONLINE_MS', 'RITARDO_SUONI_MS', 'DURATA_ESITO_MS', 'CACHE_MAX_ORE', 'SYNC_INTERVALLO_MS', 'LETTORE_MAX_GAP_MS', 'METEO_LAT', 'METEO_LON', 'METEO_LUOGO', 'SHELLY_URL', 'SHELLY_GEN', 'SHELLY_CANALE', 'PORTA_TIPO', 'PORTA_IMPULSO_S', 'PORTA_TIMEOUT_MS', 'PORT', 'DEV_DATABASE_URL'];
+const CHIAVI = ['SUPABASE_URL', 'SUPABASE_ANON_KEY', 'DB_SCHEMA', 'TIMEOUT_ONLINE_MS', 'RITARDO_SUONI_MS', 'DURATA_ESITO_MS', 'CACHE_MAX_ORE', 'SYNC_INTERVALLO_MS', 'LETTORE_MAX_GAP_MS', 'METEO_LAT', 'METEO_LON', 'METEO_LUOGO', 'SHELLY_URL', 'SHELLY_GEN', 'SHELLY_CANALE', 'PORTA_TIPO', 'PORTA_IMPULSO_S', 'PORTA_TIMEOUT_MS', 'FOTOCAMERA', 'PORT', 'DEV_DATABASE_URL'];
 
 export function leggiEnv() {
   const env = {};
@@ -44,6 +44,8 @@ export function configJs(env) {
     SHELLY_CANALE: num(env.SHELLY_CANALE, 0),
     PORTA_IMPULSO_S: num(env.PORTA_IMPULSO_S, 1),
     PORTA_TIMEOUT_MS: num(env.PORTA_TIMEOUT_MS, 1500),
+    // QR d'ingresso con la fotocamera; sul singolo terminale si attiva anche con ?fotocamera=1
+    FOTOCAMERA: ['1', 'true', 'si'].includes(String(env.FOTOCAMERA || '').toLowerCase()),
   };
   return `// generato automaticamente: non modificare\nwindow.ACCESSI_CONFIG = ${JSON.stringify(cfg, null, 2)};\n`;
 }

@@ -76,3 +76,10 @@ body.setup-attivo{cursor:auto;user-select:auto}
 .badge-offline{position:absolute;top:3vh;right:3vw;background:rgba(0,0,0,.35);color:#fff;font-weight:700;font-size:2.6vh;padding:.8vh 1.8vh;border-radius:999px}
 .sim-pannello .interruttore{display:flex;align-items:center;gap:8px;font-weight:600}
 .sim-pannello .interruttore input{width:18px;height:18px}
+
+/* fotocamera per i QR d'ingresso (?fotocamera=1): in alto a sinistra, il meteo è a destra */
+.cam{position:fixed;left:5vw;top:4vh;z-index:5;width:34vh;display:grid;gap:1vh;justify-items:center;transition:opacity .2s}
+.cam.nascosta{opacity:0;pointer-events:none}
+.cam video{width:34vh;height:25.5vh;object-fit:cover;border-radius:2vh;border:.5vh solid var(--accent);background:#000}
+.cam.specchio video{transform:scaleX(-1)}
+.cam span{font-weight:700;font-size:2.6vh;color:#fff;opacity:.85}

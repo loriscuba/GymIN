@@ -395,6 +395,31 @@ async function sendReminderTo(sid) {
   reminded.add(m.sid);
   toast(mail.channel === 'mailpit' ? `Promemoria inviato a Mailpit · ${m.email}` : `Promemoria generato (anteprima) · ${m.nome}`, 'mail');
 }
+// QR d'ingresso: tessera di tipo 'qr' creata da staff_qr_socio() e inviata via email.
+// Se il socio ha già un QR, si può reinviare lo stesso oppure rigenerarlo (il vecchio smette di funzionare).
+async function inviaQrIngresso(sid) {
+  const m = DATA.members.find((x) => x.sid === sid); if (!m) return;
+  if (!m.email) { toast('Il socio non ha un indirizzo email', 'warn'); return; }
+  if (!(await askConfirm(`Inviare il QR d'ingresso a <b>${esc(m.nome)}</b> (${esc(m.email)})?`, 'Invia'))) return;
+  try {
+    const supa = await getSupa();
+    if (!supa) throw new Error('database non disponibile');
+    let { data, error } = await supa.rpc('staff_qr_socio', { p_socio_id: m.sid, p_rigenera: false });
+    if (error) throw error;
+    if (!data.nuovo && await askConfirm('Il socio ha già un QR. Vuoi <b>generarne uno nuovo</b>? Il vecchio smetterà subito di funzionare. Con <i>Annulla</i> si reinvia quello attuale.', 'Nuovo QR')) {
+      ({ data, error } = await supa.rpc('staff_qr_socio', { p_socio_id: m.sid, p_rigenera: true }));
+      if (error) throw error;
+    }
+    const codice = data.codice;
+    const { subject, html } = templates.qrIngresso(m, codice);
+    const mail = await sendMail({ tipo: 'qr', tipoLabel: 'QR ingresso', member: m, subject, html });
+    if ((window.GYMIN_CONFIG || {}).MAILER_API_URL) await sendRealMail();
+    else toast(mail.channel === 'mailpit' ? `QR inviato a Mailpit · ${m.email}` : `QR generato (anteprima in Posta) · ${m.nome}`, 'mail');
+  } catch (err) {
+    console.error(errMsg(err));
+    toast(`QR non inviato: ${errMsg(err)}`, 'warn');
+  }
+}
 async function sendReminders() {
   const list = expiringList().filter((m) => m.email && !reminded.has(m.sid));
   if (!list.length) { toast('Nessun nuovo promemoria da inviare', 'warn'); return; }
@@ -903,7 +928,7 @@ function openScheda(sid) {
       <div id="scheda-privacy">${schedaPrivacyHtml(m, null)}</div></div>
     </div>
     <div class="mfoot" style="justify-content:space-between;align-items:center">
-      <div style="display:flex;gap:8px"><button type="button" class="btn-ghost" data-close="modal-scheda">Chiudi</button><button type="button" class="btn-ghost" data-tessera="${m.sid}">Associa tessera</button></div>
+      <div style="display:flex;gap:8px"><button type="button" class="btn-ghost" data-close="modal-scheda">Chiudi</button><button type="button" class="btn-ghost" data-tessera="${m.sid}">Associa tessera</button><button type="button" class="btn-ghost" data-qr="${m.sid}" title="Invia via email il QR personale da mostrare alla fotocamera del terminale">Invia QR d'ingresso</button></div>
       <div class="actions-cell">${actionIcons(m)}</div>
     </div>`;
   openModal('modal-scheda');
@@ -1629,6 +1654,7 @@ function wireEvents() {
   document.addEventListener('click', (e) => {
     const c = e.target.closest('[data-close]'); if (c) return closeModal(c.dataset.close);
     const ts = e.target.closest('[data-tessera]'); if (ts) return openAssociaTessera(ts.dataset.tessera);
+    const qr = e.target.closest('[data-qr]'); if (qr) return inviaQrIngresso(qr.dataset.qr);
     const planEdit = e.target.closest('[data-plan-edit]'); if (planEdit) return editPlan(planEdit.dataset.planEdit);
     const planDel = e.target.closest('[data-plan-delete]'); if (planDel) return deletePlan(planDel.dataset.planDelete);
     const ed = e.target.closest('[data-edit]'); if (ed) return openSocioModal('edit', ed.dataset.edit);

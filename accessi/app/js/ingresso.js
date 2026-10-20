@@ -8,6 +8,7 @@ import { creaSincronizzatore, SOGLIA_OROLOGIO_MS } from './sync.js';
 import { TESSERE_TEST, ALTRI_CASI } from './demo.js';
 import { scaricaMeteo } from './meteo.js';
 import { configPorta, creaApriporta } from './porta.js';
+import { avviaFotocamera } from './fotocamera.js';
 
 const CFG = window.ACCESSI_CONFIG || {};
 const DURATA_ESITO = CFG.DURATA_ESITO_MS || 3000;
@@ -25,6 +26,7 @@ const CHIAVE_TOKEN = `gymin.accessi.token${SPAZIO === 'public' ? '' : `.${SPAZIO
 const NOME_DB = `gymin-accessi-${SPAZIO}`;
 const CHIAVE_NOME = `gymin.accessi.nome.${SPAZIO}`;
 const CHIAVE_SHELLY = `gymin.accessi.shelly.${SPAZIO}`;
+const CHIAVE_FOTOCAMERA = `gymin.accessi.fotocamera.${SPAZIO}`;
 
 const store = {
   get: (k) => { try { return localStorage.getItem(k); } catch { return null; } },
@@ -43,6 +45,13 @@ if (params.has('shelly')) {
   const v = params.get('shelly').trim();
   store.set(CHIAVE_SHELLY, !v || v === 'off' ? null : v);
   params.delete('shelly');
+  history.replaceState(null, '', location.pathname + (params.size ? `?${params}` : ''));
+}
+// fotocamera per i QR d'ingresso su QUESTO terminale: ?fotocamera=1 (posteriore: ?fotocamera=retro), ?fotocamera=off
+if (params.has('fotocamera')) {
+  const v = params.get('fotocamera').trim().toLowerCase();
+  store.set(CHIAVE_FOTOCAMERA, ['off', '0', 'no'].includes(v) ? 'off' : v === 'retro' ? 'retro' : 'si');
+  params.delete('fotocamera');
   history.replaceState(null, '', location.pathname + (params.size ? `?${params}` : ''));
 }
 const porta = creaApriporta(configPorta(CFG, { shellyUrl: store.get(CHIAVE_SHELLY), sim: SIM }), {
@@ -168,6 +177,7 @@ const iniziali = (s) => `${s?.nome?.[0] || ''}${s?.cognome?.[0] || ''}`.toUpperC
 function mostra(v) {
   vista = v;
   for (const x of ['attesa', 'esito', 'setup', 'nonsync']) $(`#v-${x}`).hidden = x !== v;
+  $('#cam').classList.toggle('nascosta', v !== 'attesa');
   document.body.classList.toggle('setup-attivo', v === 'setup');
   $('#barra').hidden = v === 'setup';
   aggiornaStato();
@@ -348,6 +358,28 @@ window.addEventListener('offline', () => { data?.segnaOffline(); aggiornaStato()
 // ---------------------------------------------------------------------------
 agganciaLettore(onCodice, { attivo: () => !!data && vista !== 'setup', maxGapMs: CFG.LETTORE_MAX_GAP_MS });
 window.addEventListener('pointerdown', sbloccaAudio);
+
+// fotocamera (QR dal telefono del socio): stesso percorso del lettore
+async function avviaQr() {
+  const scelta = store.get(CHIAVE_FOTOCAMERA) ?? (CFG.FOTOCAMERA ? 'si' : 'off');
+  if (scelta === 'off') return;
+  try {
+    const cam = await avviaFotocamera({
+      video: $('#cam video'),
+      onCodice,
+      attivo: () => !!data && vista === 'attesa',
+      facingMode: scelta === 'retro' ? 'environment' : 'user',
+    });
+    $('#cam').hidden = false;
+    $('#cam').classList.toggle('specchio', scelta !== 'retro');
+    $('#invito-testo').textContent = 'Passa la tessera o mostra il QR';
+    console.info(`Fotocamera attiva (decodifica: ${cam.tipo})`);
+  } catch (e) {
+    console.error('Fotocamera non disponibile:', e);
+    notifica(`Fotocamera non disponibile: ${e.message}`);
+  }
+}
+avviaQr();
 window.addEventListener('dblclick', () => {
   if (!document.fullscreenElement) document.documentElement.requestFullscreen?.().catch(() => {});
 });
