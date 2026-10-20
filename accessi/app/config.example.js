@@ -19,4 +19,6 @@ window.ACCESSI_CONFIG = {
   SHELLY_CANALE: 0,
   PORTA_IMPULSO_S: 1,
   PORTA_TIMEOUT_MS: 1500,
+  // QR d'ingresso con la fotocamera (sul singolo terminale anche con ?fotocamera=1)
+  FOTOCAMERA: false,
 };
