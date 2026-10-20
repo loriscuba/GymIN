@@ -12,7 +12,7 @@ begin
     raise exception 'Seed demo bloccato: usa "npm run seed:dev" su un database di sviluppo.';
   end if;
 
-  delete from accessi_log where codice like 'SIM%';
+  delete from accessi_log where codice like 'SIM%' or codice = 'QR00000000000000000000000000000001';
   delete from soci where note = 'DEMO-ACCESSI';
   delete from terminali where nome = 'Terminale DEMO (sviluppo)';
   delete from piani where descrizione = 'DEMO-ACCESSI' and not exists (select 1 from abbonamenti a where a.piano_id = piani.id);
@@ -35,6 +35,7 @@ begin
   insert into soci(nome,cognome,note) values ('Giulia','Bianchi','DEMO-ACCESSI') returning id into s;
   insert into abbonamenti(socio_id,piano_id,data_inizio,data_scadenza) values (s,p_mese,current_date-10,current_date+20);
   insert into tessere(socio_id,codice) values (s,'SIM0000001');
+  insert into tessere(socio_id,codice,tipo) values (s,'QR00000000000000000000000000000001','qr');   -- QR d'ingresso (stesso della demo)
   -- 2 Marco: carnet con 3 ingressi (verde, poi avviso giallo)
   insert into soci(nome,cognome,note) values ('Marco','Rossi','DEMO-ACCESSI') returning id into s;
   insert into abbonamenti(socio_id,piano_id,data_inizio,data_scadenza,entrate_residue) values (s,p_c10,current_date-30,current_date+60,3);

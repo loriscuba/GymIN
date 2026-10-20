@@ -24,6 +24,7 @@ accessi/
 │  ├─ js/lettore.js        # listener globale per il lettore RFID in emulazione tastiera
 │  ├─ js/suoni.js          # suoni con la Web Audio API
 │  ├─ js/porta.js          # apriporta: comando al relè Shelly quando l'esito è verde
+│  ├─ js/fotocamera.js     # QR d'ingresso letti con la fotocamera (BarcodeDetector o jsQR)
 │  ├─ js/demo.js           # dati demo in memoria per la simulazione
 │  ├─ sw.js                # service worker (PWA): la pagina funziona anche senza internet
 │  └─ manifest.webmanifest
@@ -214,6 +215,19 @@ In tutti e tre i casi deve comparire "Porta non aperta". `npm test` fa le stesse
 6. **Sicurezza**: chi raggiunge lo Shelly in rete può aprire la porta. Tienilo sulla rete del PC dell'ingresso, **non sul Wi-Fi ospiti**. Disattiva l'accesso cloud se non serve.
 
 > Da verificare col dispositivo vero: se lo Shelly ha la **password** attiva (autenticazione digest), il browser non può inviargli il comando direttamente. Le opzioni sono due: lasciarlo senza password su una rete isolata, oppure aggiungere un piccolo ponte locale sul PC.
+
+## QR d'ingresso (fotocamera)
+
+Il socio riceve via email un **QR personale** e lo mostra alla fotocamera del terminale (tablet o webcam). Il QR è una **tessera** come le altre (`tessere.tipo = 'qr'`): stesse regole, stessi esiti, stessa apertura porta, funziona anche offline.
+
+- **Invio**: in GymIN, scheda socio → **Invia QR d'ingresso**. La prima volta il QR viene creato (`staff_qr_socio`); le volte successive si sceglie se reinviare lo stesso o **generarne uno nuovo** (il vecchio smette subito di funzionare). L'email finisce in **Posta** e, dove è configurato `MAILER_API_URL` (produzione), parte subito. Nell'ambiente di test resta un'anteprima.
+- **Nell'email** il QR è disegnato come tabella HTML, non come immagine: si vede anche nei client che bloccano le immagini. Codice: `QR` + 32 caratteri esadecimali casuali, non indovinabile.
+- **Anti-condivisione**: lo stesso QR **non entra due volte entro 4 ore** → rosso "QR già usato alle hh:mm", senza scalare ingressi. Un ingresso annullato dallo staff non conta. Le tessere RFID non hanno questo blocco. La finestra si cambia in un solo punto: `accessi_qr_blocco()` (SQL) e `QR_BLOCCO_MS` (`esito.js`, per la simulazione).
+- **Offline**: il terminale decide in locale senza anti-condivisione; alla sincronizzazione un secondo ingresso entro la finestra viene registrato **da verificare** (stesso meccanismo dei conflitti offline).
+- **Terminale**: si attiva una volta per PC/tablet con `/accessi/ingresso/?fotocamera=1` (fotocamera frontale; `?fotocamera=retro` per la posteriore, `?fotocamera=off` per spegnerla), oppure per tutti con `FOTOCAMERA=1` nel build. Il browser chiede una volta il permesso della fotocamera. In alto a sinistra compare l'anteprima "Inquadra qui il QR" e l'invito diventa "Passa la tessera o mostra il QR".
+- **Decodifica**: `BarcodeDetector` del browser dove esiste (Chrome su Android), altrimenti `vendor/jsQR.js`. Vengono accettati solo i QR d'ingresso (`QR…`): un QR qualsiasi viene ignorato. Un telefono tenuto davanti alla fotocamera vale **una** lettura: per rileggerlo va tolto per almeno 1,5 s.
+- **Prova senza database**: `/ingresso/?demo=1&fotocamera=1` e mostra il QR del caso demo "QR di Giulia" (`QR00000000000000000000000000000001`, generabile con qualsiasi app di QR). In SIM c'è anche il pulsante per simularlo.
+- **Migrazione**: `supabase/migrations/20261020120000_qr_ingresso.sql` (solo aggiunte: colonna `tessere.tipo`, `staff_qr_socio`, anti-condivisione in `accessi_esegui`). Va applicata a `public` e allo schema `test` (`node scripts/test-schema.mjs 20261020120000`).
 
 ## Sviluppo
 
