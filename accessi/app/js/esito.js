@@ -9,6 +9,8 @@ export const TZ = 'Europe/Rome';
 export const SOGLIA_DOPPIA_MS = 5000;     // stessa tessera entro 5 s = doppia lettura
 export const AVVISO_GIORNI = 7;           // avviso giallo se mancano meno di 7 giorni
 export const AVVISO_INGRESSI = 2;         // ...o se restano 2 ingressi o meno
+// QR d'ingresso: lo stesso QR non entra due volte entro 4 ore (= accessi_qr_blocco() nel database)
+export const QR_BLOCCO_MS = 4 * 3600 * 1000;
 
 /** Codice tessera: stringa arbitraria, maiuscola, senza spazi. */
 export function normalizzaCodice(s) {
@@ -29,6 +31,9 @@ export function fmtData(ymd, oggi) {
   const [y, m, d] = String(ymd).slice(0, 10).split('-');
   return oggi && y === String(oggi).slice(0, 4) ? `${d}/${m}` : `${d}/${m}/${y}`;
 }
+const fmtHM = new Intl.DateTimeFormat('it-IT', { timeZone: TZ, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+/** hh:mm in Europe/Rome (istante in ms o ISO) */
+export const fmtOraRoma = (t) => fmtHM.format(new Date(t));
 /** gg/mm/aaaa */
 export const fmtDataCompleta = (ymd) => fmtData(ymd, null);
 

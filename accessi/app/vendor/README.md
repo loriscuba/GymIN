@@ -3,6 +3,7 @@
 | File | Origine | Versione | Licenza |
 |---|---|---|---|
 | `supabase.js` | `@supabase/supabase-js` (npm), file `dist/umd/supabase.js` | 2.117.2 | MIT |
+| `jsQR.js` | `jsqr` (npm), `dist/jsQR.js` minificato con esbuild | 1.4.0 | Apache-2.0 |
 
 Servite dal nostro dominio invece che da un CDN: se il CDN venisse compromesso,
 il codice malevolo girerebbe con la sessione dello staff e potrebbe leggere tutti i dati.

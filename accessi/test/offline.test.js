@@ -50,7 +50,7 @@ test('prima sincronizzazione: cache minima (niente dati sensibili)', async () =>
   assert.equal(await sync.sincronizza(), true);
   const c = await locale.infoCache();
   assert.ok(c && !c.vecchia);
-  assert.equal(c.tessere, 8, 'solo tessere attive');
+  assert.equal(c.tessere, 9, 'solo tessere attive (8 RFID + 1 QR)');
   const r = await archivio.leggiEDecidi('SIM0000001', (d) => ({ risultato: d }));
   assert.deepEqual(Object.keys(r.socio).sort(), ['cognome', 'id', 'nome']);
 });
@@ -277,4 +277,17 @@ test('eventi rifiutati dal server restano in coda (mai persi) e non bloccano gli
   assert.equal(coda[0].tentativi, 1);
   assert.equal(env.sync.stato.eventiConErrori, 1);
   assert.equal(env.server.log.length, 2);
+});
+
+test('demo: lo stesso QR non entra due volte entro 4 ore (come il database)', async () => {
+  const server = creaSorgenteDemo(datiDemo());
+  const qr = 'QR00000000000000000000000000000001';
+  const r1 = await server.registraLettura({ codice: qr, evento_id: randomUUID(), ts: ts() });
+  assert.equal(r1.esito, 'ok');
+  const r2 = await server.registraLettura({ codice: qr, evento_id: randomUUID(), ts: ts() });
+  assert.equal(r2.esito, 'negato');
+  assert.equal(r2.motivo_codice, 'qr_gia_usato');
+  assert.match(r2.motivo, /^QR già usato alle \d\d:\d\d$/);
+  // la tessera RFID della stessa socia non ha il blocco
+  for (let i = 0; i < 2; i++) assert.equal((await server.registraLettura({ codice: 'SIM0000001', evento_id: randomUUID(), ts: ts() })).esito, 'ok');
 });

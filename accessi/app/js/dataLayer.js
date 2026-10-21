@@ -7,7 +7,7 @@
 //   - sorgente DEMO: un finto "server" in memoria per la simulazione (?demo=1);
 //   - creaTerminale(): prova online entro ~2 s, altrimenti decide in locale con lo STESSO evento_id.
 // Gestione (/gestione): client Supabase con la sessione staff di GymIN.
-import { decidiAccesso, decidiAbbonamenti, normalizzaCodice, oggiRoma } from './esito.js';
+import { decidiAccesso, decidiAbbonamenti, normalizzaCodice, oggiRoma, QR_BLOCCO_MS, fmtOraRoma } from './esito.js';
 import { datiDemo } from './demo.js';
 
 export class ErroreRete extends Error {
@@ -137,6 +137,13 @@ export function creaSorgenteDemo(dati = datiDemo(), { ritardoMs = 0 } = {}) {
       r = { esito: 'doppia_lettura', motivo: 'Lettura ripetuta ignorata', socio };
     } else {
       r = decidiAccesso({ tessera, socio, oggi, abbonamenti: socio ? dati.abbonamenti.filter((a) => a.socio_id === socio.id) : [] });
+      // QR: stesso QR già entrato entro QR_BLOCCO_MS (come accessi_esegui nel database)
+      if (r.esito === 'ok' && tessera.tipo === 'qr') {
+        const t = Date.parse(offline && ts ? ts : new Date().toISOString());
+        const prec = log.filter((l) => l.tessera_id === tessera.id && l.esito === 'ok')
+          .map((l) => Date.parse(l.ts_terminale || l.ora_server)).filter((x) => x <= t && t - x < QR_BLOCCO_MS);
+        if (prec.length) r = { esito: 'negato', motivo_codice: 'qr_gia_usato', motivo: `QR già usato alle ${fmtOraRoma(Math.max(...prec))}`, socio };
+      }
       const et = offline ? esitoTerminale : null;
       if (et?.esito === 'ok' && r.esito !== 'ok') {
         verifica = true;
@@ -151,7 +158,7 @@ export function creaSorgenteDemo(dati = datiDemo(), { ritardoMs = 0 } = {}) {
         if (a && a.residuo > 0) a.residuo -= 1;
       }
     }
-    const out = { ...r, log_id: log.length + 1, evento_id, codice: c, ts_terminale: ts, ora_server: oraServer(),
+    const out = { ...r, log_id: log.length + 1, evento_id, codice: c, tessera_id: tessera?.id ?? null, ts_terminale: ts, ora_server: oraServer(),
       offline, da_verificare: verifica, duplicato: false };
     log.push(out);
     return out;
