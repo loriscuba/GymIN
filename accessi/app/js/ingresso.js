@@ -359,6 +359,15 @@ window.addEventListener('offline', () => { data?.segnaOffline(); aggiornaStato()
 agganciaLettore(onCodice, { attivo: () => !!data && vista !== 'setup', maxGapMs: CFG.LETTORE_MAX_GAP_MS });
 window.addEventListener('pointerdown', sbloccaAudio);
 
+// Schermo sempre acceso (Wake Lock): su tablet lo standby spegne anche la fotocamera.
+// Il blocco decade quando la pagina va in background: si richiede di nuovo al ritorno.
+async function tieniSchermoAcceso() {
+  if (!('wakeLock' in navigator)) return;
+  const richiedi = () => navigator.wakeLock.request('screen').catch((e) => console.warn('Wake Lock non concesso:', e.message));
+  await richiedi();
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') richiedi(); });
+}
+
 // fotocamera (QR dal telefono del socio): stesso percorso del lettore
 async function avviaQr() {
   const scelta = store.get(CHIAVE_FOTOCAMERA) ?? (CFG.FOTOCAMERA ? 'si' : 'off');
@@ -369,7 +378,13 @@ async function avviaQr() {
       onCodice,
       attivo: () => !!data && vista === 'attesa',
       facingMode: scelta === 'retro' ? 'environment' : 'user',
+      // la fotocamera non si riapre neanche dopo vari tentativi: si ricarica la pagina appena il terminale è libero
+      onGuasto: () => {
+        ricaricaQuandoLibero = true;
+        if (vista === 'attesa' || vista === 'nonsync') location.reload();
+      },
     });
+    tieniSchermoAcceso();
     $('#cam').hidden = false;
     $('#cam').classList.toggle('specchio', scelta !== 'retro');
     $('#invito-testo').textContent = 'Passa la tessera o mostra il QR';
