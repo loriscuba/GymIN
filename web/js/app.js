@@ -419,6 +419,9 @@ async function inviaQrIngresso(sid) {
     const mail = await sendMail({ tipo: 'qr', tipoLabel: 'QR ingresso', member: m, subject, html });
     if ((window.GYMIN_CONFIG || {}).MAILER_API_URL) await sendRealMail();
     else toast(mail.channel === 'mailpit' ? `QR inviato a Mailpit · ${m.email}` : `QR generato (anteprima in Posta) · ${m.nome}`, 'mail');
+    // l'email con il QR si apre subito: si vede cosa riceve il socio e si può già provare al terminale
+    closeModal('modal-scheda');
+    openMailPreview(MAILBOX.indexOf(mail));
   } catch (err) {
     console.error(errMsg(err));
     toast(`QR non inviato: ${errMsg(err)}`, 'warn');
