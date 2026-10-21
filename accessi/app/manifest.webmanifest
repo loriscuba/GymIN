@@ -5,7 +5,7 @@
   "start_url": "ingresso/",
   "scope": "./",
   "display": "fullscreen",
-  "background_color": "#14181f",
+  "background_color": "#13294b",
   "theme_color": "#14181f",
   "icons": [
     { "src": "img/icon-192.png", "sizes": "192x192", "type": "image/png" },
