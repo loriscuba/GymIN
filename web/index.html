@@ -488,6 +488,11 @@
         <div class="fhint"><span class="k">Ogni giorno a quest'ora (ora italiana) viene creato il report delle modifiche dall'ora scelta del giorno prima, con email.</span></div>
         <div class="field" style="margin-top:8px"><label for="s-report-ora">Orario</label><input id="s-report-ora" type="time" step="60" required></div>
       </fieldset>
+      <fieldset id="s-qr-box" hidden style="border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin:14px 0 0">
+        <legend style="font-size:13px;font-weight:600;padding:0 6px">QR d'ingresso</legend>
+        <label style="display:flex;align-items:center;gap:8px;font-size:13.5px;cursor:pointer"><input type="checkbox" id="s-qr-attivo"> Attivo all'ingresso</label>
+        <div class="fhint"><span class="k">Spento: i terminali spengono la fotocamera, i QR già inviati non aprono la porta e non si possono inviare nuovi QR. Le tessere restano attive.</span></div>
+      </fieldset>
       <div class="fhint" style="margin-top:8px"><span class="k">Supabase URL e anon key sono già configurate in config.js: qui puoi gestire posta e recapiti obbligatori.</span></div>
       <div class="mfoot" style="padding:16px 0 0;border-top:0;justify-content:flex-end;gap:8px">
         <button type="button" class="btn-ghost" id="settings-reset">Ripristina default</button>
