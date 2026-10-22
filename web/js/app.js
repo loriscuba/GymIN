@@ -1470,6 +1470,14 @@ function avviaAggiornamentoAutomatico() {
   if (timerAggiorna) return;                           // un solo timer anche se l'avvio si ripete (nuovo login)
   timerAggiorna = setInterval(controllaNuoviIngressi, AGGIORNA_MS);
   document.addEventListener('visibilitychange', controllaNuoviIngressi);
+  segnalaPresenza();
+  setInterval(segnalaPresenza, 60000);
+  document.addEventListener('visibilitychange', segnalaPresenza);
+}
+// Utenti online in IPA Monitor: un segnale al minuto finché la scheda è visibile (errori ignorati).
+async function segnalaPresenza() {
+  if (document.hidden) return;
+  try { const supa = await getSupa(); await supa?.schema('public').rpc('monitor_segnale'); } catch { /* */ }
 }
 async function controllaNuoviIngressi() {
   if (document.hidden || aggiornando || !DATA) return;
