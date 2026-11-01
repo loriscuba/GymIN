@@ -156,6 +156,8 @@ quindi sono sempre quelle del cruscotto online. Dal repo si può usare `--local`
    L'esito di ogni giro è in `auto-import.log` accanto allo script; le righe *Socio mancante* e
    *Piano mancante* (codice, nome dal vecchio gestionale, piano, date) finiscono in `da-verificare.csv`,
    da aprire con Excel. Contengono dati dei soci: restano su quel PC.
+   Se un giro fallisce (cartella non raggiungibile, `tessere.dbf` assente, ...) l'errore finisce anche
+   nell'app: *Import abbonamenti → Importazioni*, riga rossa **Errore** (filtro *Errori*).
 
 ### Soci da verificare
 
