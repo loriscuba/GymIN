@@ -100,11 +100,31 @@ async function aggiornaDaVerificare(supa, rows, soci) {
   log(`soci da verificare aggiornati: ${righe.length}`);
 }
 
+// client creato subito: serve anche per registrare l'errore nel registro importazioni
+let supa = null;
+
+// errore del giro → una riga "errore" in import_log, così lo staff lo vede nell'app (Import abbonamenti)
+async function registraErrore(messaggio) {
+  if (!supa || DRY) return;
+  const { error } = await supa.from('import_log').insert({
+    import_id: `automatico-${new Date().toISOString()}`, fonte: 'automatico', azione: 'errore', dopo: { messaggio } });
+  if (error) log(`errore non registrato nell'app: ${error.message}`);
+}
+
 async function main() {
-  if (!DIR) throw new Error('cartella mancante: usa --dir <cartella> oppure GYMIN_IMPORT_DIR nel .env');
   const url = process.env.SUPABASE_URL, key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) throw new Error('SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY mancanti nel .env');
-  const supa = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+  supa = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+  if (!DIR) throw new Error('cartella mancante: usa --dir <cartella> oppure GYMIN_IMPORT_DIR nel .env');
+  // distingue cartella non raggiungibile (rete, credenziali cmdkey) da file assente nella cartella
+  if (!fs.existsSync(DIR)) throw new Error(`cartella ${DIR} non raggiungibile: PC/rete spenti o credenziali cambiate (cmdkey)`);
+  const mancanti = ['tessere.dbf', 'anagraf.dbf'].filter((n) => !fs.existsSync(path.join(DIR, n)));
+  if (mancanti.includes('tessere.dbf')) {
+    let presenti = '';
+    try { presenti = fs.readdirSync(DIR).filter((n) => /\.dbf$/i.test(n)).join(', '); } catch { /* elenco non leggibile */ }
+    throw new Error(`tessere.dbf assente in ${DIR} (la copia delle 9 non l'ha messo?)${presenti ? ` · DBF presenti: ${presenti}` : ' · nessun DBF nella cartella'}`);
+  }
+  if (mancanti.length) log(`attenzione: ${mancanti.join(', ')} assente in ${DIR}`);
   const [{ abbonamentiDaDbf }, { confronta, applica, IMPORTABILI }] = await Promise.all([modulo('legacydbf.js'), modulo('importlogic.js')]);
 
   const files = ['tessere.dbf', 'anagraf.dbf'].map(fileDbf).filter(Boolean);
@@ -132,4 +152,9 @@ async function main() {
   if (ko) process.exitCode = 1;
 }
 
-main().catch((e) => { log(`✖ Import fallito: ${e.message || e}`); process.exitCode = 1; });
+main().catch(async (e) => {
+  const m = e.message || String(e);
+  log(`✖ Import fallito: ${m}`);
+  process.exitCode = 1;
+  await registraErrore(m);
+});

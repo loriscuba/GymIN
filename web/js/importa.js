@@ -244,6 +244,7 @@ async function caricaRegistro() {
 }
 const AZIONI = {
   nuovo: ['Nuovo', 'g'], aggiornato: ['Aggiornato', 'w'], socio_importato: ['Socio importato', 'g'], socio_collegato: ['Socio collegato', 'n'],
+  errore: ['Errore', 'b'],
 };
 const regFiltro = (r) => !reg.azione || (reg.azione === 'socio' ? r.azione.startsWith('socio') : r.azione === reg.azione);
 function dettaglioReg(r) {
@@ -256,6 +257,7 @@ function dettaglioReg(r) {
   }
   if (r.azione === 'socio_importato') return 'Creato con i dati del vecchio gestionale';
   if (r.azione === 'socio_collegato') return 'Codice cliente assegnato al socio già presente';
+  if (r.azione === 'errore') return `Import automatico non eseguito: ${esc(r.dopo?.messaggio || '')}`;
   return '';
 }
 function renderRegistro() {
