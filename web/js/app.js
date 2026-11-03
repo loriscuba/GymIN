@@ -281,6 +281,9 @@ function openSettingsModal() {
   populateSettingsForm();
   $('#s-sezioni-box').hidden = !isAdmin;
   $('#s-licenza-box').hidden = !isAdmin;
+  $('#s-report-box').hidden = !isAdmin;
+  $('#s-report-ora').required = isAdmin;
+  $('#s-report-ora').value = reportOra;
   $('#s-licenza').value = isoToLocalInput(licenzaScadenza);
   $('#s-sezioni').innerHTML = SEZIONI.map(([k, t]) => `<label style="display:flex;align-items:center;gap:8px;font-size:13.5px;cursor:pointer">
     <input type="checkbox" data-sez="${k}" ${sezioniNascoste.includes(k) ? '' : 'checked'}> ${t}</label>`).join('');
@@ -297,6 +300,7 @@ async function saveSettingsFromModal(e) {
   saveSettingsToStorage(form);
   if (isAdmin && !(await salvaSezioni())) return;
   if (isAdmin && !(await salvaLicenza())) return;
+  if (isAdmin && !(await salvaReportOra())) return;
   closeModal('modal-settings');
   applyContattiRule();
   toast(isAdmin ? 'Impostazioni salvate' : 'Impostazioni salvate nel browser', 'mail');
@@ -1339,7 +1343,7 @@ const titles = {
   dashboard: ['Dashboard', 'Panoramica attività'], anagrafiche: ['Anagrafiche soci', 'Gestione iscritti e tesseramenti'],
   abbonamenti: ['Abbonamenti', 'Listino piani e incasso ricorrente'],
   posta: ['Posta', 'Comunicazioni automatiche agli iscritti'],
-  pagamenti: ['Pagamenti', 'Riepilogo incassi'], log: ['Log attività', 'Tutte le modifiche al database, con utente e dettagli'],
+  pagamenti: ['Pagamenti', 'Riepilogo incassi'], report: ['Report', 'Riepilogo serale delle modifiche'], log: ['Log attività', 'Tutte le modifiche al database, con utente e dettagli'],
   importa: ['Import abbonamenti', 'Dal vecchio gestionale: solo abbonamenti, le anagrafiche non vengono toccate'],
   tessere: ['Tessere', 'Tessere RFID, terminale ingresso e storico accessi'],
 };
@@ -1354,6 +1358,7 @@ function go(view) {
   $('#sidebar').classList.remove('open'); $('#scrim').classList.remove('show');
   window.scrollTo(0, 0);
   if (view === 'pagamenti') loadPayments();
+  if (view === 'report') loadReport();
   if (view === 'log') { logCache = null; loadLog(); }   // ogni apertura rilegge il log aggiornato
   if (view === 'importa') renderImporta();
   // sezione Tessere: la pagina di gestione di accessi/ incorporata (caricata alla prima apertura)
@@ -1612,6 +1617,7 @@ function wireEvents() {
   $('#logtab').addEventListener('change', (e) => { logState.tab = e.target.value; loadLog(); });
   $('#logarch').addEventListener('click', (e) => { const c = e.target.closest('[data-a]'); if (!c) return; logState.arch = c.dataset.a === '1'; document.querySelectorAll('#logarch .chip').forEach((x) => x.classList.toggle('active', x === c)); loadLog(); });
   $('#btn-log-arch').addEventListener('click', toggleLogArchive);
+  $('#btn-report-ora').addEventListener('click', aggiornaReportOggi);
   let logTimer;
   $('#logsearch').addEventListener('input', (e) => { clearTimeout(logTimer); logTimer = setTimeout(() => { logState.query = e.target.value; renderLog(); }, 150); });
   $('#pagamentoform').addEventListener('submit', submitPagamento);
@@ -1807,6 +1813,54 @@ async function deletePlan(id) {
   }
 }
 
+// ---------- report serale (solo amministratore) ----------
+// Lo genera pg_cron all'orario scelto in Impostazioni (migrations report_serale, report_orario); qui si leggono e si segnano come letti.
+const repMsg = (html, color = 'var(--ink-3)') => `<tr><td colspan="6" style="text-align:center;color:${color};padding:28px">${html}</td></tr>`;
+async function contaReportNonLetti() {
+  const supa = await getSupa();
+  const { count, error } = await supa.from('report_serali').select('giorno', { count: 'exact', head: true }).is('letto_il', null);
+  $('#c-report').hidden = error || !count;   // tabella assente: niente badge
+  $('#c-report').textContent = count || '';
+}
+async function loadReport() {
+  $('#reptable tbody').innerHTML = repMsg('Caricamento…');
+  try {
+    const supa = await getSupa();
+    const { data, error } = await supa.from('report_serali').select('giorno,riepilogo,letto_il,email_inviata_il').order('giorno', { ascending: false }).limit(60);
+    if (error) throw error;
+    $('#repcount').textContent = `${data.length} report`;
+    $('#reptable tbody').innerHTML = data.length ? data.map(renderReportRow).join('') : repMsg(`Ancora nessun report: il primo arriva alle ${reportOra}.`);
+    if (data.some((r) => !r.letto_il)) { await supa.rpc('segna_report_letti'); contaReportNonLetti(); }
+  } catch (err) {
+    console.error(errMsg(err));
+    const msg = /report_serali/.test(errMsg(err)) ? 'Report non ancora attivi: esegui la migration "report_serale".' : `Errore caricamento report: ${esc(errMsg(err))}`;
+    $('#reptable tbody').innerHTML = repMsg(msg, 'var(--bad)');
+  }
+}
+function renderReportRow(r) {
+  const x = r.riepilogo || {};
+  const giorno = new Date(r.giorno + 'T12:00:00').toLocaleDateString('it-IT', { weekday: 'short', day: 'numeric', month: 'short' });
+  const abb = (x.elenco_abbonamenti || []).map((a) => `<div>${esc(a.socio || '—')} · ${esc(a.piano || '—')}</div>`).join('');
+  const pag = (x.elenco_pagamenti || []).map((p) => `<div>${esc(p.socio || '—')} · ${euro(Number(p.importo))} · ${esc(p.metodo || '')}</div>`).join('');
+  const altro = [x.soci_modificati && `${x.soci_modificati} soci modificati`, x.abbonamenti_modificati && `${x.abbonamenti_modificati} abbonamenti modificati`,
+    x.ingressi && `${x.ingressi} ingressi`, x.eliminazioni && `${x.eliminazioni} eliminazioni`].filter(Boolean).join(' · ');
+  return `<tr${r.letto_il ? '' : ' style="font-weight:600"'}><td>${esc(giorno)}${r.email_inviata_il ? ' <span class="tag b" title="Inviato per email">email</span>' : ''}</td>
+    <td>${x.nuovi_soci ?? 0}</td><td>${x.nuovi_abbonamenti ?? 0}</td><td>${x.pagamenti ?? 0} · ${euro(x.incassato || 0)}</td><td>${x.totale_modifiche ?? 0}</td>
+    <td style="font-size:12.5px">${abb}${pag}${altro ? `<div style="color:var(--ink-3)">${esc(altro)}</div>` : ''}</td></tr>`;
+}
+async function aggiornaReportOggi() {
+  try {
+    const supa = await getSupa();
+    const { error } = await supa.rpc('genera_report_serale');
+    if (error) throw error;
+    toast('Report di oggi aggiornato');
+    loadReport();
+  } catch (err) {
+    console.error(errMsg(err));
+    toast('Errore aggiornamento report: ' + errMsg(err), 'warn');
+  }
+}
+
 // il Log attività è visibile solo all'amministratore (la stessa regola è applicata dal database)
 const LOG_ADMIN = 'loriscuba@gmail.com';
 
@@ -1838,6 +1892,24 @@ async function salvaSezioni() {
   if (error) { toast(`Sezioni visibili non salvate: ${error.message}`, 'warn'); return false; }
   sezioniNascoste = nascoste;
   applicaSezioni();
+  return true;
+}
+// ---------- orario del report serale ----------
+// app_impostazioni, chiave report_ora: lo legge report_serale_cron (migration report_orario).
+let reportOra = '20:00';
+async function caricaReportOra() {
+  const supa = await getSupa();
+  const { data, error } = await supa.from('app_impostazioni').select('valore').eq('chiave', 'report_ora').maybeSingle();
+  if (!error && /^\d{2}:\d{2}$/.test(data?.valore?.ora || '')) reportOra = data.valore.ora;
+}
+async function salvaReportOra() {
+  const ora = $('#s-report-ora').value.slice(0, 5);
+  if (ora === reportOra) return true;
+  const supa = await getSupa();
+  const { error } = await supa.from('app_impostazioni')
+    .upsert({ chiave: 'report_ora', valore: { ora }, aggiornato_il: new Date().toISOString() });
+  if (error) { toast(`Orario del report non salvato: ${error.message}`, 'warn'); return false; }
+  reportOra = ora;
   return true;
 }
 // ---------- scadenza licenza ----------
@@ -1899,6 +1971,8 @@ async function setupUser() {
   isAdmin = admin;
   utenteEmail = email;
   $('.nav[data-view="log"]').hidden = !admin;
+  $('.nav[data-view="report"]').hidden = !admin;
+  if (admin) { contaReportNonLetti(); caricaReportOra().catch(() => {}); }
   $('#u-name').textContent = admin ? 'Admin' : (email.split('@')[0] || 'Utente');
   $('#u-role').textContent = admin ? 'Amministratore' : 'Staff';
   $('#u-avatar').textContent = admin ? 'AD' : (email.slice(0, 2).toUpperCase() || '—');
