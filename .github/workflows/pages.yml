@@ -119,3 +119,19 @@ jobs:
           path: prod/web
       - id: deployment
         uses: actions/deploy-pages@v4
+
+      # Copia dello stesso sito su Cloudflare Pages (progetto "gymin").
+      # Si attiva solo se sono impostati i secret CLOUDFLARE_API_TOKEN e CLOUDFLARE_ACCOUNT_ID.
+      - name: Verifica secret Cloudflare
+        id: cf
+        env:
+          CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          if [ -n "$CF_TOKEN" ]; then echo "enabled=true" >> "$GITHUB_OUTPUT"; else echo "Secret Cloudflare assenti: salto Cloudflare Pages."; fi
+      - name: Deploy su Cloudflare Pages
+        if: steps.cf.outputs.enabled == 'true'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy prod/web --project-name=gymin --branch=main --commit-dirty=true
