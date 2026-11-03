@@ -2,10 +2,15 @@
 
 ## Da fare
 
-- [ ] **Testare il ripristino del backup DB**
-  - Scaricare un backup da GitHub → Actions → "Backup notturno database"
-  - Ripristinarlo su un progetto Supabase di test (istruzioni in testa a `.github/workflows/backup-db.yml`)
-  - Annotare qui data ed esito
+- [x] **Testare il ripristino del backup DB** — fatto il 18/10/2026, esito **OK**
+  - Backup provato: `gymin_2026-10-18.dump.gpg` (run 39106913971, 644 KB)
+  - Ripristinato con il workflow "Prova ripristino backup" in un Postgres 17 usa e getta
+    ([run 39130631790](https://github.com/loriscuba/GymIN/actions/runs/39130631790)): decifratura ok,
+    `pg_restore` senza errori, 15 tabelle, 18 policy RLS, utenti staff presenti,
+    numero di righe identico a produzione in tutte le 15 tabelle
+  - Non si ripristina nello schema `test`: è nello stesso progetto di produzione e il dump
+    (con `--clean`) riscriverebbe `public` e `auth`
+  - Per ripeterlo: Actions → "Prova ripristino backup" → Run workflow
 - [ ] **Configurare Bitwarden**
   - Creare l'account e salvare la `BACKUP_PASSPHRASE` (e le altre credenziali del progetto)
   - Conservare anche una copia cartacea della passphrase in un luogo sicuro

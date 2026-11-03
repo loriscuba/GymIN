@@ -1,0 +1,94 @@
+name: Prova ripristino backup
+
+# Prende l'ultimo backup notturno riuscito ("Backup notturno database"), lo decifra e lo
+# ripristina in un Postgres 17 usa e getta dentro il runner: produzione non viene mai toccata
+# (viene solo LETTA per confrontare il numero di righe, se il secret SUPABASE_DB_URL c'è).
+# Il job fallisce se il ripristino dà errori o se le tabelle restano vuote.
+# Nei log compaiono solo nomi di tabelle e differenze di conteggio, mai dati dei soci.
+#
+# Secret usati: BACKUP_PASSPHRASE (obbligatorio), SUPABASE_DB_URL (solo per il confronto).
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: 'ID del run di backup da provare (vuoto = ultimo riuscito)'
+        required: false
+  pull_request:
+    paths: ['.github/workflows/restore-test.yml']
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  ripristino:
+    runs-on: ubuntu-latest
+    services:
+      pg:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: prova
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 2s --health-timeout 5s --health-retries 15
+    env:
+      DST: postgresql://postgres:prova@localhost:5432/postgres
+    steps:
+      - name: Scarica il backup
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ inputs.run_id }}
+        run: |
+          if [ -z "$RUN_ID" ]; then
+            RUN_ID=$(gh run list -R "$GITHUB_REPOSITORY" --workflow backup-db.yml --status success -L 1 --json databaseId -q '.[0].databaseId')
+          fi
+          test -n "$RUN_ID" || { echo "Nessun backup riuscito trovato"; exit 1; }
+          gh run download "$RUN_ID" -R "$GITHUB_REPOSITORY" -D bk
+          FILE=$(find bk -name '*.dump.gpg' | head -1)
+          test -n "$FILE" || { echo "Artifact senza file .dump.gpg"; exit 1; }
+          echo "FILE=$FILE" >> "$GITHUB_ENV"
+          echo "Backup: run $RUN_ID, $(basename "$FILE"), $(du -h "$FILE" | cut -f1)" | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Decifra
+        env:
+          PASS: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          test -n "$PASS" || { echo "Secret BACKUP_PASSPHRASE mancante"; exit 1; }
+          gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 -d -o backup.dump "$FILE" <<< "$PASS"
+          rm "$FILE"
+
+      - name: Ripristina nel Postgres usa e getta
+        run: |
+          # ruoli che Supabase crea da sé: servono alle policy RLS contenute nel dump
+          docker run --rm --network host postgres:17 psql "$DST" -v ON_ERROR_STOP=1 -qc \
+            "create role anon nologin; create role authenticated nologin; create role service_role nologin bypassrls;"
+          docker run --rm --network host -v "$PWD:/w" postgres:17 \
+            pg_restore --clean --if-exists --no-owner --exit-on-error -d "$DST" /w/backup.dump
+          rm backup.dump
+
+      - name: Verifica
+        env:
+          PROD: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          CONTA="select table_name || ' ' || (xpath('/row/c/text()', query_to_xml(format('select count(*) as c from public.%I', table_name), false, true, '')))[1]::text
+                 from information_schema.tables where table_schema = 'public' and table_type = 'BASE TABLE' order by 1"
+          q() { docker run --rm --network host postgres:17 psql "$1" -Atc "$2"; }
+          q "$DST" "$CONTA" > ripristinato.txt
+          TABELLE=$(wc -l < ripristinato.txt)
+          RIGHE=$(awk '{s+=$2} END {print s+0}' ripristinato.txt)
+          POLICY=$(q "$DST" "select count(*) from pg_policies where schemaname = 'public'")
+          UTENTI=$(q "$DST" "select count(*) from auth.users")
+          {
+            echo "Ripristino riuscito: $TABELLE tabelle, $POLICY policy RLS, utenti staff presenti: $([ "$UTENTI" -gt 0 ] && echo sì || echo NO)"
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+          [ "$TABELLE" -gt 0 ] && [ "$RIGHE" -gt 0 ] || { echo "Tabelle assenti o vuote"; exit 1; }
+
+          PROD=$(printf '%s' "$PROD" | tr -d '\r\n' | sed -E "s/^[[:space:]\"']+//; s/[[:space:]\"']+$//")
+          if [ -z "$PROD" ]; then echo "SUPABASE_DB_URL assente: confronto con produzione saltato"; exit 0; fi
+          q "$PROD" "$CONTA" > produzione.txt
+          echo "Confronto con produzione (normale qualche differenza nelle tabelle cambiate dopo il backup):" | tee -a "$GITHUB_STEP_SUMMARY"
+          join -a1 -a2 -e '-' -o 0,1.2,2.2 ripristinato.txt produzione.txt | while read -r t b p; do
+            if [ "$b" = "$p" ]; then echo "- $t: uguale"
+            elif [ "$b" = - ] || [ "$p" = - ]; then echo "- $t: presente solo in $([ "$b" = - ] && echo produzione || echo backup)"
+            else echo "- $t: $((p - b)) righe in più in produzione"; fi
+          done | tee -a "$GITHUB_STEP_SUMMARY"
