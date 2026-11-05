@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { urlApertura, configPorta, creaApriporta } from '../app/js/porta.js';
+import { urlApertura, urlStato, configPorta, creaApriporta } from '../app/js/porta.js';
 import { creaShellyFinto } from '../scripts/shelly-finto.mjs';
 
 test('porta: URL Gen2 (RPC Switch.Set con impulso) e Gen1 (/relay)', () => {
@@ -121,4 +121,22 @@ test('risposta opaca (Shelly vero senza header CORS): il comando conta come rius
   const e = await creaApriporta(cfg, { fetch: async (_u, o) => { opzioni = o; return { type: 'opaque', ok: false, status: 0 }; } }).apri();
   assert.equal(e.ok, true);
   assert.equal(opzioni.mode, 'no-cors');
+});
+
+test('porta: verifica dello stato non apre il tornello e segnala Shelly irraggiungibile', async () => {
+  assert.equal(urlStato({ url: 'http://192.168.1.50/' }), 'http://192.168.1.50/rpc/Shelly.GetStatus');
+  assert.equal(urlStato({ url: 'http://10.0.0.2', gen: 1 }), 'http://10.0.0.2/status');
+  const chiamate = [];
+  const ok = creaApriporta(configPorta({}, { shellyUrl: 'http://192.168.1.50' }), {
+    fetch: async (u) => { chiamate.push(u); return { type: 'opaque' }; },
+  });
+  assert.equal((await ok.verifica()).ok, true);
+  assert.deepEqual(chiamate, ['http://192.168.1.50/rpc/Shelly.GetStatus']);
+  const ko = creaApriporta(configPorta({}, { shellyUrl: 'http://192.168.1.99' }), {
+    fetch: async () => { throw new TypeError('Failed to fetch'); },
+  });
+  const r = await ko.verifica();
+  assert.equal(r.ok, false);
+  assert.equal(r.codice, 'irraggiungibile');
+  assert.equal(await creaApriporta(configPorta({}, {})).verifica(), null);
 });

@@ -73,6 +73,8 @@ export function creaSorgenteRemota({ url, anonKey, schema = '', token, timeoutMs
     sync: (eventi) => rpc('terminale_sync', { p_token: token, p_eventi: eventi }, Math.max(timeoutMs, 20000)),
     stato: (stato) => rpc('terminale_stato', { p_token: token, p_stato: stato }, Math.max(timeoutMs, 5000)),
     /** Errore del terminale (es. porta non aperta) per Gestione accessi → Errori. */
+    tornello: ({ ok, errore = null }) =>
+      rpc('terminale_tornello', { p_token: token, p_ok: !!ok, p_errore: errore }, Math.max(timeoutMs, 5000)),
     errore: ({ tipo = 'porta', codice, messaggio, dettaglio = null, ts }) =>
       rpc('terminale_errore', { p_token: token, p_tipo: tipo, p_codice: codice, p_messaggio: messaggio, p_dettaglio: dettaglio, p_ts_terminale: ts }, Math.max(timeoutMs, 5000)),
   };

@@ -26,6 +26,13 @@ export function urlApertura({ url, gen = 2, canale = 0, impulsoS = IMPULSO_S }) 
     : `${base}/rpc/Switch.Set?id=${c}&on=true&toggle_after=${s}`;
 }
 
+/** URL di sola lettura dello stato (non muove il relè): serve a sapere se lo Shelly risponde. */
+export function urlStato({ url, gen = 2 }) {
+  const base = String(url || '').trim().replace(/\/+$/, '');
+  if (!/^https?:\/\//i.test(base)) throw new Error(`Indirizzo Shelly non valido: "${url}"`);
+  return Number(gen) === 1 ? `${base}/status` : `${base}/rpc/Shelly.GetStatus`;
+}
+
 /**
  * Configurazione effettiva: l'indirizzo salvato sul PC (override) vince su quello del build.
  * @param {object} cfg  window.ACCESSI_CONFIG
@@ -58,13 +65,18 @@ export function creaApriporta(cfg, { fetch: f = globalThis.fetch?.bind(globalThi
   let ultimo = null;
 
   async function esegui() {
-    const t0 = ora();
     if (tipo === 'sim') return { ok: true, tipo, ms: 0, simulato: true };
     if (tipo !== 'shelly') return { ok: false, tipo, ms: 0, saltato: true };
+    return chiama(() => urlApertura(cfg));
+  }
+
+  // GET verso lo Shelly con timeout; non lancia mai e classifica l'errore (codice + messaggio leggibile)
+  async function chiama(creaUrl) {
+    const t0 = ora();
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), cfg.timeoutMs || TIMEOUT_MS);
     try {
-      const r = await f(urlApertura(cfg), {
+      const r = await f(creaUrl(), {
         method: 'GET',
         mode: 'no-cors',
         signal: ctrl.signal,
@@ -95,6 +107,11 @@ export function creaApriporta(cfg, { fetch: f = globalThis.fetch?.bind(globalThi
     url: cfg?.url || '',
     attivo: tipo === 'sim' || tipo === 'shelly',
     get ultimo() { return ultimo; },
+    /** Controlla se lo Shelly risponde (senza aprire). null se non c'è uno Shelly configurato. */
+    verifica() {
+      if (tipo !== 'shelly') return Promise.resolve(null);
+      return chiama(() => urlStato(cfg));
+    },
     /** Apre la porta. Due richieste ravvicinate condividono lo stesso comando (niente doppio impulso). */
     apri() {
       if (inCorso) return inCorso;
