@@ -286,6 +286,9 @@ function openSettingsModal() {
   $('#s-report-ora').value = reportOra;
   $('#s-qr-box').hidden = !isAdmin;
   $('#s-qr-attivo').checked = qrAttivo;
+  $('#s-term-box').hidden = !isAdmin;
+  $('#s-term-shelly').value = termImp.shelly_url || '';
+  $('#s-term-cam').value = termImp.fotocamera || '';
   $('#s-licenza').value = isoToLocalInput(licenzaScadenza);
   $('#s-sezioni').innerHTML = SEZIONI.map(([k, t]) => `<label style="display:flex;align-items:center;gap:8px;font-size:13.5px;cursor:pointer">
     <input type="checkbox" data-sez="${k}" ${sezioniNascoste.includes(k) ? '' : 'checked'}> ${t}</label>`).join('');
@@ -304,6 +307,7 @@ async function saveSettingsFromModal(e) {
   if (isAdmin && !(await salvaLicenza())) return;
   if (isAdmin && !(await salvaReportOra())) return;
   if (isAdmin && !(await salvaQrAttivo())) return;
+  if (isAdmin && !(await salvaTerminale())) return;
   closeModal('modal-settings');
   applyContattiRule();
   toast(isAdmin ? 'Impostazioni salvate' : 'Impostazioni salvate nel browser', 'mail');
@@ -1961,6 +1965,27 @@ async function salvaQrAttivo() {
   qrAttivo = attivo;
   return true;
 }
+// ---------- terminale d'ingresso: Shelly e fotocamera ----------
+// app_impostazioni, chiave terminale_ingresso: la legge terminale_ping (migration terminale_impostazioni).
+let termImp = { shelly_url: '', fotocamera: '' };
+async function caricaTerminale() {
+  const supa = await getSupa();
+  const { data, error } = await supa.from('app_impostazioni').select('valore').eq('chiave', 'terminale_ingresso').maybeSingle();
+  if (!error && data?.valore) termImp = { shelly_url: data.valore.shelly_url || '', fotocamera: data.valore.fotocamera || '' };
+}
+async function salvaTerminale() {
+  const valore = { shelly_url: $('#s-term-shelly').value.trim().replace(/\/+$/, ''), fotocamera: $('#s-term-cam').value };
+  if (valore.shelly_url && valore.shelly_url !== 'off' && !/^https?:\/\/.+/i.test(valore.shelly_url)) {
+    toast('Indirizzo Shelly non valido: scrivi ad esempio http://192.168.1.50', 'warn'); return false;
+  }
+  if (valore.shelly_url === termImp.shelly_url && valore.fotocamera === termImp.fotocamera) return true;
+  const supa = await getSupa();
+  const { error } = await supa.from('app_impostazioni')
+    .upsert({ chiave: 'terminale_ingresso', valore, aggiornato_il: new Date().toISOString() });
+  if (error) { toast(`Impostazioni del terminale non salvate: ${error.message}`, 'warn'); return false; }
+  termImp = valore;
+  return true;
+}
 // ---------- scadenza licenza ----------
 // L'amministratore imposta data/ora da Impostazioni (app_impostazioni, chiave licenza);
 // il blocco vero e proprio è in licenza.js e vale solo per l'utente indicato lì.
@@ -2021,7 +2046,7 @@ async function setupUser() {
   utenteEmail = email;
   $('.nav[data-view="log"]').hidden = !admin;
   $('.nav[data-view="report"]').hidden = !admin;
-  if (admin) { contaReportNonLetti(); caricaReportOra().catch(() => {}); }
+  if (admin) { contaReportNonLetti(); caricaReportOra().catch(() => {}); caricaTerminale().catch(() => {}); }
   caricaQrAttivo().catch(() => {});
   $('#u-name').textContent = admin ? 'Admin' : (email.split('@')[0] || 'Utente');
   $('#u-role').textContent = admin ? 'Amministratore' : 'Staff';
