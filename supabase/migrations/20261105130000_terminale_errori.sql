@@ -10,19 +10,20 @@ declare
   v    uuid := terminale_autentica(p_token);
   nome text := (select t.nome from terminali t where t.id = v);
 begin
-  insert into audit_log(utente, tabella, operazione, record_id, dopo, azione, origine)
+  -- solo colonne base di audit_log (in produzione azione/origine non esistono)
+  insert into audit_log(utente, tabella, operazione, record_id, dopo)
   values (
     'Terminale ' || coalesce(nome, '?'),
     'errori',
     'ERRORE',
     v::text,
-    coalesce(p_dettaglio, '{}'::jsonb) || jsonb_build_object(
+    jsonb_build_object(
+      'motivo', left(coalesce(p_messaggio, ''), 500),
+      'codice', left(coalesce(nullif(p_codice, ''), 'altro'), 30),
+      'shelly', p_dettaglio->>'shelly',
+      'ms', p_dettaglio->'ms',
       'terminale', nome,
-      'tipo', left(coalesce(nullif(p_tipo, ''), 'porta'), 30),
-      'problema', left(coalesce(nullif(p_codice, ''), 'altro'), 30),
-      'ora_terminale', p_ts_terminale),
-    left(coalesce(p_messaggio, ''), 500),
-    'Terminale d''ingresso'
+      'ora_terminale', p_ts_terminale)
   );
 end $$;
 revoke execute on function terminale_errore(text, text, text, text, jsonb, timestamptz) from public;
