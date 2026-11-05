@@ -493,6 +493,13 @@
         <label style="display:flex;align-items:center;gap:8px;font-size:13.5px;cursor:pointer"><input type="checkbox" id="s-qr-attivo"> Attivo all'ingresso</label>
         <div class="fhint"><span class="k">Spento: i terminali spengono la fotocamera, i QR già inviati non aprono la porta e non si possono inviare nuovi QR. Le tessere restano attive.</span></div>
       </fieldset>
+      <fieldset id="s-term-box" hidden style="border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin:14px 0 0">
+        <legend style="font-size:13px;font-weight:600;padding:0 6px">Terminale d'ingresso</legend>
+        <div class="field"><label for="s-term-shelly">Indirizzo Shelly (tornello)</label><input id="s-term-shelly" type="text" placeholder="http://192.168.1.50" autocomplete="off"></div>
+        <div class="field" style="margin-top:8px"><label for="s-term-cam">Fotocamera per i QR</label>
+          <select id="s-term-cam"><option value="">Come configurata sul terminale</option><option value="si">Accesa (frontale)</option><option value="retro">Accesa (posteriore, tablet)</option><option value="off">Spenta</option></select></div>
+        <div class="fhint"><span class="k">Il terminale le legge da solo entro un minuto. Indirizzo vuoto = resta quello già salvato sul terminale; scrivi off per togliere lo Shelly.</span></div>
+      </fieldset>
       <div class="fhint" style="margin-top:8px"><span class="k">Supabase URL e anon key sono già configurate in config.js: qui puoi gestire posta e recapiti obbligatori.</span></div>
       <div class="mfoot" style="padding:16px 0 0;border-top:0;justify-content:flex-end;gap:8px">
         <button type="button" class="btn-ghost" id="settings-reset">Ripristina default</button>

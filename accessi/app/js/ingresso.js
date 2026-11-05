@@ -360,11 +360,24 @@ function aggiornaDaPing() {
     nomeTerminale = p.nome;
     store.set(CHIAVE_NOME, p.nome);
     aggiornaStato();
-    if (typeof p.qr_attivo !== 'boolean') return;
-    const prima = store.get(CHIAVE_QR_ATTIVO) !== 'off';
-    store.set(CHIAVE_QR_ATTIVO, p.qr_attivo ? 'si' : 'off');
-    // cambiato da GymIN: la fotocamera si accende o spegne ricaricando appena il terminale è libero
-    if (prima !== p.qr_attivo) {
+    let cambiato = false;
+    if (typeof p.qr_attivo === 'boolean') {
+      const prima = store.get(CHIAVE_QR_ATTIVO) !== 'off';
+      store.set(CHIAVE_QR_ATTIVO, p.qr_attivo ? 'si' : 'off');
+      cambiato ||= prima !== p.qr_attivo;
+    }
+    // Shelly e fotocamera decisi in GymIN (Impostazioni): vincono su ?shelly= e ?fotocamera= quando sono impostati
+    if (typeof p.shelly_url === 'string' && p.shelly_url.trim()) {
+      const v = p.shelly_url.trim() === 'off' ? null : p.shelly_url.trim();
+      cambiato ||= store.get(CHIAVE_SHELLY) !== v;
+      store.set(CHIAVE_SHELLY, v);
+    }
+    if (['si', 'retro', 'off'].includes(p.fotocamera)) {
+      cambiato ||= store.get(CHIAVE_FOTOCAMERA) !== p.fotocamera;
+      store.set(CHIAVE_FOTOCAMERA, p.fotocamera);
+    }
+    // cambiato da GymIN: si ricarica appena il terminale è libero (fotocamera e Shelly si leggono all'avvio)
+    if (cambiato) {
       ricaricaQuandoLibero = true;
       if (vista === 'attesa' || vista === 'nonsync') location.reload();
     }
