@@ -93,6 +93,47 @@ let ricaricaQuandoLibero = false;
 const filtroDoppie = creaFiltroDoppie();
 
 // ---------------------------------------------------------------------------
+// controllo costante del tornello (Shelly): pallino nella barra + avviso "Tornello offline"
+// Lo stato va anche a GymIN (terminale_tornello) per l'avviso nel gestionale.
+// ---------------------------------------------------------------------------
+const CONTROLLO_TORNELLO_MS = CFG.TORNELLO_CONTROLLO_MS || 30000;
+const INVIO_TORNELLO_MS = 120000;     // anche senza cambi, GymIN capisce che il terminale è vivo
+const CHIAVE_TORNELLO_NASCOSTO = `gymin.accessi.tornelloNascosto.${SPAZIO}`;
+let tornello = null;                  // { ok, errore }
+let tornelloInviato = { ok: null, quando: 0 };
+
+async function controllaTornello() {
+  const r = await porta.verifica();
+  if (!r) return;
+  tornello = { ok: r.ok, errore: r.ok ? null : r.errore };
+  // tornato raggiungibile: il prossimo guasto mostra di nuovo l'avviso
+  if (r.ok) store.set(CHIAVE_TORNELLO_NASCOSTO, null);
+  aggiornaStato();
+  mostraAvvisoTornello();
+  const ora = Date.now();
+  if (data?.remoto?.tornello && !data.offlineAttivo?.()
+      && (tornelloInviato.ok !== r.ok || ora - tornelloInviato.quando > INVIO_TORNELLO_MS)) {
+    data.remoto.tornello(tornello).then(() => { tornelloInviato = { ok: r.ok, quando: ora }; }).catch(() => {});
+  }
+}
+function mostraAvvisoTornello() {
+  const box = $('#avviso-tornello');
+  if (!box) return;
+  const vedi = !!tornello && !tornello.ok && store.get(CHIAVE_TORNELLO_NASCOSTO) !== '1' && vista !== 'setup';
+  box.hidden = !vedi;
+  if (vedi) $('#avviso-tornello-motivo').textContent = tornello.errore || '';
+}
+$('#avviso-tornello-nascondi')?.addEventListener('click', (ev) => {
+  ev.currentTarget.blur();    // il focus resta fuori dall'avviso: il lettore di tessere continua a leggere
+  store.set(CHIAVE_TORNELLO_NASCOSTO, '1');
+  mostraAvvisoTornello();
+});
+if (porta.tipo === 'shelly') {
+  setTimeout(() => controllaTornello().catch(() => {}), 3000);
+  setInterval(() => controllaTornello().catch(() => {}), CONTROLLO_TORNELLO_MS);
+}
+
+// ---------------------------------------------------------------------------
 // PWA: service worker + storage persistente
 // ---------------------------------------------------------------------------
 if ('serviceWorker' in navigator && location.protocol !== 'file:') {
@@ -171,6 +212,7 @@ function aggiornaStato() {
   const dx = [];
   const sfas = sync?.stato.sfasamentoMs || 0;
   if (Math.abs(sfas) > SOGLIA_OROLOGIO_MS) dx.push(`<span class="giallo">Orologio del PC sfasato di ${Math.round(Math.abs(sfas) / 60000)} min</span>`);
+  if (tornello) dx.push(`<span class="punto${tornello.ok ? '' : ' off'}"></span>${tornello.ok ? 'Tornello' : 'Tornello offline'}`);
   if (data && data.online !== null) {
     const n = inCoda();
     dx.push(`<span class="punto${data.online ? '' : ' off'}"></span>${data.online ? (n ? `Online · invio ${accessiDaSync(n)}` : 'Online') : 'Offline'}`);

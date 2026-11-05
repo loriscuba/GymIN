@@ -83,3 +83,10 @@ body.setup-attivo{cursor:auto;user-select:auto}
 .cam video{width:34vh;height:25.5vh;object-fit:cover;border-radius:2vh;border:.5vh solid var(--accent);background:#000}
 .cam.specchio video{transform:scaleX(-1)}
 .cam span{font-weight:700;font-size:2.6vh;color:#fff;opacity:.85}
+
+/* avviso "Tornello offline": il coach lo nasconde una volta, ricompare al prossimo guasto */
+.avviso-tornello{position:fixed;left:50%;bottom:8vh;transform:translateX(-50%);z-index:25;display:flex;flex-direction:column;align-items:center;gap:1vh;max-width:min(90vw,70vh);background:#c0362c;color:#fff;padding:2.2vh 3.4vh;border-radius:2vh;box-shadow:0 1vh 4vh rgba(0,0,0,.35);text-align:center}
+.avviso-tornello[hidden]{display:none}
+.avviso-tornello b{font-size:4vh}
+.avviso-tornello span{font-size:2.2vh;opacity:.9}
+.avviso-tornello .btn{margin-top:.6vh;background:#fff;color:#c0362c;border:0;font-weight:700;font-size:2.4vh;padding:1vh 3vh;border-radius:999px;cursor:pointer}

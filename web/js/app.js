@@ -1915,6 +1915,7 @@ async function caricaSezioni() {
 function applicaSezioni() {
   SEZIONI.forEach(([k]) => { const n = document.querySelector(`.nav[data-view="${k}"]`); if (n) n.hidden = sezioneNascosta(k); });
   $('#panel-ingressi').hidden = sezioneNascosta('ingressi');
+  controllaTornello().catch(() => {});
   const attiva = document.querySelector('.nav.active')?.dataset.view;
   if (attiva && sezioneNascosta(attiva)) go('dashboard');
 }
@@ -2053,6 +2054,40 @@ async function setupUser() {
   $('#u-avatar').textContent = admin ? 'AD' : (email.slice(0, 2).toUpperCase() || '—');
 }
 
+// Stato del tornello (Shelly) riportato dal terminale d'ingresso: pallino nella barra in alto e
+// avviso "Tornello offline" che il coach può nascondere (ricompare al guasto successivo).
+const TORN_CONTROLLO_MS = 30000;
+const TORN_SILENZIO_MS = 5 * 60000;            // terminale muto da 5 minuti: stato del tornello sconosciuto → offline
+const TORN_NASCOSTO = 'gymin.tornelloNascosto';
+const tornStore = {
+  get: () => { try { return localStorage.getItem(TORN_NASCOSTO); } catch { return null; } },
+  set: (v) => { try { v ? localStorage.setItem(TORN_NASCOSTO, v) : localStorage.removeItem(TORN_NASCOSTO); } catch { /* niente storage */ } },
+};
+async function controllaTornello() {
+  // modulo Tessere spento per lo staff (Impostazioni → sezioni visibili): niente pallino né avviso
+  if (sezioneNascosta('tessere')) { $('#torn-stato').hidden = true; $('#torn-avviso').hidden = true; return; }
+  const supa = await getSupa();
+  const { data, error } = await supa.from('terminali').select('nome, tornello_ok, tornello_errore, tornello_controllo')
+    .eq('attivo', true).not('tornello_controllo', 'is', null);
+  if (error) return;                             // colonne non ancora create: nessun indicatore
+  const pill = $('#torn-stato');
+  const box = $('#torn-avviso');
+  if (!data?.length) { pill.hidden = true; box.hidden = true; return; }
+  const guasti = data.map((t) => {
+    const muto = Date.now() - new Date(t.tornello_controllo).getTime() > TORN_SILENZIO_MS;
+    if (muto) return `${t.nome}: App Ingresso spenta o senza rete dalle ${new Date(t.tornello_controllo).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}`;
+    return t.tornello_ok ? null : `${t.nome}: ${t.tornello_errore || 'lo Shelly non risponde'}`;
+  }).filter(Boolean);
+  const ok = !guasti.length;
+  if (ok) tornStore.set(null);                   // tornato online: il prossimo guasto mostra di nuovo l'avviso
+  pill.hidden = false;
+  pill.classList.toggle('off', !ok);
+  pill.querySelector('.torn-lbl').textContent = ok ? 'Tornello' : 'Tornello offline';
+  pill.title = ok ? 'Tornello raggiungibile' : guasti.join('\n');
+  box.hidden = ok || tornStore.get() === '1';
+  $('#torn-avviso-motivo').textContent = guasti.join(' · ');
+}
+
 async function boot() {
   const ok = await ensureAuth();
   if (!ok) return;
@@ -2060,6 +2095,9 @@ async function boot() {
   caricaSezioni().catch((err) => console.error(errMsg(err)));
   caricaLicenza().catch((err) => console.error(errMsg(err)));
   setInterval(() => caricaLicenza().catch(() => {}), 60000);   // nuova scadenza senza ricaricare
+  $('#torn-avviso-nascondi').addEventListener('click', () => { tornStore.set('1'); $('#torn-avviso').hidden = true; });
+  controllaTornello().catch(() => {});
+  setInterval(() => controllaTornello().catch(() => {}), TORN_CONTROLLO_MS);
   caricaContaTessere().catch(() => {});
   caricaContaImport().catch(() => {});
 
