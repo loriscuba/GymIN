@@ -114,3 +114,11 @@ test('integrazione: Shelly spento (porta chiusa) → non raggiungibile', async (
   assert.equal(e.ok, false);
   assert.match(e.errore, /non raggiungibile/);
 });
+
+test('risposta opaca (Shelly vero senza header CORS): il comando conta come riuscito', async () => {
+  const cfg = configPorta({ SHELLY_URL: 'http://192.168.1.50' });
+  let opzioni = null;
+  const e = await creaApriporta(cfg, { fetch: async (_u, o) => { opzioni = o; return { type: 'opaque', ok: false, status: 0 }; } }).apri();
+  assert.equal(e.ok, true);
+  assert.equal(opzioni.mode, 'no-cors');
+});
