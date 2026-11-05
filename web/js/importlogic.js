@@ -1,10 +1,13 @@
 // Regole dell'import abbonamenti, condivise da web/js/importa.js (cruscotto nel browser)
 // e tools/import-legacy/auto-import.mjs (import automatico pianificato): stesso confronto,
-// stesse scritture. Scrive solo su abbonamenti e su soci.aggiornato_da_import.
+// stesse scritture. Scrive su abbonamenti, su soci.aggiornato_da_import e, per gli abbonamenti
+// nuovi e recenti, un pagamento "da verificare" col prezzo di listino del piano.
 export const IMPORTABILI = new Set(['nuovo', 'diverso']);
 // data_scadenza dei carnet importati senza scadenza (data_scadenza è obbligatoria)
 export const SENZA_SCADENZA = '2999-12-31';
 const CHUNK = 500;
+// pagamento da verificare solo per gli abbonamenti nuovi iniziati negli ultimi N giorni (niente storico)
+export const GIORNI_PAGAMENTO = 30;
 
 const nz = (v) => (v && v.trim() !== '' ? v.trim() : null);
 const dz = (v) => { const s = nz(v); return s && s >= '1900-01-01' && s < '2900-01-01' ? s : null; };
@@ -85,11 +88,13 @@ export async function applica(supa, scelte, onProgress = () => {}) {
   const errori = [];
   const toccati = new Set();
   const fatti = [];
+  const inseriti = [];
   for (let k = 0; k < nuovi.length; k += CHUNK) {
     const part = nuovi.slice(k, k + CHUNK);
-    const { error } = await supa.from('abbonamenti').insert(part.map((r) => r.nuovo));
-    if (error) { ko += part.length; errori.push(error.message); } else { ok += part.length; part.forEach((r) => { toccati.add(r.nuovo.socio_id); fatti.push(r); }); }
+    const { data, error } = await supa.from('abbonamenti').insert(part.map((r) => r.nuovo)).select('id,socio_id,piano_id,data_inizio');
+    if (error) { ko += part.length; errori.push(error.message); } else { ok += part.length; inseriti.push(...data); part.forEach((r) => { toccati.add(r.nuovo.socio_id); fatti.push(r); }); }
   }
+  const pagamenti = await pagamentiDaVerificare(supa, inseriti, errori);
   for (const r of agg) {
     onProgress(ok + ko + 1, scelte.length);
     const { error } = await supa.from('abbonamenti').update(r.diff).eq('id', r.ex.id);
@@ -104,7 +109,27 @@ export async function applica(supa, scelte, onProgress = () => {}) {
     ? { azione: 'nuovo', socio_id: r.nuovo.socio_id, cod_cli: r.cod, socio: r.socio, piano: r.piano, dopo: r.nuovo }
     : { azione: 'aggiornato', socio_id: r.ex.socio_id, cod_cli: r.cod, socio: r.socio, piano: r.piano,
       prima: Object.fromEntries(Object.keys(r.diff).map((k) => [k, r.ex[k] ?? null])), dopo: r.diff })));
-  return { ok, ko, errori };
+  return { ok, ko, errori, pagamenti };
+}
+
+// un pagamento "da verificare" per ogni abbonamento appena inserito e recente, al prezzo del piano
+// (piani a prezzo 0 saltati); lo staff poi corregge importo/metodo (es. sconto) dalla modifica pagamento
+async function pagamentiDaVerificare(supa, abb, errori) {
+  const d = new Date(); d.setDate(d.getDate() - GIORNI_PAGAMENTO);
+  const recenti = abb.filter((a) => a.data_inizio >= d.toISOString().slice(0, 10));
+  if (!recenti.length) return 0;
+  const { data: piani, error } = await supa.from('piani').select('id,prezzo').in('id', [...new Set(recenti.map((a) => a.piano_id))]);
+  if (error) { errori.push(`pagamenti non creati: ${error.message}`); return 0; }
+  const prezzo = new Map(piani.map((p) => [p.id, Number(p.prezzo)]));
+  const righe = recenti.filter((a) => prezzo.get(a.piano_id) > 0).map((a) => ({
+    abbonamento_id: a.id, socio_id: a.socio_id, importo: prezzo.get(a.piano_id),
+    data: new Date(a.data_inizio + 'T12:00:00').toISOString(), da_verificare: true }));
+  let n = 0;
+  for (let k = 0; k < righe.length; k += CHUNK) {
+    const { error: e } = await supa.from('pagamenti').insert(righe.slice(k, k + CHUNK));
+    if (e) errori.push(`pagamenti non creati: ${e.message}`); else n += righe.slice(k, k + CHUNK).length;
+  }
+  return n;
 }
 
 // registro delle importazioni (tabella import_log): righe di uno stesso giro con lo stesso import_id.
