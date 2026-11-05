@@ -74,11 +74,17 @@ export function creaApriporta(cfg, { fetch: f = globalThis.fetch?.bind(globalThi
       });
       // risposta opaca: lo Shelly ha risposto ma il browser non ne mostra il contenuto → comando arrivato
       if (r?.type === 'opaque') return { ok: true, tipo, ms: ora() - t0 };
-      if (!r.ok) return { ok: false, tipo, ms: ora() - t0, errore: `Shelly ha risposto HTTP ${r.status}` };
+      if (!r.ok) return { ok: false, tipo, ms: ora() - t0, codice: 'http', errore: `Lo Shelly ha risposto con un errore (HTTP ${r.status})` };
       return { ok: true, tipo, ms: ora() - t0 };
     } catch (e) {
-      const errore = ctrl.signal.aborted ? `Shelly non risponde entro ${cfg.timeoutMs || TIMEOUT_MS} ms` : `Shelly non raggiungibile (${e.message})`;
-      return { ok: false, tipo, ms: ora() - t0, errore };
+      const ms = cfg.timeoutMs || TIMEOUT_MS;
+      if (/non valido/.test(e.message)) return { ok: false, tipo, ms: ora() - t0, codice: 'indirizzo', errore: e.message };
+      if (ctrl.signal.aborted) {
+        return { ok: false, tipo, ms: ora() - t0, codice: 'timeout',
+          errore: `Lo Shelly non risponde entro ${ms} ms: spento, indirizzo IP sbagliato o su un'altra rete` };
+      }
+      return { ok: false, tipo, ms: ora() - t0, codice: 'irraggiungibile',
+        errore: `Shelly non raggiungibile: indirizzo IP sbagliato, Shelly spento o permesso "rete locale" negato in Chrome (${e.message})` };
     } finally {
       clearTimeout(timer);
     }
