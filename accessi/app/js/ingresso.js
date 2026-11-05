@@ -55,9 +55,30 @@ if (params.has('fotocamera')) {
   params.delete('fotocamera');
   history.replaceState(null, '', location.pathname + (params.size ? `?${params}` : ''));
 }
+// errori del terminale (porta non aperta) → Gestione accessi → Errori. Coda nel browser se offline.
+const CHIAVE_ERRORI = `gymin.accessi.errori.${SPAZIO}`;
+function codaErrori() { try { return JSON.parse(store.get(CHIAVE_ERRORI) || '[]'); } catch { return []; } }
+async function inviaErrori() {
+  const coda = codaErrori();
+  if (!coda.length || !data?.remoto?.errore || data.offlineAttivo?.()) return;
+  const resto = [];
+  for (const e of coda) {
+    try { await data.remoto.errore(e); } catch { resto.push(e); }
+  }
+  store.set(CHIAVE_ERRORI, resto.length ? JSON.stringify(resto.slice(-50)) : null);
+}
+function segnalaErrore(e) {
+  store.set(CHIAVE_ERRORI, JSON.stringify([...codaErrori(), e].slice(-50)));
+  inviaErrori().catch(() => {});
+}
+
 const porta = creaApriporta(configPorta(CFG, { shellyUrl: store.get(CHIAVE_SHELLY), sim: SIM }), {
   onEsito: (e) => {
-    if (!e.ok && !e.saltato) console.warn('Apertura porta non riuscita:', e.errore);
+    if (!e.ok && !e.saltato) {
+      console.warn('Apertura porta non riuscita:', e.errore);
+      segnalaErrore({ tipo: 'porta', codice: e.codice || 'altro', messaggio: `Porta non aperta: ${e.errore}`,
+        dettaglio: { shelly: porta?.url || '', ms: e.ms }, ts: new Date().toISOString() });
+    }
     aggiornaPannelloSim();
   },
 });
@@ -357,6 +378,7 @@ async function avvia() {
 function aggiornaDaPing() {
   if (!data || data.forzaOffline) return;
   data.ping().then((p) => {
+    inviaErrori().catch(() => {});
     nomeTerminale = p.nome;
     store.set(CHIAVE_NOME, p.nome);
     aggiornaStato();
