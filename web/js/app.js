@@ -2072,7 +2072,7 @@ async function controllaTornello() {
   if (!data?.length) { pill.hidden = true; box.hidden = true; return; }
   const guasti = data.map((t) => {
     const muto = Date.now() - new Date(t.tornello_controllo).getTime() > TORN_SILENZIO_MS;
-    if (muto) return `${t.nome}: il terminale d'ingresso non comunica dalle ${new Date(t.tornello_controllo).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}`;
+    if (muto) return `${t.nome}: App Ingresso spenta o senza rete dalle ${new Date(t.tornello_controllo).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}`;
     return t.tornello_ok ? null : `${t.nome}: ${t.tornello_errore || 'lo Shelly non risponde'}`;
   }).filter(Boolean);
   const ok = !guasti.length;
