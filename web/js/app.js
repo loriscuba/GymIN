@@ -1915,6 +1915,7 @@ async function caricaSezioni() {
 function applicaSezioni() {
   SEZIONI.forEach(([k]) => { const n = document.querySelector(`.nav[data-view="${k}"]`); if (n) n.hidden = sezioneNascosta(k); });
   $('#panel-ingressi').hidden = sezioneNascosta('ingressi');
+  controllaTornello().catch(() => {});
   const attiva = document.querySelector('.nav.active')?.dataset.view;
   if (attiva && sezioneNascosta(attiva)) go('dashboard');
 }
@@ -2063,6 +2064,8 @@ const tornStore = {
   set: (v) => { try { v ? localStorage.setItem(TORN_NASCOSTO, v) : localStorage.removeItem(TORN_NASCOSTO); } catch { /* niente storage */ } },
 };
 async function controllaTornello() {
+  // modulo Tessere spento per lo staff (Impostazioni → sezioni visibili): niente pallino né avviso
+  if (sezioneNascosta('tessere')) { $('#torn-stato').hidden = true; $('#torn-avviso').hidden = true; return; }
   const supa = await getSupa();
   const { data, error } = await supa.from('terminali').select('nome, tornello_ok, tornello_errore, tornello_controllo')
     .eq('attivo', true).not('tornello_controllo', 'is', null);
