@@ -22,6 +22,7 @@ export const ALTRI_CASI = [
   { codice: 'SIM0000008', descr: 'Tessera disattivata' },
   { codice: 'SIM0000009', descr: 'Non ancora attivo' },
   { codice: 'SIMXXXXXXX', descr: 'Tessera sconosciuta' },
+  { codice: 'QR00000000000000000000000000000001', descr: 'QR di Giulia (2ª volta: già usato)' },
 ];
 
 export function datiDemo(oggi = oggiRoma()) {
@@ -45,7 +46,9 @@ export function datiDemo(oggi = oggiRoma()) {
     a('a9', 's9', 'scadenza', 'Open Mese', 4, 34),
   ];
   const tessere = soci.map((x, i) => ({
-    id: `t${i + 1}`, codice: `SIM000000${i + 1}`, socio_id: x.id, attiva: x.id !== 's8',
+    id: `t${i + 1}`, codice: `SIM000000${i + 1}`, socio_id: x.id, attiva: x.id !== 's8', tipo: 'rfid',
   }));
+  // QR d'ingresso di Giulia (stesso codice nel seed di sviluppo)
+  tessere.push({ id: 'tq1', codice: 'QR00000000000000000000000000000001', socio_id: 's1', attiva: true, tipo: 'qr' });
   return { soci, abbonamenti, tessere };
 }

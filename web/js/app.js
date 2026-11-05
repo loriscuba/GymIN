@@ -284,6 +284,8 @@ function openSettingsModal() {
   $('#s-report-box').hidden = !isAdmin;
   $('#s-report-ora').required = isAdmin;
   $('#s-report-ora').value = reportOra;
+  $('#s-qr-box').hidden = !isAdmin;
+  $('#s-qr-attivo').checked = qrAttivo;
   $('#s-licenza').value = isoToLocalInput(licenzaScadenza);
   $('#s-sezioni').innerHTML = SEZIONI.map(([k, t]) => `<label style="display:flex;align-items:center;gap:8px;font-size:13.5px;cursor:pointer">
     <input type="checkbox" data-sez="${k}" ${sezioniNascoste.includes(k) ? '' : 'checked'}> ${t}</label>`).join('');
@@ -301,6 +303,7 @@ async function saveSettingsFromModal(e) {
   if (isAdmin && !(await salvaSezioni())) return;
   if (isAdmin && !(await salvaLicenza())) return;
   if (isAdmin && !(await salvaReportOra())) return;
+  if (isAdmin && !(await salvaQrAttivo())) return;
   closeModal('modal-settings');
   applyContattiRule();
   toast(isAdmin ? 'Impostazioni salvate' : 'Impostazioni salvate nel browser', 'mail');
@@ -398,6 +401,34 @@ async function sendReminderTo(sid) {
   const mail = await sendMail({ tipo: 'rinnovo', tipoLabel: 'Rinnovo', member: m, subject, html });
   reminded.add(m.sid);
   toast(mail.channel === 'mailpit' ? `Promemoria inviato a Mailpit · ${m.email}` : `Promemoria generato (anteprima) · ${m.nome}`, 'mail');
+}
+// QR d'ingresso: tessera di tipo 'qr' creata da staff_qr_socio() e inviata via email.
+// Se il socio ha già un QR, si può reinviare lo stesso oppure rigenerarlo (il vecchio smette di funzionare).
+async function inviaQrIngresso(sid) {
+  const m = DATA.members.find((x) => x.sid === sid); if (!m) return;
+  if (!m.email) { toast('Il socio non ha un indirizzo email', 'warn'); return; }
+  if (!(await askConfirm(`Inviare il QR d'ingresso a <b>${esc(m.nome)}</b> (${esc(m.email)})?`, 'Invia'))) return;
+  try {
+    const supa = await getSupa();
+    if (!supa) throw new Error('database non disponibile');
+    let { data, error } = await supa.rpc('staff_qr_socio', { p_socio_id: m.sid, p_rigenera: false });
+    if (error) throw error;
+    if (!data.nuovo && await askConfirm('Il socio ha già un QR. Vuoi <b>generarne uno nuovo</b>? Il vecchio smetterà subito di funzionare. Con <i>Annulla</i> si reinvia quello attuale.', 'Nuovo QR')) {
+      ({ data, error } = await supa.rpc('staff_qr_socio', { p_socio_id: m.sid, p_rigenera: true }));
+      if (error) throw error;
+    }
+    const codice = data.codice;
+    const { subject, html } = templates.qrIngresso(m, codice);
+    const mail = await sendMail({ tipo: 'qr', tipoLabel: 'QR ingresso', member: m, subject, html });
+    if ((window.GYMIN_CONFIG || {}).MAILER_API_URL) await sendRealMail();
+    else toast(mail.channel === 'mailpit' ? `QR inviato a Mailpit · ${m.email}` : `QR generato (anteprima in Posta) · ${m.nome}`, 'mail');
+    // l'email con il QR si apre subito: si vede cosa riceve il socio e si può già provare al terminale
+    closeModal('modal-scheda');
+    openMailPreview(MAILBOX.indexOf(mail));
+  } catch (err) {
+    console.error(errMsg(err));
+    toast(`QR non inviato: ${errMsg(err)}`, 'warn');
+  }
 }
 async function sendReminders() {
   const list = expiringList().filter((m) => m.email && !reminded.has(m.sid));
@@ -907,7 +938,7 @@ function openScheda(sid) {
       <div id="scheda-privacy">${schedaPrivacyHtml(m, null)}</div></div>
     </div>
     <div class="mfoot" style="justify-content:space-between;align-items:center">
-      <div style="display:flex;gap:8px"><button type="button" class="btn-ghost" data-close="modal-scheda">Chiudi</button><button type="button" class="btn-ghost" data-tessera="${m.sid}">Associa tessera</button></div>
+      <div style="display:flex;gap:8px"><button type="button" class="btn-ghost" data-close="modal-scheda">Chiudi</button><button type="button" class="btn-ghost" data-tessera="${m.sid}">Associa tessera</button>${qrAttivo ? `<button type="button" class="btn-ghost" data-qr="${m.sid}" title="Invia via email il QR personale da mostrare alla fotocamera del terminale">Invia QR d'ingresso</button>` : ''}</div>
       <div class="actions-cell">${actionIcons(m)}</div>
     </div>`;
   openModal('modal-scheda');
@@ -1633,6 +1664,7 @@ function wireEvents() {
   document.addEventListener('click', (e) => {
     const c = e.target.closest('[data-close]'); if (c) return closeModal(c.dataset.close);
     const ts = e.target.closest('[data-tessera]'); if (ts) return openAssociaTessera(ts.dataset.tessera);
+    const qr = e.target.closest('[data-qr]'); if (qr) return inviaQrIngresso(qr.dataset.qr);
     const planEdit = e.target.closest('[data-plan-edit]'); if (planEdit) return editPlan(planEdit.dataset.planEdit);
     const planDel = e.target.closest('[data-plan-delete]'); if (planDel) return deletePlan(planDel.dataset.planDelete);
     const ed = e.target.closest('[data-edit]'); if (ed) return openSocioModal('edit', ed.dataset.edit);
@@ -1910,6 +1942,25 @@ async function salvaReportOra() {
   reportOra = ora;
   return true;
 }
+// ---------- QR d'ingresso acceso/spento ----------
+// app_impostazioni, chiave qr_ingresso: la leggono accessi_esegui, terminale_snapshot e terminale_ping
+// (migration qr_interruttore). Spento: nella scheda socio sparisce "Invia QR d'ingresso".
+let qrAttivo = true;
+async function caricaQrAttivo() {
+  const supa = await getSupa();
+  const { data, error } = await supa.from('app_impostazioni').select('valore').eq('chiave', 'qr_ingresso').maybeSingle();
+  if (!error && typeof data?.valore?.attivo === 'boolean') qrAttivo = data.valore.attivo;
+}
+async function salvaQrAttivo() {
+  const attivo = $('#s-qr-attivo').checked;
+  if (attivo === qrAttivo) return true;
+  const supa = await getSupa();
+  const { error } = await supa.from('app_impostazioni')
+    .upsert({ chiave: 'qr_ingresso', valore: { attivo }, aggiornato_il: new Date().toISOString() });
+  if (error) { toast(`QR d'ingresso non salvato: ${error.message}`, 'warn'); return false; }
+  qrAttivo = attivo;
+  return true;
+}
 // ---------- scadenza licenza ----------
 // L'amministratore imposta data/ora da Impostazioni (app_impostazioni, chiave licenza);
 // il blocco vero e proprio è in licenza.js e vale solo per l'utente indicato lì.
@@ -1971,6 +2022,7 @@ async function setupUser() {
   $('.nav[data-view="log"]').hidden = !admin;
   $('.nav[data-view="report"]').hidden = !admin;
   if (admin) { contaReportNonLetti(); caricaReportOra().catch(() => {}); }
+  caricaQrAttivo().catch(() => {});
   $('#u-name').textContent = admin ? 'Admin' : (email.split('@')[0] || 'Utente');
   $('#u-role').textContent = admin ? 'Amministratore' : 'Staff';
   $('#u-avatar').textContent = admin ? 'AD' : (email.slice(0, 2).toUpperCase() || '—');

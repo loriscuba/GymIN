@@ -1,5 +1,9 @@
 // Template email GymIN lato frontend — identici nella resa a mailer/templates.js.
 // Usati per l'anteprima nella sezione Posta e per l'invio opzionale a Mailpit.
+import { matriceQr, tabellaQrHtml } from './qrmail.js?v=__BUILD__';
+
+// logo Kinesia a colori al centro del QR: URL assoluto del sito pubblicato (le email non vedono i percorsi relativi)
+const LOGO_URL = globalThis.location?.href ? new URL('img/logo.png', globalThis.location.href).href : null;
 const ACCENT = '#f4511e', INK = '#161b22', MUTED = '#6b7280';
 const euro = (n) => '€ ' + Number(n).toLocaleString('it-IT');
 const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -21,6 +25,18 @@ GymIN · Via dello Sport 12, Milano · +39 02 000 0000<br>Ricevi questa email co
 }
 
 export const templates = {
+  // QR d'ingresso personale (tessera di tipo 'qr', vedi accessi/README.md)
+  qrIngresso: (m, codice) => ({
+    subject: 'GymIN · il tuo QR d\'ingresso',
+    html: layout({
+      titolo: `${esc(m.nome.split(' ')[0])}, ecco il tuo QR d'ingresso`,
+      corpo: `All'ingresso <b>mostra questo QR alla fotocamera</b> del terminale: se l'abbonamento è valido la porta si apre.<br><br>
+        <div style="background:#ffffff;padding:16px;border:1px solid #e6e8ee;border-radius:12px;text-align:center">${tabellaQrHtml(matriceQr(codice), { logo: LOGO_URL })}</div>
+        <br><b>Il QR è personale:</b> non condividerlo. Lo stesso QR non può entrare due volte di seguito a poche ore di distanza.<br>
+        Consiglio: fai uno screenshot di questa email o aggiungila ai preferiti, così lo ritrovi subito anche senza connessione.<br>
+        Se lo perdi o pensi che qualcuno lo usi al posto tuo, chiedi alla reception di generarne uno nuovo: il vecchio smette subito di funzionare.`,
+    }),
+  }),
   benvenuto: (m) => ({
     subject: 'Benvenuto in GymIN! 💪',
     html: layout({
