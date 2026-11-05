@@ -284,6 +284,8 @@ function openSettingsModal() {
   $('#s-report-box').hidden = !isAdmin;
   $('#s-report-ora').required = isAdmin;
   $('#s-report-ora').value = reportOra;
+  $('#s-qr-box').hidden = !isAdmin;
+  $('#s-qr-attivo').checked = qrAttivo;
   $('#s-licenza').value = isoToLocalInput(licenzaScadenza);
   $('#s-sezioni').innerHTML = SEZIONI.map(([k, t]) => `<label style="display:flex;align-items:center;gap:8px;font-size:13.5px;cursor:pointer">
     <input type="checkbox" data-sez="${k}" ${sezioniNascoste.includes(k) ? '' : 'checked'}> ${t}</label>`).join('');
@@ -301,6 +303,7 @@ async function saveSettingsFromModal(e) {
   if (isAdmin && !(await salvaSezioni())) return;
   if (isAdmin && !(await salvaLicenza())) return;
   if (isAdmin && !(await salvaReportOra())) return;
+  if (isAdmin && !(await salvaQrAttivo())) return;
   closeModal('modal-settings');
   applyContattiRule();
   toast(isAdmin ? 'Impostazioni salvate' : 'Impostazioni salvate nel browser', 'mail');
@@ -935,7 +938,7 @@ function openScheda(sid) {
       <div id="scheda-privacy">${schedaPrivacyHtml(m, null)}</div></div>
     </div>
     <div class="mfoot" style="justify-content:space-between;align-items:center">
-      <div style="display:flex;gap:8px"><button type="button" class="btn-ghost" data-close="modal-scheda">Chiudi</button><button type="button" class="btn-ghost" data-tessera="${m.sid}">Associa tessera</button><button type="button" class="btn-ghost" data-qr="${m.sid}" title="Invia via email il QR personale da mostrare alla fotocamera del terminale">Invia QR d'ingresso</button></div>
+      <div style="display:flex;gap:8px"><button type="button" class="btn-ghost" data-close="modal-scheda">Chiudi</button><button type="button" class="btn-ghost" data-tessera="${m.sid}">Associa tessera</button>${qrAttivo ? `<button type="button" class="btn-ghost" data-qr="${m.sid}" title="Invia via email il QR personale da mostrare alla fotocamera del terminale">Invia QR d'ingresso</button>` : ''}</div>
       <div class="actions-cell">${actionIcons(m)}</div>
     </div>`;
   openModal('modal-scheda');
@@ -1939,6 +1942,25 @@ async function salvaReportOra() {
   reportOra = ora;
   return true;
 }
+// ---------- QR d'ingresso acceso/spento ----------
+// app_impostazioni, chiave qr_ingresso: la leggono accessi_esegui, terminale_snapshot e terminale_ping
+// (migration qr_interruttore). Spento: nella scheda socio sparisce "Invia QR d'ingresso".
+let qrAttivo = true;
+async function caricaQrAttivo() {
+  const supa = await getSupa();
+  const { data, error } = await supa.from('app_impostazioni').select('valore').eq('chiave', 'qr_ingresso').maybeSingle();
+  if (!error && typeof data?.valore?.attivo === 'boolean') qrAttivo = data.valore.attivo;
+}
+async function salvaQrAttivo() {
+  const attivo = $('#s-qr-attivo').checked;
+  if (attivo === qrAttivo) return true;
+  const supa = await getSupa();
+  const { error } = await supa.from('app_impostazioni')
+    .upsert({ chiave: 'qr_ingresso', valore: { attivo }, aggiornato_il: new Date().toISOString() });
+  if (error) { toast(`QR d'ingresso non salvato: ${error.message}`, 'warn'); return false; }
+  qrAttivo = attivo;
+  return true;
+}
 // ---------- scadenza licenza ----------
 // L'amministratore imposta data/ora da Impostazioni (app_impostazioni, chiave licenza);
 // il blocco vero e proprio è in licenza.js e vale solo per l'utente indicato lì.
@@ -2000,6 +2022,7 @@ async function setupUser() {
   $('.nav[data-view="log"]').hidden = !admin;
   $('.nav[data-view="report"]').hidden = !admin;
   if (admin) { contaReportNonLetti(); caricaReportOra().catch(() => {}); }
+  caricaQrAttivo().catch(() => {});
   $('#u-name').textContent = admin ? 'Admin' : (email.split('@')[0] || 'Utente');
   $('#u-role').textContent = admin ? 'Amministratore' : 'Staff';
   $('#u-avatar').textContent = admin ? 'AD' : (email.slice(0, 2).toUpperCase() || '—');

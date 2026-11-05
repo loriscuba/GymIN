@@ -27,6 +27,7 @@ const NOME_DB = `gymin-accessi-${SPAZIO}`;
 const CHIAVE_NOME = `gymin.accessi.nome.${SPAZIO}`;
 const CHIAVE_SHELLY = `gymin.accessi.shelly.${SPAZIO}`;
 const CHIAVE_FOTOCAMERA = `gymin.accessi.fotocamera.${SPAZIO}`;
+const CHIAVE_QR_ATTIVO = `gymin.accessi.qrattivo.${SPAZIO}`;   // interruttore generale da GymIN, ricordato per i riavvii offline
 
 const store = {
   get: (k) => { try { return localStorage.getItem(k); } catch { return null; } },
@@ -348,8 +349,26 @@ async function avvia() {
   await sync.aggiornaContatori();
   sync.avvia().then(() => {
     // nome del terminale per la barra di stato
-    if (data && !data.forzaOffline) data.ping().then((p) => { nomeTerminale = p.nome; store.set(CHIAVE_NOME, p.nome); aggiornaStato(); }).catch(() => {});
+    aggiornaDaPing();
   });
+  // ping periodico: segue l'interruttore del QR d'ingresso deciso in GymIN (Impostazioni)
+  setInterval(aggiornaDaPing, CFG.SYNC_INTERVALLO_MS || 60000);
+}
+function aggiornaDaPing() {
+  if (!data || data.forzaOffline) return;
+  data.ping().then((p) => {
+    nomeTerminale = p.nome;
+    store.set(CHIAVE_NOME, p.nome);
+    aggiornaStato();
+    if (typeof p.qr_attivo !== 'boolean') return;
+    const prima = store.get(CHIAVE_QR_ATTIVO) !== 'off';
+    store.set(CHIAVE_QR_ATTIVO, p.qr_attivo ? 'si' : 'off');
+    // cambiato da GymIN: la fotocamera si accende o spegne ricaricando appena il terminale è libero
+    if (prima !== p.qr_attivo) {
+      ricaricaQuandoLibero = true;
+      if (vista === 'attesa' || vista === 'nonsync') location.reload();
+    }
+  }).catch(() => {});
 }
 window.addEventListener('offline', () => { data?.segnaOffline(); aggiornaStato(); });
 
@@ -372,6 +391,8 @@ async function tieniSchermoAcceso() {
 async function avviaQr() {
   const scelta = store.get(CHIAVE_FOTOCAMERA) ?? (CFG.FOTOCAMERA ? 'si' : 'off');
   if (scelta === 'off') return;
+  // QR d'ingresso spento per tutti da GymIN (Impostazioni dell'amministratore)
+  if (store.get(CHIAVE_QR_ATTIVO) === 'off') { console.info('QR d\'ingresso disattivato da GymIN'); return; }
   try {
     const cam = await avviaFotocamera({
       video: $('#cam video'),

@@ -108,3 +108,26 @@ test('QR offline: secondo ingresso entro la finestra → registrato "da verifica
   const [{ r }] = await q('select entrate_residue r from abbonamenti where socio_id=$1', [s]);
   assert.equal(r, 4);
 });
+
+test('interruttore QR spento: il QR vale come tessera sconosciuta, esce dallo snapshot, la tessera RFID entra', async () => {
+  const s = await socioValido('Ivo');
+  const { codice } = await qrDi(s);
+  await staff((c) => c.query('select staff_assegna_tessera($1,$2)', [s, '0009998887']));
+  const snap = () => anon((c) => c.query('select terminale_snapshot($1) r', [token]).then((r) => r.rows[0].r));
+  const ping = () => anon((c) => c.query('select terminale_ping($1) r', [token]).then((r) => r.rows[0].r));
+  assert.equal((await ping()).qr_attivo, true);
+  await q(`update app_impostazioni set valore='{"attivo": false}' where chiave='qr_ingresso'`);
+  try {
+    assert.equal((await ping()).qr_attivo, false);
+    const r = await leggi(codice);
+    assert.equal(r.esito, 'negato');
+    assert.equal(r.motivo_codice, 'tessera_sconosciuta');
+    assert.equal((await leggi('0009998887')).esito, 'ok');
+    const codici = (await snap()).tessere.map((t) => t.codice);
+    assert.ok(codici.includes('0009998887'));
+    assert.ok(!codici.includes(codice));
+  } finally {
+    await q(`update app_impostazioni set valore='{"attivo": true}' where chiave='qr_ingresso'`);
+  }
+  assert.equal((await leggi(codice)).esito, 'ok');
+});
