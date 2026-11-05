@@ -7,7 +7,9 @@
 //   'shelly'→ HTTP locale verso lo Shelly (Gen2/Gen3/Gen4: RPC Switch.Set; Gen1: /relay/N)
 //
 // Il comando va in LAN, non via internet: la porta si apre anche col terminale OFFLINE.
-// La richiesta è una GET "semplice" (niente header custom, niente preflight CORS).
+// La richiesta è una GET "semplice" (niente header custom, niente preflight CORS) in modalità
+// "no-cors": lo Shelly vero non manda gli header CORS, quindi il browser non lascia leggere la
+// risposta (risposta "opaca") anche se il comando è arrivato e il relè è scattato.
 // SHELLY_URL va indicato con l'IP (http://192.168.1.50), non con un nome DNS.
 
 export const IMPULSO_S = 1;          // per quanti secondi il relè resta chiuso (serratura elettrica)
@@ -64,11 +66,14 @@ export function creaApriporta(cfg, { fetch: f = globalThis.fetch?.bind(globalThi
     try {
       const r = await f(urlApertura(cfg), {
         method: 'GET',
+        mode: 'no-cors',
         signal: ctrl.signal,
         cache: 'no-store',
         // niente targetAddressSpace: se non corrisponde alla rete vera Chrome blocca la richiesta.
         // Con un IP della LAN (192.168.x.x) Chrome riconosce da solo la "rete locale" (vedi README).
       });
+      // risposta opaca: lo Shelly ha risposto ma il browser non ne mostra il contenuto → comando arrivato
+      if (r?.type === 'opaque') return { ok: true, tipo, ms: ora() - t0 };
       if (!r.ok) return { ok: false, tipo, ms: ora() - t0, errore: `Shelly ha risposto HTTP ${r.status}` };
       return { ok: true, tipo, ms: ora() - t0 };
     } catch (e) {
