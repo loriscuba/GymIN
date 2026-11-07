@@ -164,7 +164,7 @@
   /* login */
   .login{position:fixed;inset:0;background:var(--bg);display:grid;place-items:center;z-index:60;padding:20px}
   .loginbox{background:var(--surface);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);padding:32px;max-width:380px;width:100%}
-  .loginbox .mark{margin:0 auto 16px}.loginbox h1{font-size:22px;text-align:center;font-weight:800}
+  .loginbox .mark{margin:0 auto 16px;width:72px;height:72px;border-radius:16px}.loginbox h1{font-size:22px;text-align:center;font-weight:800}
   .loginbox p{text-align:center;color:var(--ink-3);font-size:13.5px;margin:6px 0 22px}
   .loginbox label{font-size:12.5px;font-weight:600;color:var(--ink-2);display:block;margin:12px 0 5px}
   .loginbox input{width:100%;padding:11px 13px;border:1px solid var(--line);border-radius:10px;background:var(--surface-2);color:var(--ink);font-size:14px;font-family:inherit}
@@ -323,7 +323,7 @@
 <!-- login (mostrato solo se Supabase è configurato e non c'è sessione) -->
 <div class="login" id="login" hidden>
   <form class="loginbox" id="loginform">
-    <div class="mark logo"><img src="img/logo.png" alt="Kinesia"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"><path d="M6.5 7v10M17.5 7v10M4 9.5v5M20 9.5v5M6.5 12h11"/></svg></div>
+    <div class="mark logo"><img src="img/gymin-logo.svg" alt="GymIN"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"><path d="M6.5 7v10M17.5 7v10M4 9.5v5M20 9.5v5M6.5 12h11"/></svg></div>
     <h1>GymIN</h1><p>Accedi al gestionale</p>
     <label for="email">Email</label><input id="email" type="email" autocomplete="username" required>
     <label for="pwd">Password</label><input id="pwd" type="password" autocomplete="current-password" required>
@@ -336,7 +336,7 @@
   <div class="scrim" id="scrim"></div>
   <aside class="sidebar" id="sidebar">
     <div class="brand">
-      <div class="mark logo"><img src="img/logo.png" alt="Kinesia"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"><path d="M6.5 7v10M17.5 7v10M4 9.5v5M20 9.5v5M6.5 12h11"/></svg></div>
+      <div class="mark logo"><img src="img/gymin-logo.svg" alt="GymIN"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"><path d="M6.5 7v10M17.5 7v10M4 9.5v5M20 9.5v5M6.5 12h11"/></svg></div>
       <div class="brand-txt"><b>GymIN</b><small>Palestra Kinesia</small></div>
     </div>
     <div class="navlabel">Generale</div>
@@ -358,7 +358,7 @@
   <div class="main">
     <header class="topbar">
       <button class="iconbtn mobile-top" id="burger" aria-label="Menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>
-      <div class="mark logo mobile-top"><img src="img/logo.png" alt="Kinesia"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"><path d="M6.5 7v10M17.5 7v10M4 9.5v5M20 9.5v5M6.5 12h11"/></svg></div>
+      <div class="mark logo mobile-top"><img src="img/gymin-logo.svg" alt="GymIN"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"><path d="M6.5 7v10M17.5 7v10M4 9.5v5M20 9.5v5M6.5 12h11"/></svg></div>
       <div style="min-width:0"><h2 id="pg-title">Dashboard</h2><div class="sub" id="pg-sub">Panoramica attività</div></div>
       <div class="spacer"></div>
       <span class="torn-stato" id="torn-stato" hidden><span class="torn-punto"></span><span class="torn-lbl">Tornello</span></span>
