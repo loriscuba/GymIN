@@ -280,7 +280,15 @@ function populateSettingsForm() {
 function openSettingsModal() {
   populateSettingsForm();
   $('#s-sezioni-box').hidden = !isAdmin;
-  $('#s-licenza-box').hidden = !(isAdmin && IS_TEST);
+  $('#s-licenza-box').hidden = !isAdmin;
+  $('#s-report-box').hidden = !isAdmin;
+  $('#s-report-ora').required = isAdmin;
+  $('#s-report-ora').value = reportOra;
+  $('#s-qr-box').hidden = !isAdmin;
+  $('#s-qr-attivo').checked = qrAttivo;
+  $('#s-term-box').hidden = !isAdmin;
+  $('#s-term-shelly').value = termImp.shelly_url || '';
+  $('#s-term-cam').value = termImp.fotocamera || '';
   $('#s-licenza').value = isoToLocalInput(licenzaScadenza);
   $('#s-sezioni').innerHTML = SEZIONI.map(([k, t]) => `<label style="display:flex;align-items:center;gap:8px;font-size:13.5px;cursor:pointer">
     <input type="checkbox" data-sez="${k}" ${sezioniNascoste.includes(k) ? '' : 'checked'}> ${t}</label>`).join('');
@@ -296,7 +304,10 @@ async function saveSettingsFromModal(e) {
   };
   saveSettingsToStorage(form);
   if (isAdmin && !(await salvaSezioni())) return;
-  if (isAdmin && IS_TEST && !(await salvaLicenza())) return;
+  if (isAdmin && !(await salvaLicenza())) return;
+  if (isAdmin && !(await salvaReportOra())) return;
+  if (isAdmin && !(await salvaQrAttivo())) return;
+  if (isAdmin && !(await salvaTerminale())) return;
   closeModal('modal-settings');
   applyContattiRule();
   toast(isAdmin ? 'Impostazioni salvate' : 'Impostazioni salvate nel browser', 'mail');
@@ -931,7 +942,7 @@ function openScheda(sid) {
       <div id="scheda-privacy">${schedaPrivacyHtml(m, null)}</div></div>
     </div>
     <div class="mfoot" style="justify-content:space-between;align-items:center">
-      <div style="display:flex;gap:8px"><button type="button" class="btn-ghost" data-close="modal-scheda">Chiudi</button><button type="button" class="btn-ghost" data-tessera="${m.sid}">Associa tessera</button><button type="button" class="btn-ghost" data-qr="${m.sid}" title="Invia via email il QR personale da mostrare alla fotocamera del terminale">Invia QR d'ingresso</button></div>
+      <div style="display:flex;gap:8px"><button type="button" class="btn-ghost" data-close="modal-scheda">Chiudi</button><button type="button" class="btn-ghost" data-tessera="${m.sid}">Associa tessera</button>${qrAttivo ? `<button type="button" class="btn-ghost" data-qr="${m.sid}" title="Invia via email il QR personale da mostrare alla fotocamera del terminale">Invia QR d'ingresso</button>` : ''}</div>
       <div class="actions-cell">${actionIcons(m)}</div>
     </div>`;
   openModal('modal-scheda');
@@ -1029,10 +1040,9 @@ async function loadPayments() {
       const supa = await getSupa();
       if (!supa) throw new Error('Connessione Supabase non disponibile.');
       const from = periodStart(payState.period);
-      const rows = await fetchAll(supa, 'pagamenti', 'id,importo,metodo,data,socio_id,descrizione,abbonamento_id,da_verificare,abbonamento:abbonamenti(socio_id,data_scadenza,piano:piani(nome))', (q) => {
+      const rows = await fetchAll(supa, 'pagamenti', 'id,importo,metodo,data,socio_id,descrizione,abbonamento_id,abbonamento:abbonamenti(socio_id,data_scadenza,piano:piani(nome))', (q) => {
         if (from) q = q.gte('data', from.toISOString());
         if (payState.sid) q = q.eq('socio_id', payState.sid);
-        if (payState.period === 'verifica') q = q.eq('da_verificare', true);
         return q.order('data', { ascending: false });
       });
       if (key !== `${payState.period}|${payState.sid || ''}`) return;   // filtro cambiato nel frattempo
@@ -1062,7 +1072,7 @@ function renderPayments() {
     + Object.entries(perMetodo).sort((a, b) => b[1] - a[1]).map(([k, v]) => `<div class="pbox"><span>${esc(metodoLabel(k))}</span><b>${eur2(v)}</b></div>`).join('');
 
   const fmtDT = (d) => new Date(d).toLocaleString('it-IT', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-  $('#paytable tbody').innerHTML = list.map((p) => `<tr><td class="mono">${fmtDT(p.data)}</td><td>${p.m ? `<a role="button" style="cursor:pointer;font-weight:600" data-member="${esc(p.m.sid)}">${esc(p.nome)}</a>` : '—'}</td><td class="mono">${esc(p.tessera)}</td><td><span class="plan-pill">${esc(p.piano)}</span></td><td>${esc(metodoLabel(p.metodo))}</td><td class="mono" style="text-align:right">${p.da_verificare ? '<span class="tag w" title="Creato dall\'import al prezzo del piano: verifica importo e metodo">Da verificare</span> ' : ''}${eur2(p.importo)}</td><td><div class="actions-cell"><button class="ibtn edit" data-payedit="${esc(p.id)}" data-tip="Modifica pagamento" aria-label="Modifica pagamento">${editSvg}</button><button class="ibtn del" data-paydel="${esc(p.id)}" data-tip="Annulla pagamento" aria-label="Annulla pagamento">${trashSvg}</button></div></td></tr>`).join('')
+  $('#paytable tbody').innerHTML = list.map((p) => `<tr><td class="mono">${fmtDT(p.data)}</td><td>${p.m ? `<a role="button" style="cursor:pointer;font-weight:600" data-member="${esc(p.m.sid)}">${esc(p.nome)}</a>` : '—'}</td><td class="mono">${esc(p.tessera)}</td><td><span class="plan-pill">${esc(p.piano)}</span></td><td>${esc(metodoLabel(p.metodo))}</td><td class="mono" style="text-align:right">${eur2(p.importo)}</td><td><div class="actions-cell"><button class="ibtn edit" data-payedit="${esc(p.id)}" data-tip="Modifica pagamento" aria-label="Modifica pagamento">${editSvg}</button><button class="ibtn del" data-paydel="${esc(p.id)}" data-tip="Annulla pagamento" aria-label="Annulla pagamento">${trashSvg}</button></div></td></tr>`).join('')
     || '<tr><td colspan="7" style="text-align:center;color:var(--ink-3);padding:28px">Nessun pagamento nel periodo selezionato</td></tr>';
   $('#paycount').textContent = `${list.length} ${list.length === 1 ? 'pagamento' : 'pagamenti'}`;
 
@@ -1110,8 +1120,7 @@ async function submitPayEdit(e) {
   const giorno = $('#pe-data').value;
   if (!(importo > 0)) { toast('Inserisci un importo valido', 'warn'); return; }
   if (!giorno) { toast('Inserisci la data del pagamento', 'warn'); return; }
-  // salvare la modifica conferma anche un pagamento "da verificare" creato dall'import
-  const patch = { importo, metodo: $('#pe-metodo').value, descrizione: $('#pe-descr').value.trim() || null, ...(p.da_verificare && { da_verificare: false }) };
+  const patch = { importo, metodo: $('#pe-metodo').value, descrizione: $('#pe-descr').value.trim() || null };
   // la data cambia solo se è stato scelto un altro giorno (così resta l'orario originale)
   if (giorno !== new Date(p.data).toLocaleDateString('sv')) patch.data = new Date(giorno + 'T12:00:00').toISOString();
   const supa = await getSupa();
@@ -1233,8 +1242,8 @@ async function submitPagamento(e) {
 }
 
 // ---------- log attività (tabella audit_log, scritta dai trigger del database) ----------
-const LOG_TAB = { soci: 'Soci', abbonamenti: 'Abbonamenti', pagamenti: 'Pagamenti', piani: 'Piani', accessi: 'Accessi', mail_log: 'Posta', informative_privacy: 'Informative privacy', consensi_eventi: 'Privacy soci', login: 'Accessi al gestionale' };
-const LOG_OP = { INSERT: ['Nuovo', 'g'], UPDATE: ['Modifica', 'w'], DELETE: ['Eliminato', 'b'], LOGIN: ['Accesso', 'g'] };
+const LOG_TAB = { soci: 'Soci', abbonamenti: 'Abbonamenti', pagamenti: 'Pagamenti', piani: 'Piani', accessi: 'Accessi', mail_log: 'Posta', informative_privacy: 'Informative privacy', consensi_eventi: 'Privacy soci', login: 'Accessi al gestionale', errori: 'Errori' };
+const LOG_OP = { INSERT: ['Nuovo', 'g'], UPDATE: ['Modifica', 'w'], DELETE: ['Eliminato', 'b'], LOGIN: ['Accesso', 'g'], ERRORE: ['Errore', 'b'] };
 const LOG_MAX = 500;
 const logState = { period: '7', tab: '', query: '', arch: false };   // arch: true = sezione Archivio
 let logCache = null;   // { key, rows }
@@ -1367,7 +1376,7 @@ const titles = {
   dashboard: ['Dashboard', 'Panoramica attività'], anagrafiche: ['Anagrafiche soci', 'Gestione iscritti e tesseramenti'],
   abbonamenti: ['Abbonamenti', 'Listino piani e incasso ricorrente'],
   posta: ['Posta', 'Comunicazioni automatiche agli iscritti'],
-  pagamenti: ['Pagamenti', 'Riepilogo incassi'], log: ['Log attività', 'Tutte le modifiche al database, con utente e dettagli'],
+  pagamenti: ['Pagamenti', 'Riepilogo incassi'], report: ['Report', 'Riepilogo serale delle modifiche'], log: ['Log attività', 'Tutte le modifiche al database, con utente e dettagli'],
   importa: ['Import abbonamenti', 'Dal vecchio gestionale: solo abbonamenti, le anagrafiche non vengono toccate'],
   tessere: ['Tessere', 'Tessere RFID, terminale ingresso e storico accessi'],
 };
@@ -1382,6 +1391,7 @@ function go(view) {
   $('#sidebar').classList.remove('open'); $('#scrim').classList.remove('show');
   window.scrollTo(0, 0);
   if (view === 'pagamenti') loadPayments();
+  if (view === 'report') loadReport();
   if (view === 'log') { logCache = null; loadLog(); }   // ogni apertura rilegge il log aggiornato
   if (view === 'importa') renderImporta();
   // sezione Tessere: la pagina di gestione di accessi/ incorporata (caricata alla prima apertura)
@@ -1640,6 +1650,7 @@ function wireEvents() {
   $('#logtab').addEventListener('change', (e) => { logState.tab = e.target.value; loadLog(); });
   $('#logarch').addEventListener('click', (e) => { const c = e.target.closest('[data-a]'); if (!c) return; logState.arch = c.dataset.a === '1'; document.querySelectorAll('#logarch .chip').forEach((x) => x.classList.toggle('active', x === c)); loadLog(); });
   $('#btn-log-arch').addEventListener('click', toggleLogArchive);
+  $('#btn-report-ora').addEventListener('click', aggiornaReportOggi);
   let logTimer;
   $('#logsearch').addEventListener('input', (e) => { clearTimeout(logTimer); logTimer = setTimeout(() => { logState.query = e.target.value; renderLog(); }, 150); });
   $('#pagamentoform').addEventListener('submit', submitPagamento);
@@ -1836,6 +1847,54 @@ async function deletePlan(id) {
   }
 }
 
+// ---------- report serale (solo amministratore) ----------
+// Lo genera pg_cron all'orario scelto in Impostazioni (migrations report_serale, report_orario); qui si leggono e si segnano come letti.
+const repMsg = (html, color = 'var(--ink-3)') => `<tr><td colspan="6" style="text-align:center;color:${color};padding:28px">${html}</td></tr>`;
+async function contaReportNonLetti() {
+  const supa = await getSupa();
+  const { count, error } = await supa.from('report_serali').select('giorno', { count: 'exact', head: true }).is('letto_il', null);
+  $('#c-report').hidden = error || !count;   // tabella assente: niente badge
+  $('#c-report').textContent = count || '';
+}
+async function loadReport() {
+  $('#reptable tbody').innerHTML = repMsg('Caricamento…');
+  try {
+    const supa = await getSupa();
+    const { data, error } = await supa.from('report_serali').select('giorno,riepilogo,letto_il,email_inviata_il').order('giorno', { ascending: false }).limit(60);
+    if (error) throw error;
+    $('#repcount').textContent = `${data.length} report`;
+    $('#reptable tbody').innerHTML = data.length ? data.map(renderReportRow).join('') : repMsg(`Ancora nessun report: il primo arriva alle ${reportOra}.`);
+    if (data.some((r) => !r.letto_il)) { await supa.rpc('segna_report_letti'); contaReportNonLetti(); }
+  } catch (err) {
+    console.error(errMsg(err));
+    const msg = /report_serali/.test(errMsg(err)) ? 'Report non ancora attivi: esegui la migration "report_serale".' : `Errore caricamento report: ${esc(errMsg(err))}`;
+    $('#reptable tbody').innerHTML = repMsg(msg, 'var(--bad)');
+  }
+}
+function renderReportRow(r) {
+  const x = r.riepilogo || {};
+  const giorno = new Date(r.giorno + 'T12:00:00').toLocaleDateString('it-IT', { weekday: 'short', day: 'numeric', month: 'short' });
+  const abb = (x.elenco_abbonamenti || []).map((a) => `<div>${esc(a.socio || '—')} · ${esc(a.piano || '—')}</div>`).join('');
+  const pag = (x.elenco_pagamenti || []).map((p) => `<div>${esc(p.socio || '—')} · ${euro(Number(p.importo))} · ${esc(p.metodo || '')}</div>`).join('');
+  const altro = [x.soci_modificati && `${x.soci_modificati} soci modificati`, x.abbonamenti_modificati && `${x.abbonamenti_modificati} abbonamenti modificati`,
+    x.ingressi && `${x.ingressi} ingressi`, x.eliminazioni && `${x.eliminazioni} eliminazioni`].filter(Boolean).join(' · ');
+  return `<tr${r.letto_il ? '' : ' style="font-weight:600"'}><td>${esc(giorno)}${r.email_inviata_il ? ' <span class="tag b" title="Inviato per email">email</span>' : ''}</td>
+    <td>${x.nuovi_soci ?? 0}</td><td>${x.nuovi_abbonamenti ?? 0}</td><td>${x.pagamenti ?? 0} · ${euro(x.incassato || 0)}</td><td>${x.totale_modifiche ?? 0}</td>
+    <td style="font-size:12.5px">${abb}${pag}${altro ? `<div style="color:var(--ink-3)">${esc(altro)}</div>` : ''}</td></tr>`;
+}
+async function aggiornaReportOggi() {
+  try {
+    const supa = await getSupa();
+    const { error } = await supa.rpc('genera_report_serale');
+    if (error) throw error;
+    toast('Report di oggi aggiornato');
+    loadReport();
+  } catch (err) {
+    console.error(errMsg(err));
+    toast('Errore aggiornamento report: ' + errMsg(err), 'warn');
+  }
+}
+
 // il Log attività è visibile solo all'amministratore (la stessa regola è applicata dal database)
 const LOG_ADMIN = 'loriscuba@gmail.com';
 
@@ -1856,6 +1915,7 @@ async function caricaSezioni() {
 function applicaSezioni() {
   SEZIONI.forEach(([k]) => { const n = document.querySelector(`.nav[data-view="${k}"]`); if (n) n.hidden = sezioneNascosta(k); });
   $('#panel-ingressi').hidden = sezioneNascosta('ingressi');
+  controllaTornello().catch(() => {});
   const attiva = document.querySelector('.nav.active')?.dataset.view;
   if (attiva && sezioneNascosta(attiva)) go('dashboard');
 }
@@ -1869,8 +1929,66 @@ async function salvaSezioni() {
   applicaSezioni();
   return true;
 }
-// ---------- simulazione scadenza licenza (solo ambiente di test) ----------
-// L'amministratore imposta data/ora da Impostazioni (app_impostazioni, chiave licenza_test);
+// ---------- orario del report serale ----------
+// app_impostazioni, chiave report_ora: lo legge report_serale_cron (migration report_orario).
+let reportOra = '20:00';
+async function caricaReportOra() {
+  const supa = await getSupa();
+  const { data, error } = await supa.from('app_impostazioni').select('valore').eq('chiave', 'report_ora').maybeSingle();
+  if (!error && /^\d{2}:\d{2}$/.test(data?.valore?.ora || '')) reportOra = data.valore.ora;
+}
+async function salvaReportOra() {
+  const ora = $('#s-report-ora').value.slice(0, 5);
+  if (ora === reportOra) return true;
+  const supa = await getSupa();
+  const { error } = await supa.from('app_impostazioni')
+    .upsert({ chiave: 'report_ora', valore: { ora }, aggiornato_il: new Date().toISOString() });
+  if (error) { toast(`Orario del report non salvato: ${error.message}`, 'warn'); return false; }
+  reportOra = ora;
+  return true;
+}
+// ---------- QR d'ingresso acceso/spento ----------
+// app_impostazioni, chiave qr_ingresso: la leggono accessi_esegui, terminale_snapshot e terminale_ping
+// (migration qr_interruttore). Spento: nella scheda socio sparisce "Invia QR d'ingresso".
+let qrAttivo = true;
+async function caricaQrAttivo() {
+  const supa = await getSupa();
+  const { data, error } = await supa.from('app_impostazioni').select('valore').eq('chiave', 'qr_ingresso').maybeSingle();
+  if (!error && typeof data?.valore?.attivo === 'boolean') qrAttivo = data.valore.attivo;
+}
+async function salvaQrAttivo() {
+  const attivo = $('#s-qr-attivo').checked;
+  if (attivo === qrAttivo) return true;
+  const supa = await getSupa();
+  const { error } = await supa.from('app_impostazioni')
+    .upsert({ chiave: 'qr_ingresso', valore: { attivo }, aggiornato_il: new Date().toISOString() });
+  if (error) { toast(`QR d'ingresso non salvato: ${error.message}`, 'warn'); return false; }
+  qrAttivo = attivo;
+  return true;
+}
+// ---------- terminale d'ingresso: Shelly e fotocamera ----------
+// app_impostazioni, chiave terminale_ingresso: la legge terminale_ping (migration terminale_impostazioni).
+let termImp = { shelly_url: '', fotocamera: '' };
+async function caricaTerminale() {
+  const supa = await getSupa();
+  const { data, error } = await supa.from('app_impostazioni').select('valore').eq('chiave', 'terminale_ingresso').maybeSingle();
+  if (!error && data?.valore) termImp = { shelly_url: data.valore.shelly_url || '', fotocamera: data.valore.fotocamera || '' };
+}
+async function salvaTerminale() {
+  const valore = { shelly_url: $('#s-term-shelly').value.trim().replace(/\/+$/, ''), fotocamera: $('#s-term-cam').value };
+  if (valore.shelly_url && valore.shelly_url !== 'off' && !/^https?:\/\/.+/i.test(valore.shelly_url)) {
+    toast('Indirizzo Shelly non valido: scrivi ad esempio http://192.168.1.50', 'warn'); return false;
+  }
+  if (valore.shelly_url === termImp.shelly_url && valore.fotocamera === termImp.fotocamera) return true;
+  const supa = await getSupa();
+  const { error } = await supa.from('app_impostazioni')
+    .upsert({ chiave: 'terminale_ingresso', valore, aggiornato_il: new Date().toISOString() });
+  if (error) { toast(`Impostazioni del terminale non salvate: ${error.message}`, 'warn'); return false; }
+  termImp = valore;
+  return true;
+}
+// ---------- scadenza licenza ----------
+// L'amministratore imposta data/ora da Impostazioni (app_impostazioni, chiave licenza);
 // il blocco vero e proprio è in licenza.js e vale solo per l'utente indicato lì.
 const IS_TEST = (window.GYMIN_CONFIG || {}).ENV === 'test';
 let licenzaScadenza = null;   // ISO, null = nessun blocco
@@ -1882,9 +2000,8 @@ function isoToLocalInput(iso) {
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
 }
 async function caricaLicenza() {
-  if (!IS_TEST) return;
   const supa = await getSupa();
-  const { data, error } = await supa.from('app_impostazioni').select('valore').eq('chiave', 'licenza_test').maybeSingle();
+  const { data, error } = await supa.from('app_impostazioni').select('valore').eq('chiave', 'licenza').maybeSingle();
   if (error) return;
   licenzaScadenza = data?.valore?.scadenza || null;
   window.gyminLicenza?.(utenteEmail, licenzaScadenza, avvisaSblocco);
@@ -1916,7 +2033,7 @@ async function salvaLicenza() {
   const scadenza = v ? new Date(v).toISOString() : null;
   const supa = await getSupa();
   const { error } = await supa.from('app_impostazioni')
-    .upsert({ chiave: 'licenza_test', valore: { scadenza }, aggiornato_il: new Date().toISOString() });
+    .upsert({ chiave: 'licenza', valore: { scadenza }, aggiornato_il: new Date().toISOString() });
   if (error) { toast(`Scadenza licenza non salvata: ${error.message}`, 'warn'); return false; }
   licenzaScadenza = scadenza;
   return true;
@@ -1929,9 +2046,46 @@ async function setupUser() {
   isAdmin = admin;
   utenteEmail = email;
   $('.nav[data-view="log"]').hidden = !admin;
+  $('.nav[data-view="report"]').hidden = !admin;
+  if (admin) { contaReportNonLetti(); caricaReportOra().catch(() => {}); caricaTerminale().catch(() => {}); }
+  caricaQrAttivo().catch(() => {});
   $('#u-name').textContent = admin ? 'Admin' : (email.split('@')[0] || 'Utente');
   $('#u-role').textContent = admin ? 'Amministratore' : 'Staff';
   $('#u-avatar').textContent = admin ? 'AD' : (email.slice(0, 2).toUpperCase() || '—');
+}
+
+// Stato del tornello (Shelly) riportato dal terminale d'ingresso: pallino nella barra in alto e
+// avviso "Tornello offline" che il coach può nascondere (ricompare al guasto successivo).
+const TORN_CONTROLLO_MS = 30000;
+const TORN_SILENZIO_MS = 5 * 60000;            // terminale muto da 5 minuti: stato del tornello sconosciuto → offline
+const TORN_NASCOSTO = 'gymin.tornelloNascosto';
+const tornStore = {
+  get: () => { try { return localStorage.getItem(TORN_NASCOSTO); } catch { return null; } },
+  set: (v) => { try { v ? localStorage.setItem(TORN_NASCOSTO, v) : localStorage.removeItem(TORN_NASCOSTO); } catch { /* niente storage */ } },
+};
+async function controllaTornello() {
+  // modulo Tessere spento per lo staff (Impostazioni → sezioni visibili): niente pallino né avviso
+  if (sezioneNascosta('tessere')) { $('#torn-stato').hidden = true; $('#torn-avviso').hidden = true; return; }
+  const supa = await getSupa();
+  const { data, error } = await supa.from('terminali').select('nome, tornello_ok, tornello_errore, tornello_controllo')
+    .eq('attivo', true).not('tornello_controllo', 'is', null);
+  if (error) return;                             // colonne non ancora create: nessun indicatore
+  const pill = $('#torn-stato');
+  const box = $('#torn-avviso');
+  if (!data?.length) { pill.hidden = true; box.hidden = true; return; }
+  const guasti = data.map((t) => {
+    const muto = Date.now() - new Date(t.tornello_controllo).getTime() > TORN_SILENZIO_MS;
+    if (muto) return `${t.nome}: App Ingresso spenta o senza rete dalle ${new Date(t.tornello_controllo).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}`;
+    return t.tornello_ok ? null : `${t.nome}: ${t.tornello_errore || 'lo Shelly non risponde'}`;
+  }).filter(Boolean);
+  const ok = !guasti.length;
+  if (ok) tornStore.set(null);                   // tornato online: il prossimo guasto mostra di nuovo l'avviso
+  pill.hidden = false;
+  pill.classList.toggle('off', !ok);
+  pill.querySelector('.torn-lbl').textContent = ok ? 'Tornello' : 'Tornello offline';
+  pill.title = ok ? 'Tornello raggiungibile' : guasti.join('\n');
+  box.hidden = ok || tornStore.get() === '1';
+  $('#torn-avviso-motivo').textContent = guasti.join(' · ');
 }
 
 async function boot() {
@@ -1939,10 +2093,11 @@ async function boot() {
   if (!ok) return;
   try { await setupUser(); } catch (err) { console.error(errMsg(err)); }
   caricaSezioni().catch((err) => console.error(errMsg(err)));
-  if (IS_TEST) {
-    caricaLicenza().catch((err) => console.error(errMsg(err)));
-    setInterval(() => caricaLicenza().catch(() => {}), 60000);   // nuova scadenza senza ricaricare
-  }
+  caricaLicenza().catch((err) => console.error(errMsg(err)));
+  setInterval(() => caricaLicenza().catch(() => {}), 60000);   // nuova scadenza senza ricaricare
+  $('#torn-avviso-nascondi').addEventListener('click', () => { tornStore.set('1'); $('#torn-avviso').hidden = true; });
+  controllaTornello().catch(() => {});
+  setInterval(() => controllaTornello().catch(() => {}), TORN_CONTROLLO_MS);
   caricaContaTessere().catch(() => {});
   caricaContaImport().catch(() => {});
 
